@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Gestão de Docas | Separação e Carregamento</title>
+    <script>
+      // Aplica o tema salvo (ou o padrão escuro do app) antes da primeira
+      // pintura, evitando o "flash" de tema claro ao carregar.
+      (function () {
+        try {
+          var salvo = window.localStorage.getItem('doca-manager:tema');
+          var escuro = salvo ? salvo === 'dark' : true;
+          if (escuro) document.documentElement.classList.add('dark');
+        } catch (e) {
+          document.documentElement.classList.add('dark');
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

@@ -1,0 +1,32 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  @apply bg-slate-100 text-slate-800 antialiased dark:bg-slate-900 dark:text-slate-100;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  @apply bg-slate-300 rounded-full dark:bg-slate-600;
+}
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-slate-400 dark:bg-slate-500;
+}
+
+/* A impressão de etiquetas (Agrupamento e Etiquetas → Etiquetas → Imprimir)
+   não depende mais de uma regra @media print aqui: o documento impresso é
+   montado à parte e aberto numa aba própria (ver LabelGenerator.jsx), o que
+   evita depender do navegador permitir `window.print()` a partir da página
+   atual — algo que pode ser bloqueado quando o app roda dentro de um
+   iframe incorporado. */
