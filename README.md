@@ -234,3 +234,5 @@ reimpressão de etiquetas.
 - **Histórico preservado**: mesmo após a loja ser finalizada e as vagas liberadas, o registro
   da loja mantém `boxNumero`/`vagasOcupadas`/`colaboradores` para consulta e reimpressão de
   etiquetas — apenas o estado físico do box (`state.boxes`) reflete a ocupação atual.
+
+  
