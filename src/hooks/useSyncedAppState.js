@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase, SUPABASE_CONFIGURADO } from '../lib/supabaseClient';
 import { useAuth } from '../context/AuthContext';
 import { useLocalStorage } from './useLocalStorage';
+import { sincronizarBoxes, criarBoxesIniciais } from '../utils/boxLogic';
+import { hojeISO } from '../utils/dateHelpers';
 
 // Id fixo da única linha compartilhada da tabela `app_state` — o estado
 // inteiro do sistema (lojas, boxes, motoristas, carregamentos etc.) vive
@@ -14,6 +16,30 @@ const ID_ESTADO_COMPARTILHADO = 'estado-v1';
 // em sequência rápida (ex.: apontar várias lojas seguidas). A tela sempre
 // atualiza na hora (gravação é só em segundo plano).
 const ATRASO_GRAVACAO_MS = 600;
+
+// Garante que qualquer estado vindo de fora (do Supabase — outra pessoa
+// pode estar numa versão ligeiramente diferente do app, ou a linha
+// compartilhada pode ter sido criada antes de algum campo existir) tenha
+// todos os campos que o app espera, com o mesmo valor "vazio" que o
+// reducer usa (ver SINCRONIZAR_BOXES/SINCRONIZAR_CADASTROS em
+// AppContext.jsx). Sem isso, um campo ausente (ex.: contatosNotificacao)
+// quebra a tela com "Cannot read properties of undefined".
+function normalizarEstadoRecebido(dados) {
+  if (!dados || typeof dados !== 'object') return dados;
+  const placasBrutas = Array.isArray(dados.placasCadastradas) ? dados.placasCadastradas : [];
+  return {
+    ...dados,
+    lojas: Array.isArray(dados.lojas) ? dados.lojas : [],
+    protocolos: Array.isArray(dados.protocolos) ? dados.protocolos : [],
+    boxes: sincronizarBoxes(Array.isArray(dados.boxes) ? dados.boxes : criarBoxesIniciais()),
+    diaAtual: dados.diaAtual || hojeISO(),
+    colaboradoresCadastrados: Array.isArray(dados.colaboradoresCadastrados) ? dados.colaboradoresCadastrados : [],
+    motoristasCadastrados: Array.isArray(dados.motoristasCadastrados) ? dados.motoristasCadastrados : [],
+    placasCadastradas: placasBrutas.map((p) => (typeof p === 'string' ? { placa: p, possuiPlataforma: false } : p)),
+    contatosNotificacao: Array.isArray(dados.contatosNotificacao) ? dados.contatosNotificacao : [],
+    localizacaoLojas: Array.isArray(dados.localizacaoLojas) ? dados.localizacaoLojas : [],
+  };
+}
 
 /**
  * Substituto de useLocalStorage que, com o Supabase configurado (site
@@ -71,7 +97,7 @@ function useEstadoSincronizado(estadoLocal, setEstadoLocal) {
       .upsert(
         {
           id: ID_ESTADO_COMPARTILHADO,
-          dados,
+          dados: normalizarEstadoRecebido(dados),
           atualizado_em: agora,
           atualizado_por: idUsuarioRef.current,
         },
@@ -106,7 +132,7 @@ function useEstadoSincronizado(estadoLocal, setEstadoLocal) {
         }
         if (data) {
           ultimoTimestampAplicadoRef.current = data.atualizado_em;
-          setEstadoLocal(data.dados);
+          setEstadoLocal(normalizarEstadoRecebido(data.dados));
         } else {
           // Primeira vez que o sistema roda com Supabase: publica o estado
           // atual (o que já estava salvo localmente) como ponto de partida
@@ -132,7 +158,7 @@ function useEstadoSincronizado(estadoLocal, setEstadoLocal) {
             return;
           }
           ultimoTimestampAplicadoRef.current = novo.atualizado_em;
-          setEstadoLocal(novo.dados);
+          setEstadoLocal(normalizarEstadoRecebido(novo.dados));
         }
       )
       .subscribe();
