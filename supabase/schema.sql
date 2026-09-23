@@ -75,3 +75,10 @@ drop policy if exists "Usuário logado insere o estado" on public.app_state;
 create policy "Usuário logado insere o estado"
   on public.app_state for insert
   with check (auth.role() = 'authenticated');
+
+-- Fase B agora em uso: publica as mudanças de app_state em tempo real, pra
+-- que o Supabase Realtime avise instantaneamente todos os navegadores
+-- conectados quando alguém grava um novo estado (ver
+-- src/hooks/useSyncedAppState.js). Sem isso a tabela funciona normalmente,
+-- mas ninguém recebe as atualizações dos outros sem recarregar a página.
+alter publication supabase_realtime add table public.app_state;

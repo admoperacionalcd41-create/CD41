@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { useLocalStorage } from '../hooks/useLocalStorage';
+import { useSyncedAppState } from '../hooks/useSyncedAppState';
 import { gerarDadosIniciais } from '../data/mockData';
 import { gerarId } from '../utils/idGenerator';
 import { hojeISO, somarDias } from '../utils/dateHelpers';
@@ -916,7 +916,7 @@ function aplicarAcao(state, acao) {
 }
 
 export function AppProvider({ children }) {
-  const [state, setState] = useLocalStorage(CHAVE_STORAGE, () => gerarDadosIniciais());
+  const [state, setState] = useSyncedAppState(CHAVE_STORAGE, () => gerarDadosIniciais());
 
   // Filtro global de Tipo de Carga (Seca/Resfriada/Todos), selecionado no
   // cabeçalho e válido em todas as abas (exceto Cadastros, que não lista
