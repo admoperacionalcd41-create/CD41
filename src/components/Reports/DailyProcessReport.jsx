@@ -67,10 +67,11 @@ export default function DailyProcessReport() {
         // O que ainda falta (apontamento ou carregamento) aparece primeiro,
         // pra chamar atenção logo de cara — igual ao relatório de meta.
         if (a.completo !== b.completo) return a.completo ? 1 : -1;
-        return (a.loja.carga || a.loja.loja).localeCompare(b.loja.carga || b.loja.loja, 'pt-BR', {
-          numeric: true,
-          sensitivity: 'base',
-        });
+        // Ordenado pela LOJA (código físico da loja), não pela carga — é
+        // por loja que o supervisor procura na lista, e é o código de loja
+        // que se repete de forma previsível dia a dia (a carga muda a cada
+        // importação).
+        return a.loja.loja.localeCompare(b.loja.loja, 'pt-BR', { numeric: true, sensitivity: 'base' });
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.lojas, state.protocolos, state.diaAtual, filtroTipoCarga]);
@@ -132,7 +133,7 @@ export default function DailyProcessReport() {
             <table className="w-full text-left text-xs">
               <thead className="text-slate-500 dark:text-slate-400">
                 <tr className="border-b border-slate-100 dark:border-slate-700">
-                  <th className="py-2 pr-3 font-semibold">Carga / Loja</th>
+                  <th className="py-2 pr-3 font-semibold">Loja</th>
                   <th className="px-2 py-2 font-semibold">Status atual</th>
                   <th className="px-2 py-2 text-center font-semibold">Apontamento</th>
                   <th className="px-2 py-2 text-center font-semibold">Carregamento</th>
@@ -150,12 +151,11 @@ export default function DailyProcessReport() {
                     >
                       <td className="py-2 pr-3">
                         <div className="flex items-center gap-1.5">
-                          <span className="font-semibold text-slate-700 dark:text-slate-200">{loja.carga}</span>
+                          <span className="font-mono font-semibold text-slate-700 dark:text-slate-200">{loja.loja}</span>
+                          <span className="text-slate-500 dark:text-slate-400">{loja.nomeLoja}</span>
                           <TipoCargaBadge tipo={loja.tipoCarga} />
                         </div>
-                        <div className="text-slate-400 dark:text-slate-500">
-                          Loja {loja.loja} — {loja.nomeLoja}
-                        </div>
+                        <div className="text-slate-400 dark:text-slate-500">Carga {loja.carga}</div>
                       </td>
                       <td className="px-2 py-2">
                         <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${status.corBadge}`}>
