@@ -4,8 +4,8 @@ import { supabase, SUPABASE_CONFIGURADO } from '../lib/supabaseClient';
 const AuthContext = createContext(null);
 
 // Controla login/sessão (Supabase Auth) e o perfil de acesso do usuário
-// logado (tabela `profiles`, com o campo `grupo`: 'motorista' |
-// 'administrativo' — ver supabase/schema.sql). Não há cadastro público: as contas
+// logado (tabela `profiles`, com o campo `grupo`: 'motorista' | 'operacao'
+// | 'gestao' — ver supabase/schema.sql). Não há cadastro público: as contas
 // são criadas manualmente por quem administra o sistema (Supabase
 // dashboard, ou futuramente um painel próprio em Cadastros), então este
 // contexto só cuida de entrar/sair e descobrir o grupo de quem já tem

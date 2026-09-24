@@ -17,7 +17,8 @@ import { useAuth } from '../../context/AuthContext.jsx';
 
 const ROTULO_GRUPO = {
   motorista: 'Motorista',
-  administrativo: 'Administrativo',
+  operacao: 'Operação',
+  gestao: 'Gestão',
 };
 
 const ICONES = {

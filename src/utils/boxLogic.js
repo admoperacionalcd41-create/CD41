@@ -377,3 +377,80 @@ export function getResumoBox(box, lojasPorId) {
     lojasIds,
   };
 }
+
+// Mesmos dois grupos de ORDEM_STATUS_NO_BOX acima, usados por compactarBox
+// pra saber de que lado do box (crescente a partir da vaga 1, ou
+// decrescente a partir da última) cada loja deve ocupar.
+const STATUS_CRESCENTE_NO_BOX = new Set(['apontada', 'conferencia_finalizada', 'em_agrupamento']);
+const STATUS_DECRESCENTE_NO_BOX = new Set(['agrupada', 'carregando']);
+
+/**
+ * Reempacota as vagas ocupadas de um box, fechando os "buracos" que sobram
+ * quando uma loja no meio da fila termina e libera vagas: as lojas que
+ * ficam continuam plantadas exatamente nos números que tinham antes, ainda
+ * que agora sobre um vão livre entre elas e a borda do box, deixando a
+ * ocupação visualmente fora de ordem mesmo com cada loja numa quantidade de
+ * vagas correta.
+ *
+ * Preserva sempre a QUANTIDADE de vagas de cada loja (nunca muda quantos
+ * paletes uma loja está ocupando) — só reorganiza as posições, seguindo a
+ * mesma regra de preenchimento de sempre e a mesma ordem de exibição de
+ * `ordenarLojasDoBox`: Em Execução, Conferência Finalizada e Agrupando a
+ * partir da vaga 1 pra cima; Agrupada e Em Carregamento a partir da última
+ * vaga pra baixo. Idempotente — um box já compacto (sem vãos) sai
+ * exatamente igual, então pode ser chamada depois de qualquer ação sem
+ * custo quando nada mudou.
+ *
+ * Por segurança, se alguma loja ocupando vaga estiver em um status que não
+ * é nem um dos "crescentes" nem um dos "decrescentes" acima (não deveria
+ * acontecer — só essas cinco etapas ocupam vaga), não mexe em nada no box.
+ */
+export function compactarBox(box, lojasPorId) {
+  const contagemPorLoja = new Map();
+  for (const v of box.vagas) {
+    if (v.ocupada && v.lojaId) {
+      contagemPorLoja.set(v.lojaId, (contagemPorLoja.get(v.lojaId) || 0) + 1);
+    }
+  }
+  if (contagemPorLoja.size === 0) return box;
+
+  const lojasIds = [...contagemPorLoja.keys()];
+  const statusDesconhecido = lojasIds.some((id) => {
+    const status = lojasPorId?.[id]?.status;
+    return !STATUS_CRESCENTE_NO_BOX.has(status) && !STATUS_DECRESCENTE_NO_BOX.has(status);
+  });
+  if (statusDesconhecido) return box;
+
+  const ordenadas = ordenarLojasDoBox(lojasIds, lojasPorId);
+  const crescentes = ordenadas.filter((id) => STATUS_CRESCENTE_NO_BOX.has(lojasPorId[id].status));
+  const decrescentes = ordenadas.filter((id) => STATUS_DECRESCENTE_NO_BOX.has(lojasPorId[id].status));
+
+  const novaVagaPorLoja = new Map();
+  let cursorBaixo = 1;
+  for (const id of crescentes) {
+    const quantidade = contagemPorLoja.get(id);
+    for (let i = 0; i < quantidade; i += 1) {
+      novaVagaPorLoja.set(cursorBaixo, id);
+      cursorBaixo += 1;
+    }
+  }
+  let cursorAlto = box.totalVagas;
+  for (const id of decrescentes) {
+    const quantidade = contagemPorLoja.get(id);
+    for (let i = 0; i < quantidade; i += 1) {
+      novaVagaPorLoja.set(cursorAlto, id);
+      cursorAlto -= 1;
+    }
+  }
+
+  const inalterado = box.vagas.every((v) => (novaVagaPorLoja.get(v.numero) || null) === (v.lojaId || null));
+  if (inalterado) return box;
+
+  return {
+    ...box,
+    vagas: box.vagas.map((v) => {
+      const lojaId = novaVagaPorLoja.get(v.numero) || null;
+      return lojaId ? { numero: v.numero, ocupada: true, lojaId } : { numero: v.numero, ocupada: false, lojaId: null };
+    }),
+  };
+}

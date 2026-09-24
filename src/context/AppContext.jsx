@@ -14,6 +14,7 @@ import {
   reocuparVagas,
   vagasIndisponiveisParaReocupar,
   sincronizarBoxes,
+  compactarBox,
   getNomeBox,
 } from '../utils/boxLogic';
 
@@ -57,7 +58,7 @@ const CHAVE_STORAGE = 'doca-manager:estado-v1';
 
 const AppStateContext = createContext(null);
 
-function aplicarAcao(state, acao) {
+function aplicarAcaoInterna(state, acao) {
   switch (acao.tipo) {
     case 'IMPORTAR_LOJAS': {
       const novasLojas = acao.payload.map((registro) => ({
@@ -1022,6 +1023,62 @@ function aplicarAcao(state, acao) {
     default:
       return state;
   }
+}
+
+// Depois de qualquer ação que tenha alterado as vagas de um ou mais boxes
+// (uma loja liberou vagas ao sair do box, foi movida, teve o apontamento
+// cancelado etc.), reempacota esses boxes específicos com `compactarBox` —
+// fecha os vãos que sobram no meio da fila quando uma loja termina e libera
+// vagas, deixando as lojas que ficaram exatamente nas mesmas quantidades,
+// mas nos números certos (ver comentário de compactarBox em boxLogic.js).
+// Só mexe nos boxes que realmente mudaram nesta ação (evita trabalho à toa
+// nas dezenas de ações que não tocam vaga nenhuma) e sincroniza de volta
+// `vagasOcupadas` de cada loja afetada, já que essa lista é usada ao
+// cancelar um protocolo de carregamento (ver reocuparVagas acima).
+function compactarBoxesAfetados(state, numerosBoxesAfetados) {
+  const lojasPorId = Object.fromEntries(state.lojas.map((l) => [l.id, l]));
+
+  let algumBoxMudou = false;
+  const novosBoxes = state.boxes.map((box) => {
+    if (!numerosBoxesAfetados.has(box.numero)) return box;
+    const compactado = compactarBox(box, lojasPorId);
+    if (compactado !== box) algumBoxMudou = true;
+    return compactado;
+  });
+  if (!algumBoxMudou) return state;
+
+  const novasVagasPorLoja = new Map();
+  for (const box of novosBoxes) {
+    if (!numerosBoxesAfetados.has(box.numero)) continue;
+    for (const v of box.vagas) {
+      if (v.ocupada && v.lojaId) {
+        if (!novasVagasPorLoja.has(v.lojaId)) novasVagasPorLoja.set(v.lojaId, []);
+        novasVagasPorLoja.get(v.lojaId).push(v.numero);
+      }
+    }
+  }
+
+  return {
+    ...state,
+    boxes: novosBoxes,
+    lojas: state.lojas.map((l) => {
+      const vagas = novasVagasPorLoja.get(l.id);
+      return vagas ? { ...l, vagasOcupadas: vagas.sort((a, b) => a - b) } : l;
+    }),
+  };
+}
+
+function aplicarAcao(state, acao) {
+  const resultado = aplicarAcaoInterna(state, acao);
+  if (resultado.boxes === state.boxes) return resultado;
+
+  const numerosBoxesAfetados = new Set();
+  resultado.boxes.forEach((box, i) => {
+    if (box !== state.boxes[i]) numerosBoxesAfetados.add(box.numero);
+  });
+  if (numerosBoxesAfetados.size === 0) return resultado;
+
+  return compactarBoxesAfetados(resultado, numerosBoxesAfetados);
 }
 
 export function AppProvider({ children }) {

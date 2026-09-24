@@ -4,7 +4,7 @@ import { useApp } from '../../context/AppContext.jsx';
 import { formatarHora, formatarDuracao, paraDataHoraLocalInput, deDataHoraLocalInput } from '../../utils/dateHelpers';
 import TipoCargaBadge from '../Shared/TipoCargaBadge.jsx';
 import { lojaPassaFiltroTipoCarga } from '../../utils/tipoCarga';
-import { calcularDistanciaMetros, formatarDistancia, RAIO_GEOFENCE_METROS } from '../../utils/geo';
+import { calcularDistanciaMetros, formatarDistancia, RAIO_GEOFENCE_METROS, buscarEnderecoPorCoordenada } from '../../utils/geo';
 
 // Tela simples para uso dos motoristas: digitam o próprio nome e veem as
 // lojas de entrega dos carregamentos feitos por eles, com um botão grande
@@ -23,6 +23,11 @@ export default function DriversPage() {
   const [motoristaDigitado, setMotoristaDigitado] = useState('');
   const [motoristaBuscado, setMotoristaBuscado] = useState(null);
   const [posicaoAtual, setPosicaoAtual] = useState(null);
+  // Endereço da rua já resolvido (geocodificação reversa) pra posição atual
+  // do GPS — mantido em segundo plano (ver useEffect abaixo) pra já estar
+  // pronto quando o motorista tocar em "Registrar Chegada/Saída", sem
+  // atrasar o toque esperando a rede.
+  const [enderecoAtual, setEnderecoAtual] = useState(null);
   // 'inativo' | 'buscando' | 'ativo' | 'negado' | 'indisponivel'
   const [statusLocalizacao, setStatusLocalizacao] = useState('inativo');
 
@@ -106,12 +111,37 @@ export default function DriversPage() {
     return () => navigator.geolocation.clearWatch(watchId);
   }, [temEntregaPendente]);
 
+  // Resolve o endereço da rua (geocodificação reversa) em segundo plano
+  // sempre que a posição do GPS muda o suficiente (arredondado a ~11 m, pra
+  // não disparar uma busca nova a cada tremulação do GPS parado). Guarda
+  // contra resposta atrasada de uma posição antiga sobrescrever um endereço
+  // mais novo (`ignorar` no cleanup). Falha silenciosa (ver
+  // buscarEnderecoPorCoordenada) — sem internet ou serviço fora do ar, o
+  // registro continua funcionando normalmente, só sem endereço anexado.
+  useEffect(() => {
+    if (!posicaoAtual) {
+      setEnderecoAtual(null);
+      return undefined;
+    }
+    let ignorar = false;
+    buscarEnderecoPorCoordenada(posicaoAtual.latitude, posicaoAtual.longitude).then((endereco) => {
+      if (!ignorar && endereco) setEnderecoAtual(endereco);
+    });
+    return () => {
+      ignorar = true;
+    };
+  }, [
+    posicaoAtual && Math.round(posicaoAtual.latitude * 10000),
+    posicaoAtual && Math.round(posicaoAtual.longitude * 10000),
+  ]);
+
   // Registra chegada/saída anexando a posição do GPS já disponível (a
   // mesma usada pro destaque do botão) — sem posição (GPS desligado, sem
   // permissão, ou ainda buscando), registra normalmente, só sem localização
   // anexada, pra nunca travar o motorista por causa disso.
   function aoRegistrar(acaoFn, protocoloId) {
-    acaoFn(protocoloId, undefined, posicaoAtual || undefined);
+    const localizacao = posicaoAtual ? { ...posicaoAtual, endereco: enderecoAtual || null } : undefined;
+    acaoFn(protocoloId, undefined, localizacao);
   }
 
   function urlMapa(localizacao) {
@@ -236,9 +266,11 @@ export default function DriversPage() {
                             href={urlMapa(entrega.localizacaoChegada)}
                             target="_blank"
                             rel="noreferrer"
-                            className="ml-1.5 inline-flex items-center gap-0.5 text-brand-600 hover:underline dark:text-brand-400"
+                            title="Abrir no mapa"
+                            className="ml-1.5 inline-flex items-center gap-1 text-brand-600 hover:underline dark:text-brand-400"
                           >
-                            <MapPin size={11} /> mapa
+                            <MapPin size={11} className="flex-shrink-0" />
+                            {entrega.localizacaoChegada.endereco || 'mapa'}
                           </a>
                         )}
                       </span>
@@ -252,9 +284,11 @@ export default function DriversPage() {
                             href={urlMapa(entrega.localizacaoSaida)}
                             target="_blank"
                             rel="noreferrer"
-                            className="ml-1.5 inline-flex items-center gap-0.5 text-brand-600 hover:underline dark:text-brand-400"
+                            title="Abrir no mapa"
+                            className="ml-1.5 inline-flex items-center gap-1 text-brand-600 hover:underline dark:text-brand-400"
                           >
-                            <MapPin size={11} /> mapa
+                            <MapPin size={11} className="flex-shrink-0" />
+                            {entrega.localizacaoSaida.endereco || 'mapa'}
                           </a>
                         )}
                       </span>

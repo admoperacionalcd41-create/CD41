@@ -26,3 +26,49 @@ export function formatarDistancia(metros) {
   if (metros < 1000) return `${Math.round(metros)} m`;
   return `${(metros / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} km`;
 }
+
+// Monta um endereço curto (rua, número - bairro - cidade) a partir da
+// resposta de geocodificação reversa do Nominatim (OpenStreetMap) — usado
+// no lugar de coordenadas cruas no registro de chegada/saída do motorista
+// (ver DriversPage.jsx). Cai pro `display_name` completo quando os campos
+// estruturados de endereço vêm incompletos.
+function formatarEnderecoNominatim(dados) {
+  const endereco = dados?.address || {};
+  const rua = [
+    endereco.road || endereco.pedestrian || endereco.footway || endereco.residential,
+    endereco.house_number,
+  ]
+    .filter(Boolean)
+    .join(', ');
+  const bairro = endereco.suburb || endereco.neighbourhood || endereco.city_district;
+  const cidade = endereco.city || endereco.town || endereco.village || endereco.municipality;
+  const partes = [rua, bairro, cidade].filter(Boolean);
+  if (partes.length > 0) return partes.join(' - ');
+  return dados?.display_name || null;
+}
+
+/**
+ * Busca o endereço da rua a partir de uma coordenada (geocodificação
+ * reversa), usando a API pública e gratuita do Nominatim/OpenStreetMap —
+ * não precisa de chave de API. Nunca lança erro: sem internet (ex.: a
+ * prévia interativa publicada como artifact, que bloqueia chamadas de rede
+ * externas), serviço fora do ar ou demora demais, retorna `null` — o
+ * chamador cai de volta para exibir as coordenadas cruas, sem travar o
+ * registro de chegada/saída por causa disso.
+ */
+export async function buscarEnderecoPorCoordenada(latitude, longitude) {
+  try {
+    const controlador = new AbortController();
+    const timeoutId = setTimeout(() => controlador.abort(), 6000);
+    const resposta = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`,
+      { signal: controlador.signal, headers: { Accept: 'application/json' } }
+    );
+    clearTimeout(timeoutId);
+    if (!resposta.ok) return null;
+    const dados = await resposta.json();
+    return formatarEnderecoNominatim(dados);
+  } catch {
+    return null;
+  }
+}
