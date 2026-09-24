@@ -18,12 +18,17 @@ import { SUPABASE_CONFIGURADO } from './lib/supabaseClient';
 
 // `grupos` lista quem pode ver cada aba — motorista só tem acesso à tela
 // que ele realmente usa no dia a dia (registrar chegada/saída);
-// administrativo tem acesso total, incluindo dashboard, operação,
-// relatórios, cadastros e importação de dados.
+// administrativo tem acesso total, incluindo operação, relatórios,
+// cadastros e importação de dados.
+//
+// A aba Dashboard fica oculta do menu por escolha do usuário (o
+// componente/rota continuam existindo em renderConteudo, caso precise
+// voltar — basta reinserir a entrada aqui). "Boxes & Vagas" é a primeira
+// da lista de propósito: é ela que abre por padrão ao entrar no app (ver
+// useEffect logo abaixo, que sempre cai na primeira aba permitida).
 export const ABAS = [
-  { chave: 'dashboard', rotulo: 'Dashboard', grupos: ['administrativo'] },
-  { chave: 'agrupamento', rotulo: 'Agrupamento & Etiquetas', grupos: ['administrativo'] },
   { chave: 'boxes', rotulo: 'Boxes & Vagas', grupos: ['administrativo'] },
+  { chave: 'agrupamento', rotulo: 'Agrupamento & Etiquetas', grupos: ['administrativo'] },
   { chave: 'carregamento', rotulo: 'Carregamento', grupos: ['administrativo'] },
   { chave: 'motoristas', rotulo: 'Motoristas', grupos: ['motorista', 'administrativo'] },
   { chave: 'relatorios', rotulo: 'Relatórios', grupos: ['administrativo'] },

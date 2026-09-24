@@ -335,6 +335,7 @@ export function parseDadosColados(texto) {
       paletesPlanejados: paletesInformados && paletesInformados > 0 ? paletesInformados : 0,
       paletesAgrupados: 0,
       paletesNoAgrupamento: 0,
+      paletesApontados: 0,
       status: 'pendente',
       boxNumero: null,
       vagasOcupadas: [],

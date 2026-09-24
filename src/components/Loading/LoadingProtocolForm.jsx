@@ -15,6 +15,18 @@ function descricaoPalete(l, numero) {
   return composicao && composicao.trim() ? `${numero} (lotes ${composicao.trim()})` : `${numero}`;
 }
 
+// Quantos números de palete mostrar na marcação de saldo: sempre a
+// quantidade ESTIMADA no Apontamento (Etapa 1 — reserva rápida das vagas,
+// antes da conferência física), não a quantidade final reconfirmada na
+// Conclusão do Agrupamento (`paletesAgrupados`, que normalmente é menor,
+// já que os agrupadores costumam juntar lotes num palete só). O saldo é
+// sempre descrito pela numeração original do apontamento (ver
+// AppContext.jsx, campo `paletesApontados`). O fallback cobre lojas
+// salvas antes desse campo existir.
+function numerosParaMarcarSaldo(l) {
+  return l.paletesApontados > 0 ? l.paletesApontados : l.paletesAgrupados;
+}
+
 // Aceita `lojas` (array): 1 item usa o fluxo tradicional de protocolo único,
 // com suporte a envio parcial/saldo; 2+ itens registram um único protocolo
 // (mesma placa/motorista/lacres) cobrindo todas as lojas selecionadas, que
@@ -259,7 +271,7 @@ export default function LoadingProtocolForm({ lojas, aoFechar, aoRegistrar }) {
                             Marque o(s) palete(s) (número da etiqueta) que fica(m) no {getNomeBox(l.boxNumero)}:
                           </p>
                           <div className="flex flex-wrap gap-1">
-                            {Array.from({ length: l.paletesAgrupados }, (_, i) => i + 1).map((numero) => {
+                            {Array.from({ length: numerosParaMarcarSaldo(l) }, (_, i) => i + 1).map((numero) => {
                               const marcado = restantesLoja.includes(numero);
                               return (
                                 <button
@@ -410,7 +422,7 @@ export default function LoadingProtocolForm({ lojas, aoFechar, aoRegistrar }) {
                 Marque o(s) palete(s) (número da etiqueta) que fica(m) no {getNomeBox(loja.boxNumero)}:
               </p>
               <div className="flex flex-wrap gap-1.5">
-                {Array.from({ length: loja.paletesAgrupados }, (_, i) => i + 1).map((numero) => {
+                {Array.from({ length: numerosParaMarcarSaldo(loja) }, (_, i) => i + 1).map((numero) => {
                   const marcado = loteRestante.includes(numero);
                   return (
                     <button

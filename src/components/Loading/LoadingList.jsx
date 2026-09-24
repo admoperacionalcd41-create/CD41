@@ -16,6 +16,9 @@ export default function LoadingList({ aoAbrirProtocolo }) {
   const [selecionadas, setSelecionadas] = useState([]);
   // id do protocolo com o "Cancelar?" em confirmação na tabela abaixo.
   const [confirmandoCancelamento, setConfirmandoCancelamento] = useState(null);
+  // id da loja com o "Cancelar carregamento?" em confirmação na lista "Em
+  // Carregamento" (desfaz o "Iniciar Carregamento", volta pra Agrupada).
+  const [confirmandoCancelamentoInicio, setConfirmandoCancelamentoInicio] = useState(null);
   // null = nada a mostrar; 'ok' = impressão preparada (mostra dica de Ctrl+P);
   // 'erro' = falha real ao preparar o conteúdo para impressão.
   const [statusImpressao, setStatusImpressao] = useState(null);
@@ -112,6 +115,12 @@ export default function LoadingList({ aoAbrirProtocolo }) {
     setConfirmandoCancelamento(null);
   }
 
+  function aoCancelarInicioCarregamento(lojaId) {
+    actions.cancelarInicioCarregamento(lojaId);
+    setConfirmandoCancelamentoInicio(null);
+    setSelecionadas((prev) => prev.filter((id) => id !== lojaId));
+  }
+
   return (
     <div className="space-y-6">
       <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
@@ -192,12 +201,42 @@ export default function LoadingList({ aoAbrirProtocolo }) {
                     </p>
                   </div>
                 </div>
-                <button
-                  onClick={() => aoAbrirProtocolo([loja])}
-                  className="flex items-center gap-1.5 rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700"
-                >
-                  <FileSignature size={14} /> Registrar Protocolo
-                </button>
+                {confirmandoCancelamentoInicio === loja.id ? (
+                  <div className="flex items-center gap-1.5 rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-xs dark:border-amber-700 dark:bg-amber-900/40">
+                    <span className="text-amber-700 dark:text-amber-300">Cancelar carregamento?</span>
+                    <button
+                      type="button"
+                      onClick={() => aoCancelarInicioCarregamento(loja.id)}
+                      className="rounded bg-amber-600 px-2 py-0.5 font-medium text-white hover:bg-amber-700"
+                    >
+                      Sim
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmandoCancelamentoInicio(null)}
+                      className="rounded px-2 py-0.5 font-medium text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700"
+                    >
+                      Não
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setConfirmandoCancelamentoInicio(loja.id)}
+                      title="Cancelar o início do carregamento — a loja volta para Agrupada"
+                      className="flex items-center gap-1.5 rounded-md border border-red-200 px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 dark:border-red-900/60 dark:text-red-400 dark:hover:bg-red-950/40"
+                    >
+                      <Ban size={14} /> Cancelar
+                    </button>
+                    <button
+                      onClick={() => aoAbrirProtocolo([loja])}
+                      className="flex items-center gap-1.5 rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700"
+                    >
+                      <FileSignature size={14} /> Registrar Protocolo
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
 

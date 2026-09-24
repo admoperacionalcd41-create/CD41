@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { ClipboardPaste, CheckCircle2, AlertCircle, Trash2, FileSpreadsheet, Download } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { ClipboardPaste, CheckCircle2, AlertCircle, Trash2, FileSpreadsheet, Download, Search, Ban } from 'lucide-react';
 import { useApp } from '../../context/AppContext.jsx';
 import { parseDadosColados, MODELO_EXEMPLO } from '../../utils/parseImport';
 import { formatarDataHora } from '../../utils/dateHelpers';
@@ -22,6 +22,10 @@ export default function DataImport() {
   // vez por lote colado (seca OU resfriada), e ela é aplicada a todas as
   // lojas desse lote na importação. Ver utils/tipoCarga.js.
   const [tipoCarga, setTipoCarga] = useState('seca');
+  // Busca (por carga, loja ou nome) e confirmação de exclusão na lista de
+  // lojas importadas por engano, mais abaixo.
+  const [buscaExcluir, setBuscaExcluir] = useState('');
+  const [confirmandoExclusao, setConfirmandoExclusao] = useState(null);
 
   function processar() {
     const res = parseDadosColados(texto);
@@ -33,6 +37,33 @@ export default function DataImport() {
     actions.importarLojas(resultado.registros.map((r) => ({ ...r, tipoCarga })));
     setTexto('');
     setResultado(null);
+  }
+
+  // Lojas ainda "pendente" — ou seja, que ainda não passaram pelo
+  // Apontamento de Box (Etapa 1 do Agrupamento & Etiquetas: a reserva
+  // rápida das vagas antes da conferência física, ver GroupingForm.jsx) —
+  // só essas podem ser excluídas aqui, pra nunca deixar vaga ou protocolo
+  // órfão (ver EXCLUIR_LOJA em AppContext.jsx). Uma loja que já teve o
+  // Apontamento de Box feito precisa ser cancelada nas telas de
+  // Agrupamento/Carregamento antes (o que a devolve pra pendente).
+  const pendentes = useMemo(
+    () => state.lojas.filter((l) => l.status === 'pendente'),
+    [state.lojas]
+  );
+  const pendentesFiltradas = useMemo(() => {
+    const termo = buscaExcluir.trim().toLowerCase();
+    if (!termo) return pendentes;
+    return pendentes.filter(
+      (l) =>
+        l.loja?.toLowerCase().includes(termo) ||
+        l.carga?.toLowerCase().includes(termo) ||
+        l.nomeLoja?.toLowerCase().includes(termo)
+    );
+  }, [pendentes, buscaExcluir]);
+
+  function aoExcluirLoja(lojaId) {
+    actions.excluirLoja(lojaId);
+    setConfirmandoExclusao(null);
   }
 
   async function exportarExcel() {
@@ -120,6 +151,85 @@ export default function DataImport() {
             Usar exemplo
           </button>
         </div>
+      </div>
+
+      <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+        <div className="mb-3 flex items-center gap-2">
+          <Ban size={18} className="text-red-600 dark:text-red-400" />
+          <h2 className="text-sm font-bold text-slate-700 dark:text-slate-200">
+            Excluir Lojas Importadas ({pendentes.length})
+          </h2>
+        </div>
+        <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
+          Corrige um import errado antes que a loja entre no fluxo — só aparecem aqui as lojas que ainda{' '}
+          <strong>não tiveram o Apontamento de Box feito</strong> (a reserva rápida das vagas antes da
+          conferência física, na aba Agrupamento & Etiquetas). Uma loja que já passou por essa etapa
+          precisa ser cancelada lá primeiro (botão "Cancelar" da loja), o que a devolve pra pendente antes
+          de poder excluir.
+        </p>
+        {pendentes.length === 0 ? (
+          <p className="text-sm text-slate-400 dark:text-slate-500">Nenhuma loja pendente para excluir no momento.</p>
+        ) : (
+          <>
+            <div className="relative mb-3 max-w-sm">
+              <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                value={buscaExcluir}
+                onChange={(e) => setBuscaExcluir(e.target.value)}
+                placeholder="Buscar por carga, loja ou nome..."
+                className="w-full rounded-md border border-slate-300 bg-white py-1.5 pl-8 pr-3 text-xs text-slate-800 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+              />
+            </div>
+            {pendentesFiltradas.length === 0 ? (
+              <p className="text-sm text-slate-400 dark:text-slate-500">Nenhuma loja pendente corresponde à busca.</p>
+            ) : (
+              <div className="max-h-72 space-y-1.5 overflow-y-auto">
+                {pendentesFiltradas.map((loja) => (
+                  <div
+                    key={loja.id}
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-slate-100 px-3 py-2 text-xs dark:border-slate-700"
+                  >
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className="flex-shrink-0 font-semibold text-slate-700 dark:text-slate-200">
+                        {loja.carga} — Loja {loja.loja}
+                      </span>
+                      <span className="truncate text-slate-400 dark:text-slate-500">{loja.nomeLoja}</span>
+                      <TipoCargaBadge tipo={loja.tipoCarga} />
+                    </div>
+                    {confirmandoExclusao === loja.id ? (
+                      <div className="flex flex-shrink-0 items-center gap-1.5 rounded-md border border-amber-300 bg-amber-50 px-2 py-1 dark:border-amber-700 dark:bg-amber-900/40">
+                        <span className="text-amber-700 dark:text-amber-300">Excluir esta loja?</span>
+                        <button
+                          type="button"
+                          onClick={() => aoExcluirLoja(loja.id)}
+                          className="rounded bg-amber-600 px-2 py-0.5 font-medium text-white hover:bg-amber-700"
+                        >
+                          Sim
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setConfirmandoExclusao(null)}
+                          className="rounded px-2 py-0.5 font-medium text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700"
+                        >
+                          Não
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setConfirmandoExclusao(loja.id)}
+                        title="Excluir esta loja importada"
+                        className="flex flex-shrink-0 items-center gap-1 rounded-md border border-red-200 px-2 py-1 font-medium text-red-600 hover:bg-red-50 dark:border-red-900/60 dark:text-red-400 dark:hover:bg-red-950/40"
+                      >
+                        <Trash2 size={12} /> Excluir
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
       </div>
 
       <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800">

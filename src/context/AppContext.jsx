@@ -73,6 +73,34 @@ function aplicarAcao(state, acao) {
       };
     }
 
+    // Exclui uma loja importada por engano (ver tela de Importar Dados).
+    // Só permite excluir lojas ainda "pendente" — sem box/vaga alocada, sem
+    // protocolo — pra nunca deixar vaga ocupada ou protocolo órfão
+    // apontando pra uma loja que não existe mais. Uma loja que já entrou no
+    // fluxo (apontada em diante) precisa ser cancelada nas telas de
+    // Agrupamento/Carregamento primeiro (ver CANCELAR_AGRUPAMENTO acima),
+    // o que a devolve para "pendente" e libera as vagas, antes de poder ser
+    // excluída aqui.
+    case 'EXCLUIR_LOJA': {
+      const { lojaId } = acao.payload;
+      const loja = state.lojas.find((l) => l.id === lojaId);
+      if (!loja) {
+        return { ...state, ultimoErro: 'Loja não encontrada.' };
+      }
+      if (loja.status !== 'pendente') {
+        return {
+          ...state,
+          ultimoErro: `Loja ${loja.loja} já está em andamento e não pode ser excluída — cancele o apontamento dela primeiro.`,
+        };
+      }
+      return {
+        ...state,
+        lojas: state.lojas.filter((l) => l.id !== lojaId),
+        ultimoErro: null,
+        ultimoAviso: `Loja ${loja.loja} (${loja.nomeLoja}) excluída.`,
+      };
+    }
+
     // Etapa 1 — Apontamento: aponta manualmente a loja para um box, apenas
     // reservando as vagas físicas em ordem CRESCENTE (estimativa rápida,
     // antes da conferência física). Sinaliza que a loja está "em execução"
@@ -107,6 +135,14 @@ function aplicarAcao(state, acao) {
                 vagasOcupadas: resultado.vagasAlocadas,
                 paletesAgrupados: quantidadePaletes,
                 paletesNoAgrupamento: quantidadePaletes,
+                // Guarda a quantidade "estimada" do Apontamento (Etapa 1)
+                // separada de `paletesAgrupados`, que é reescrita pela
+                // Conclusão do Agrupamento (Etapa 4) com a contagem final
+                // reconferida — diferente de `paletesApontados`, que nunca
+                // muda depois daqui. É essa quantidade estimada (não a
+                // final) que numera os paletes na marcação de saldo do
+                // Carregamento (ver LoadingProtocolForm.jsx).
+                paletesApontados: quantidadePaletes,
                 dataApontamento: new Date().toISOString(),
               }
             : l
@@ -259,6 +295,7 @@ function aplicarAcao(state, acao) {
                   colaboradores: [],
                   paletesAgrupados: 0,
                   paletesNoAgrupamento: 0,
+                  paletesApontados: 0,
                   dataApontamento: null,
                   dataConferencia: null,
                   dataInicioAgrupamento: null,
@@ -336,6 +373,25 @@ function aplicarAcao(state, acao) {
         lojas: state.lojas.map((l) => (l.id === lojaId ? { ...l, status: 'carregando' } : l)),
         ultimoErro: null,
         ultimoAviso: `Carregamento da loja ${loja.loja} iniciado.`,
+      };
+    }
+
+    // Desfaz o início do carregamento (botão "Cancelar" na lista "Em
+    // Carregamento" — ver LoadingList.jsx) — a loja ainda não tem protocolo
+    // registrado nessa etapa, então basta voltar o status para "agrupada".
+    // Não mexe nas vagas: INICIAR_CARREGAMENTO acima também não mexeu, só
+    // trocou o status.
+    case 'CANCELAR_INICIO_CARREGAMENTO': {
+      const { lojaId } = acao.payload;
+      const loja = state.lojas.find((l) => l.id === lojaId);
+      if (!loja || loja.status !== 'carregando') {
+        return { ...state, ultimoErro: 'Esta loja não está com o carregamento em andamento.' };
+      }
+      return {
+        ...state,
+        lojas: state.lojas.map((l) => (l.id === lojaId ? { ...l, status: 'agrupada' } : l)),
+        ultimoErro: null,
+        ultimoAviso: `Carregamento da loja ${loja.loja} cancelado — voltou para Agrupada.`,
       };
     }
 
@@ -993,6 +1049,7 @@ export function AppProvider({ children }) {
   const actions = useMemo(
     () => ({
       importarLojas: (registros) => dispatch({ tipo: 'IMPORTAR_LOJAS', payload: registros }),
+      excluirLoja: (lojaId) => dispatch({ tipo: 'EXCLUIR_LOJA', payload: { lojaId } }),
       apontarBox: (payload) => dispatch({ tipo: 'APONTAR_BOX', payload }),
       concluirConferencia: (lojaId) => dispatch({ tipo: 'CONCLUIR_CONFERENCIA', payload: { lojaId } }),
       iniciarAgrupamento: (payload) => dispatch({ tipo: 'INICIAR_AGRUPAMENTO', payload }),
@@ -1000,6 +1057,7 @@ export function AppProvider({ children }) {
       cancelarAgrupamento: (lojaId) => dispatch({ tipo: 'CANCELAR_AGRUPAMENTO', payload: { lojaId } }),
       moverBox: (payload) => dispatch({ tipo: 'MOVER_BOX', payload }),
       iniciarCarregamento: (lojaId) => dispatch({ tipo: 'INICIAR_CARREGAMENTO', payload: { lojaId } }),
+      cancelarInicioCarregamento: (lojaId) => dispatch({ tipo: 'CANCELAR_INICIO_CARREGAMENTO', payload: { lojaId } }),
       finalizarCarregamento: (payload) => dispatch({ tipo: 'FINALIZAR_CARREGAMENTO', payload }),
       finalizarCarregamentoMultiplo: (payload) => dispatch({ tipo: 'FINALIZAR_CARREGAMENTO_MULTIPLO', payload }),
       cancelarProtocolo: (protocoloId) => dispatch({ tipo: 'CANCELAR_PROTOCOLO', payload: { protocoloId } }),

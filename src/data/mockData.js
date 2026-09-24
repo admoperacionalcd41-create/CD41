@@ -67,6 +67,7 @@ function novaLoja({
     paletesPlanejados: paletes,
     paletesAgrupados: 0,
     paletesNoAgrupamento: 0,
+    paletesApontados: 0,
     status: 'pendente',
     boxNumero: null,
     vagasOcupadas: [],
@@ -152,6 +153,7 @@ export function gerarDadosIniciais() {
             vagasOcupadas: resultado.vagasAlocadas,
             paletesAgrupados: l.paletesPlanejados,
             paletesNoAgrupamento: l.paletesPlanejados,
+            paletesApontados: l.paletesPlanejados,
             dataApontamento: new Date().toISOString(),
           }
         : l
