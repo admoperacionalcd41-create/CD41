@@ -10,7 +10,7 @@ export default function BoxCard({ box, lojasPorId, aoSelecionarLoja }) {
   // lojas do box — só a lista de lojas detalhada abaixo é filtrada, para não
   // fazer um box parecer "com vaga livre" quando na verdade está ocupado por
   // uma carga do outro tipo.
-  const resumo = useMemo(() => getResumoBox(box), [box]);
+  const resumo = useMemo(() => getResumoBox(box, lojasPorId), [box, lojasPorId]);
   const statusBox = useMemo(() => getStatusBox(box, lojasPorId), [box, lojasPorId]);
   const especial = boxEhEspecial(box.nome);
   // Boxes bem maiores que o padrão (BLOCADO 1/2, com 36/42 vagas) usam mais

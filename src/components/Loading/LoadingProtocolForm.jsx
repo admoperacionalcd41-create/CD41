@@ -6,6 +6,15 @@ import { montarMensagemProtocolo } from '../../utils/notificacoes';
 import TipoCargaBadge from '../Shared/TipoCargaBadge.jsx';
 import SequenciaCarregamentoCaminhao from './SequenciaCarregamentoCaminhao.jsx';
 
+// Descreve um número de palete junto com sua composição, quando os
+// agrupadores juntaram lotes diferentes nele (ex.: "2 (lotes 2 + 5)") —
+// ver ConcludeGroupingModal, onde essa composição é informada. Sem
+// composição registrada, mostra só o número.
+function descricaoPalete(l, numero) {
+  const composicao = (l.composicaoPaletes || [])[numero - 1];
+  return composicao && composicao.trim() ? `${numero} (lotes ${composicao.trim()})` : `${numero}`;
+}
+
 // Aceita `lojas` (array): 1 item usa o fluxo tradicional de protocolo único,
 // com suporte a envio parcial/saldo; 2+ itens registram um único protocolo
 // (mesma placa/motorista/lacres) cobrindo todas as lojas selecionadas, que
@@ -21,14 +30,28 @@ export default function LoadingProtocolForm({ lojas, aoFechar, aoRegistrar }) {
   const [motorista, setMotorista] = useState('');
   const [lacres, setLacres] = useState(['', '', '']);
   const [statusEnvio, setStatusEnvio] = useState('completo');
-  const [paletesEnviados, setPaletesEnviados] = useState(lojas?.[0]?.paletesAgrupados ?? 0);
-  // Fluxo em lote: status ('completo' | 'saldo') e quantidade por loja,
-  // inicializados como envio completo (todos os paletes) para cada uma.
+  // Números dos paletes (os mesmos impressos nas etiquetas — ver
+  // LabelGenerator, "PALETE n/total") que o operador marca como "ficando"
+  // no box quando o envio é parcial — em vez de só informar uma
+  // quantidade, ele diz exatamente qual(is) palete(s) permanece(m), pra
+  // essa numeração ir na mensagem de WhatsApp pra equipe.
+  const [loteRestante, setLoteRestante] = useState([]);
+  // Quantidade de paletes enviados (loja única) — campo sempre em branco,
+  // preenchido manualmente pelo operador (não é mais derivado da marcação
+  // de paletes que ficaram de saldo).
+  const [paletesEnviadosInput, setPaletesEnviadosInput] = useState('');
+  // Fluxo em lote: status ('completo' | 'saldo') e paletes marcados como
+  // restantes por loja, inicializados como envio completo para cada uma.
   const [statusPorLoja, setStatusPorLoja] = useState(() =>
     Object.fromEntries((lojas || []).map((l) => [l.id, 'completo']))
   );
-  const [quantidadesPorLoja, setQuantidadesPorLoja] = useState(() =>
-    Object.fromEntries((lojas || []).map((l) => [l.id, l.paletesAgrupados]))
+  const [lotesRestantesPorLoja, setLotesRestantesPorLoja] = useState(() =>
+    Object.fromEntries((lojas || []).map((l) => [l.id, []]))
+  );
+  // Quantidade de paletes enviados por loja (fluxo em lote) — também em
+  // branco por padrão, informada manualmente pelo operador para cada loja.
+  const [quantidadesInformadasPorLoja, setQuantidadesInformadasPorLoja] = useState(() =>
+    Object.fromEntries((lojas || []).map((l) => [l.id, '']))
   );
   // Ordem de carregamento no lote (array de ids de loja; posição 0 = primeira
   // carregada). Começa na mesma ordem em que as lojas foram selecionadas na
@@ -43,11 +66,11 @@ export default function LoadingProtocolForm({ lojas, aoFechar, aoRegistrar }) {
     (p) => p.placa === placa.trim().toUpperCase()
   );
 
+  // A quantidade enviada de cada loja (fluxo em lote) vem sempre do que o
+  // operador digitou — não é mais calculada a partir de quantos paletes
+  // foram marcados como "ficando" no box.
   function quantidadeEfetiva(l) {
-    if (statusPorLoja[l.id] === 'saldo') {
-      return Math.min(Math.max(Number(quantidadesPorLoja[l.id]) || 0, 0), l.paletesAgrupados);
-    }
-    return l.paletesAgrupados;
+    return Number(quantidadesInformadasPorLoja[l.id]) || 0;
   }
 
   const totalAEnviarLote = lojas.reduce((soma, l) => soma + quantidadeEfetiva(l), 0);
@@ -59,18 +82,39 @@ export default function LoadingProtocolForm({ lojas, aoFechar, aoRegistrar }) {
 
   function alterarStatusLoja(lojaId, novoStatus) {
     setStatusPorLoja((prev) => ({ ...prev, [lojaId]: novoStatus }));
-    if (novoStatus === 'completo') {
-      const l = lojas.find((x) => x.id === lojaId);
-      if (l) setQuantidadesPorLoja((prev) => ({ ...prev, [lojaId]: l.paletesAgrupados }));
-    }
+    setLotesRestantesPorLoja((prev) => ({ ...prev, [lojaId]: [] }));
+    setQuantidadesInformadasPorLoja((prev) => ({ ...prev, [lojaId]: '' }));
+  }
+
+  function atualizarQuantidadeLoja(lojaId, valor) {
+    setQuantidadesInformadasPorLoja((prev) => ({ ...prev, [lojaId]: valor }));
+  }
+
+  function alternarLoteRestante(numero) {
+    setLoteRestante((prev) =>
+      prev.includes(numero) ? prev.filter((n) => n !== numero) : [...prev, numero].sort((a, b) => a - b)
+    );
+  }
+
+  function alternarLoteRestantePorLoja(lojaId, numero) {
+    setLotesRestantesPorLoja((prev) => {
+      const atual = prev[lojaId] || [];
+      const proximo = atual.includes(numero) ? atual.filter((n) => n !== numero) : [...atual, numero].sort((a, b) => a - b);
+      return { ...prev, [lojaId]: proximo };
+    });
   }
 
   function enviar(e) {
     e.preventDefault();
 
     if (emLote) {
+      // Envio parcial exige marcar pelo menos um palete como "ficando" —
+      // senão não tem como saber o que realmente ficou de saldo.
+      if (lojas.some((l) => statusPorLoja[l.id] === 'saldo' && (lotesRestantesPorLoja[l.id] || []).length === 0)) {
+        return;
+      }
       const quantidades = Object.fromEntries(lojas.map((l) => [l.id, quantidadeEfetiva(l)]));
-      if (Object.values(quantidades).some((q) => q <= 0)) return;
+      if (lojas.some((l) => quantidades[l.id] <= 0 || quantidades[l.id] > l.paletesAgrupados)) return;
       const placaFinal = placa.toUpperCase();
       actions.finalizarCarregamentoMultiplo({
         lojaIds: lojas.map((l) => l.id),
@@ -79,6 +123,7 @@ export default function LoadingProtocolForm({ lojas, aoFechar, aoRegistrar }) {
         lacres,
         quantidades,
         ordemCarregamento,
+        lotesRestantesPorLoja,
       });
       if (aoRegistrar) {
         const totalLote = ordemCarregamento.length;
@@ -94,6 +139,10 @@ export default function LoadingProtocolForm({ lojas, aoFechar, aoRegistrar }) {
                 nomeLoja: l.nomeLoja,
                 paletesEnviados: quantidades[l.id],
                 statusEnvio: statusPorLoja[l.id],
+                lotesRestantesDescricao:
+                  statusPorLoja[l.id] === 'saldo'
+                    ? (lotesRestantesPorLoja[l.id] || []).map((n) => descricaoPalete(l, n))
+                    : [],
                 posicaoCarregamento,
                 posicaoEntrega: totalLote - posicaoCarregamento + 1,
               };
@@ -105,10 +154,12 @@ export default function LoadingProtocolForm({ lojas, aoFechar, aoRegistrar }) {
       return;
     }
 
-    const quantidade =
-      statusEnvio === 'completo' ? loja.paletesAgrupados : Math.min(Number(paletesEnviados) || 0, loja.paletesAgrupados);
+    // Envio parcial exige marcar pelo menos um palete como "ficando".
+    if (statusEnvio === 'saldo' && loteRestante.length === 0) return;
 
-    if (quantidade <= 0) return;
+    const quantidade = Number(paletesEnviadosInput) || 0;
+
+    if (quantidade <= 0 || quantidade > loja.paletesAgrupados) return;
 
     const placaFinal = placa.toUpperCase();
     actions.finalizarCarregamento({
@@ -118,6 +169,7 @@ export default function LoadingProtocolForm({ lojas, aoFechar, aoRegistrar }) {
       lacres,
       statusEnvio,
       paletesEnviados: quantidade,
+      lotesRestantes: statusEnvio === 'saldo' ? loteRestante : [],
     });
     if (aoRegistrar) {
       aoRegistrar(
@@ -131,6 +183,7 @@ export default function LoadingProtocolForm({ lojas, aoFechar, aoRegistrar }) {
               nomeLoja: loja.nomeLoja,
               paletesEnviados: quantidade,
               statusEnvio,
+              lotesRestantesDescricao: statusEnvio === 'saldo' ? loteRestante.map((n) => descricaoPalete(loja, n)) : [],
             },
           ],
         })
@@ -167,7 +220,7 @@ export default function LoadingProtocolForm({ lojas, aoFechar, aoRegistrar }) {
               <div className="space-y-2.5">
                 {lojas.map((l) => {
                   const statusLoja = statusPorLoja[l.id] || 'completo';
-                  const quantidade = quantidadeEfetiva(l);
+                  const restantesLoja = lotesRestantesPorLoja[l.id] || [];
                   return (
                     <div key={l.id} className="rounded-md border border-slate-200 bg-white p-2 dark:border-slate-700 dark:bg-slate-800">
                       <div className="flex items-center justify-between gap-2">
@@ -175,34 +228,65 @@ export default function LoadingProtocolForm({ lojas, aoFechar, aoRegistrar }) {
                           <span className="truncate">{l.carga} — Loja {l.loja} ({l.nomeLoja})</span>
                           <TipoCargaBadge tipo={l.tipoCarga} />
                         </span>
-                        <span className="flex-shrink-0 text-slate-400 dark:text-slate-500">de {l.paletesAgrupados} paletes</span>
+                        <span className="flex-shrink-0 text-slate-400 dark:text-slate-500">{l.paletesAgrupados} paletes agrupados</span>
                       </div>
-                      <div className="mt-1.5 flex items-center gap-2">
+                      <div className="mt-1.5 flex flex-wrap items-center gap-2">
                         <select
                           value={statusLoja}
                           onChange={(e) => alterarStatusLoja(l.id, e.target.value)}
                           className="rounded-md border border-slate-300 bg-white px-2 py-1 text-[11px] text-slate-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
                         >
                           <option value="completo">Todos os paletes</option>
-                          <option value="saldo">Editar saldo</option>
+                          <option value="saldo">Ficou saldo</option>
                         </select>
-                        <input
-                          type="number"
-                          min={1}
-                          max={l.paletesAgrupados}
-                          value={quantidade}
-                          disabled={statusLoja === 'completo'}
-                          onChange={(e) =>
-                            setQuantidadesPorLoja((prev) => ({ ...prev, [l.id]: e.target.value }))
-                          }
-                          className="w-20 rounded-md border border-slate-300 bg-white px-2 py-1 text-[11px] text-slate-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:bg-slate-50 disabled:text-slate-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:disabled:bg-slate-800 dark:disabled:text-slate-500"
-                        />
-                        <span className="text-[11px] text-slate-400 dark:text-slate-500">paletes enviados</span>
+                        <label className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400">
+                          Paletes enviados:
+                          <input
+                            type="number"
+                            min={1}
+                            max={l.paletesAgrupados}
+                            value={quantidadesInformadasPorLoja[l.id] || ''}
+                            onChange={(e) => atualizarQuantidadeLoja(l.id, e.target.value)}
+                            required
+                            placeholder={`${l.paletesAgrupados}`}
+                            className="w-16 rounded-md border border-slate-300 bg-white px-2 py-1 text-[11px] text-slate-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+                          />
+                        </label>
                       </div>
                       {statusLoja === 'saldo' && (
-                        <p className="mt-1 text-[11px] text-amber-600 dark:text-amber-400">
-                          Saldo de {l.paletesAgrupados - quantidade} palete(s) permanece no {getNomeBox(l.boxNumero)}.
-                        </p>
+                        <div className="mt-2">
+                          <p className="mb-1 text-[11px] text-slate-500 dark:text-slate-400">
+                            Marque o(s) palete(s) (número da etiqueta) que fica(m) no {getNomeBox(l.boxNumero)}:
+                          </p>
+                          <div className="flex flex-wrap gap-1">
+                            {Array.from({ length: l.paletesAgrupados }, (_, i) => i + 1).map((numero) => {
+                              const marcado = restantesLoja.includes(numero);
+                              return (
+                                <button
+                                  type="button"
+                                  key={numero}
+                                  onClick={() => alternarLoteRestantePorLoja(l.id, numero)}
+                                  title={descricaoPalete(l, numero)}
+                                  className={`flex h-6 w-6 items-center justify-center rounded text-[11px] font-semibold transition-colors ${
+                                    marcado
+                                      ? 'bg-amber-600 text-white'
+                                      : 'bg-slate-100 text-slate-500 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600'
+                                  }`}
+                                >
+                                  {numero}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          {restantesLoja.length === 0 ? (
+                            <p className="mt-1 text-[11px] text-amber-600 dark:text-amber-400">Marque pelo menos um palete.</p>
+                          ) : (
+                            <p className="mt-1 text-[11px] text-amber-600 dark:text-amber-400">
+                              Palete(s) {restantesLoja.map((n) => descricaoPalete(l, n)).join(', ')} permanece(m) no{' '}
+                              {getNomeBox(l.boxNumero)}.
+                            </p>
+                          )}
+                        </div>
                       )}
                     </div>
                   );
@@ -279,6 +363,8 @@ export default function LoadingProtocolForm({ lojas, aoFechar, aoRegistrar }) {
                   onChange={(e) => atualizarLacre(i, e.target.value)}
                   required={i === 0}
                   placeholder={i === 0 ? 'Lacre 1' : `Lacre ${i + 1} (opcional)`}
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
                 />
               ))}
@@ -293,7 +379,8 @@ export default function LoadingProtocolForm({ lojas, aoFechar, aoRegistrar }) {
                   value={statusEnvio}
                   onChange={(e) => {
                     setStatusEnvio(e.target.value);
-                    if (e.target.value === 'completo') setPaletesEnviados(loja.paletesAgrupados);
+                    setLoteRestante([]);
+                    setPaletesEnviadosInput('');
                   }}
                   className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
                 >
@@ -302,33 +389,76 @@ export default function LoadingProtocolForm({ lojas, aoFechar, aoRegistrar }) {
                 </select>
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">
-                  Paletes enviados (de {loja.paletesAgrupados})
-                </label>
+                <label className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Paletes enviados</label>
                 <input
                   type="number"
                   min={1}
                   max={loja.paletesAgrupados}
-                  value={paletesEnviados}
-                  disabled={statusEnvio === 'completo'}
-                  onChange={(e) => setPaletesEnviados(e.target.value)}
-                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:bg-slate-50 disabled:text-slate-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:disabled:bg-slate-800 dark:disabled:text-slate-500"
+                  value={paletesEnviadosInput}
+                  onChange={(e) => setPaletesEnviadosInput(e.target.value)}
+                  required
+                  placeholder={`de ${loja.paletesAgrupados}`}
+                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
                 />
               </div>
             </div>
           )}
 
           {!emLote && statusEnvio === 'saldo' && (
-            <p className="rounded-lg bg-amber-50 p-2 text-xs text-amber-700 dark:border dark:border-current dark:bg-amber-500/10 dark:text-amber-300">
-              O saldo de {loja.paletesAgrupados - (Number(paletesEnviados) || 0)} palete(s) permanecerá
-              alocado no {getNomeBox(loja.boxNumero)}, aguardando um novo carregamento.
-            </p>
+            <div>
+              <p className="mb-1 text-xs font-medium text-slate-500 dark:text-slate-400">
+                Marque o(s) palete(s) (número da etiqueta) que fica(m) no {getNomeBox(loja.boxNumero)}:
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {Array.from({ length: loja.paletesAgrupados }, (_, i) => i + 1).map((numero) => {
+                  const marcado = loteRestante.includes(numero);
+                  return (
+                    <button
+                      type="button"
+                      key={numero}
+                      onClick={() => alternarLoteRestante(numero)}
+                      title={descricaoPalete(loja, numero)}
+                      className={`flex h-7 w-7 items-center justify-center rounded text-xs font-semibold transition-colors ${
+                        marcado
+                          ? 'bg-amber-600 text-white'
+                          : 'bg-slate-100 text-slate-500 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600'
+                      }`}
+                    >
+                      {numero}
+                    </button>
+                  );
+                })}
+              </div>
+              {loteRestante.length === 0 ? (
+                <p className="mt-1.5 rounded-lg bg-amber-50 p-2 text-xs text-amber-700 dark:border dark:border-current dark:bg-amber-500/10 dark:text-amber-300">
+                  Marque pelo menos um palete que vai ficar.
+                </p>
+              ) : (
+                <p className="mt-1.5 rounded-lg bg-amber-50 p-2 text-xs text-amber-700 dark:border dark:border-current dark:bg-amber-500/10 dark:text-amber-300">
+                  Palete(s) {loteRestante.map((n) => descricaoPalete(loja, n)).join(', ')} permanece(m) alocado(s) no{' '}
+                  {getNomeBox(loja.boxNumero)}, aguardando um novo carregamento.
+                </p>
+              )}
+            </div>
           )}
         </div>
 
         <button
           type="submit"
-          className="mt-5 w-full rounded-md bg-emerald-600 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700"
+          disabled={
+            emLote
+              ? lojas.some((l) => statusPorLoja[l.id] === 'saldo' && (lotesRestantesPorLoja[l.id] || []).length === 0) ||
+                lojas.some((l) => {
+                  const q = Number(quantidadesInformadasPorLoja[l.id]) || 0;
+                  return q <= 0 || q > l.paletesAgrupados;
+                })
+              : (statusEnvio === 'saldo' && loteRestante.length === 0) ||
+                (() => {
+                  const q = Number(paletesEnviadosInput) || 0;
+                  return q <= 0 || q > loja.paletesAgrupados;
+                })()
+          }
+          className="mt-5 w-full rounded-md bg-emerald-600 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300 dark:disabled:bg-slate-600"
         >
           {emLote ? `Finalizar Protocolo de ${lojas.length} Lojas` : 'Finalizar Protocolo e Liberar'}
         </button>

@@ -26,8 +26,15 @@ export function montarMensagemProtocolo({ placa, motorista, itens }) {
   const temSequencia = itens.length > 1 && itens.every((item) => item.posicaoEntrega != null);
   const linhasLojas = itens.map((item) => {
     const status = item.statusEnvio === 'saldo' ? ' (saldo — envio parcial)' : '';
+    // Paletes (números das etiquetas, com a composição de lotes quando
+    // houver — ex.: "2 (lotes 2 + 5)") que o operador marcou como tendo
+    // ficado no box — só existe em envio parcial (ver LoadingProtocolForm).
+    const lotes =
+      item.statusEnvio === 'saldo' && item.lotesRestantesDescricao && item.lotesRestantesDescricao.length > 0
+        ? ` — palete(s) ${item.lotesRestantesDescricao.join(', ')} ficou(aram)`
+        : '';
     const sequencia = temSequencia ? ` [${item.posicaoEntrega}ª entrega]` : '';
-    return `${item.carga} — Loja ${item.loja} (${item.nomeLoja}): ${item.paletesEnviados} pal.${status}${sequencia}`;
+    return `${item.carga} — Loja ${item.loja} (${item.nomeLoja}): ${item.paletesEnviados} pal.${status}${lotes}${sequencia}`;
   });
 
   return ['Carregamento liberado:', `Placa: ${placa}`, `Motorista: ${motorista}`, ...linhasLojas].join('\n');

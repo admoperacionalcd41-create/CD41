@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { PlayCircle, FileSignature, Truck, Printer, Ban, AlertTriangle, Info } from 'lucide-react';
+import { PlayCircle, FileSignature, Truck, Printer, Ban, AlertTriangle, Info, MapPin } from 'lucide-react';
 import { useApp } from '../../context/AppContext.jsx';
 import { getLojasProntasParaCarregar, getLojasEmCarregamento } from '../../utils/selectors';
 import { formatarDataHora } from '../../utils/dateHelpers';
@@ -24,6 +24,25 @@ export default function LoadingList({ aoAbrirProtocolo }) {
     () => getLojasProntasParaCarregar(state).filter((l) => lojaPassaFiltroTipoCarga(l, filtroTipoCarga)),
     [state, filtroTipoCarga]
   );
+  // Agrupadas por região para o operador conseguir despachar veículos
+  // cobrindo uma região de cada vez, em vez de pular entre regiões
+  // diferentes. Usa o campo `nomeLoja` (Nome da Loja da planilha) como
+  // região — é ali que a operação registra o nome da zona/região (ex.:
+  // "Zona Sul", "Zona Leste"), não no campo `regiao` separado. Lojas sem
+  // nome cadastrado caem num grupo "Sem região" ao final.
+  const prontasPorRegiao = useMemo(() => {
+    const mapa = new Map();
+    prontas.forEach((loja) => {
+      const chave = (loja.nomeLoja || '').trim() || 'Sem região';
+      if (!mapa.has(chave)) mapa.set(chave, []);
+      mapa.get(chave).push(loja);
+    });
+    return [...mapa.entries()].sort(([a], [b]) => {
+      if (a === 'Sem região') return 1;
+      if (b === 'Sem região') return -1;
+      return a.localeCompare(b, 'pt-BR');
+    });
+  }, [prontas]);
   const emCarregamento = useMemo(
     () => getLojasEmCarregamento(state).filter((l) => lojaPassaFiltroTipoCarga(l, filtroTipoCarga)),
     [state, filtroTipoCarga]
@@ -100,25 +119,34 @@ export default function LoadingList({ aoAbrirProtocolo }) {
         {prontas.length === 0 ? (
           <p className="text-sm text-slate-400 dark:text-slate-500">Nenhuma loja aguardando início de carregamento.</p>
         ) : (
-          <div className="space-y-2">
-            {prontas.map((loja) => (
-              <div key={loja.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-100 p-3 dark:border-slate-700">
-                <div className="text-sm">
-                  <p className="flex items-center gap-1.5 font-semibold text-slate-700 dark:text-slate-200">
-                    <span className={`h-2 w-2 flex-shrink-0 rounded-full ${getStatusLoja(loja.status).corPonto}`} />
-                    {loja.carga} — Loja {loja.loja}
-                    <TipoCargaBadge tipo={loja.tipoCarga} />
-                  </p>
-                  <p className="text-xs text-slate-400 dark:text-slate-500">
-                    {loja.nomeLoja} • {getNomeBox(loja.boxNumero)} • {loja.paletesAgrupados} paletes
-                  </p>
+          <div className="space-y-4">
+            {prontasPorRegiao.map(([regiao, lojasDaRegiao]) => (
+              <div key={regiao}>
+                <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                  <MapPin size={12} /> {regiao} ({lojasDaRegiao.length})
+                </p>
+                <div className="space-y-2">
+                  {lojasDaRegiao.map((loja) => (
+                    <div key={loja.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-100 p-3 dark:border-slate-700">
+                      <div className="text-sm">
+                        <p className="flex items-center gap-1.5 font-semibold text-slate-700 dark:text-slate-200">
+                          <span className={`h-2 w-2 flex-shrink-0 rounded-full ${getStatusLoja(loja.status).corPonto}`} />
+                          {loja.carga} — Loja {loja.loja}
+                          <TipoCargaBadge tipo={loja.tipoCarga} />
+                        </p>
+                        <p className="text-xs text-slate-400 dark:text-slate-500">
+                          {getNomeBox(loja.boxNumero)} • {loja.paletesAgrupados} paletes
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => actions.iniciarCarregamento(loja.id)}
+                        className="flex items-center gap-1.5 rounded-md bg-purple-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-purple-700"
+                      >
+                        <PlayCircle size={14} /> Iniciar Carregamento
+                      </button>
+                    </div>
+                  ))}
                 </div>
-                <button
-                  onClick={() => actions.iniciarCarregamento(loja.id)}
-                  className="flex items-center gap-1.5 rounded-md bg-purple-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-purple-700"
-                >
-                  <PlayCircle size={14} /> Iniciar Carregamento
-                </button>
               </div>
             ))}
           </div>
@@ -259,6 +287,11 @@ export default function LoadingList({ aoAbrirProtocolo }) {
                       <td className="py-2 pr-3">{p.paletesEnviados}</td>
                       <td className="py-2 pr-3">
                         <span
+                          title={
+                            p.statusEnvio === 'saldo' && p.lotesRestantesDescricao?.length
+                              ? `Palete(s) ${p.lotesRestantesDescricao.join(', ')} ficaram no box`
+                              : undefined
+                          }
                           className={`rounded-full px-2 py-0.5 font-semibold ${
                             p.statusEnvio === 'completo' ? 'bg-emerald-50 text-emerald-600 dark:border dark:border-current dark:bg-emerald-500/10 dark:text-emerald-300' : 'bg-amber-50 text-amber-600 dark:border dark:border-current dark:bg-amber-500/10 dark:text-amber-300'
                           }`}

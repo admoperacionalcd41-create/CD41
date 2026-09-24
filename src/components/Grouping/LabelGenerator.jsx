@@ -10,6 +10,9 @@ import TipoCargaBadge from '../Shared/TipoCargaBadge.jsx';
 // da etiqueta impressa (Loja em destaque bem maior que o resto), só que com
 // classes Tailwind em vez do CSS de impressão de montarHtmlImpressao.
 function Etiqueta({ loja, indice, total }) {
+  // Composição do palete (quando os agrupadores juntaram lotes diferentes
+  // nele — ver ConcludeGroupingModal), ex.: "2 + 5".
+  const composicao = (loja.composicaoPaletes || [])[indice - 1];
   return (
     <div className="flex flex-col gap-1.5 rounded-lg border-2 border-slate-800 p-3 text-slate-900">
       <div className="flex items-center justify-between border-b-2 border-slate-800 pb-1.5">
@@ -22,6 +25,7 @@ function Etiqueta({ loja, indice, total }) {
       <div className="flex flex-col items-center justify-center py-2">
         <p className="text-[10px] uppercase tracking-widest text-slate-400">Loja</p>
         <p className="text-5xl font-black leading-none">{loja.loja}</p>
+        {composicao && <p className="text-[10px] font-semibold text-slate-500">Lotes: {composicao}</p>}
       </div>
       <div className="flex items-end justify-between gap-2 text-xs">
         <div className="min-w-0">
@@ -63,6 +67,7 @@ const ALTURA_ETIQUETA_MM = 50;
 // nas bordas.
 function montarHtmlImpressao(loja, total) {
   const etiquetas = Array.from({ length: total }, (_, i) => i + 1);
+  const composicaoPaletes = loja.composicaoPaletes || [];
   const tipoCfg = getTipoCarga(loja.tipoCarga);
   // Cores sólidas equivalentes às usadas em tela (laranja para Seca, ciano
   // para Resfriada) — aqui em hex porque a impressão é um documento HTML
@@ -122,6 +127,7 @@ function montarHtmlImpressao(loja, total) {
       <div class="loja-destaque">
         <p class="loja-rotulo">Loja</p>
         <p class="loja-valor">${loja.loja}</p>
+        ${composicaoPaletes[n - 1] ? `<p style="margin:0.5mm 0 0;font-size:7pt;font-weight:700;color:#64748b;">Lotes: ${composicaoPaletes[n - 1]}</p>` : ''}
       </div>
       <div>
         <div class="rodape-campos">

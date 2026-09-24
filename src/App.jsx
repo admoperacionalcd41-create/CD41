@@ -56,7 +56,10 @@ function AppLogado({ grupo }) {
       case 'importar':
         return <DataImport />;
       case 'boxes':
-        return <BoxGrid irPara={setAbaAtiva} />;
+        // Clicar numa loja dentro de um box leva pra aba Agrupamento &
+        // Etiquetas (onde ficam as ações daquela loja — etiquetas, mover,
+        // concluir), sem abrir nenhuma tela por cima automaticamente.
+        return <BoxGrid irPara={setAbaAtiva} aoAbrirAgrupamento={() => setAbaAtiva('agrupamento')} />;
       case 'agrupamento':
         return <GroupingPage irPara={setAbaAtiva} />;
       case 'carregamento':

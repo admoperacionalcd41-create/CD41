@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { LogIn, LogOut, CheckCircle2, LocateFixed, MapPinOff, Clock } from 'lucide-react';
+import { LogIn, LogOut, CheckCircle2, LocateFixed, MapPinOff, Clock, MapPin } from 'lucide-react';
 import { useApp } from '../../context/AppContext.jsx';
 import { formatarHora, formatarDuracao, paraDataHoraLocalInput, deDataHoraLocalInput } from '../../utils/dateHelpers';
 import TipoCargaBadge from '../Shared/TipoCargaBadge.jsx';
@@ -75,16 +75,16 @@ export default function DriversPage() {
       });
   }, [state.protocolos, lojasPorId, motoristaBuscado, filtroTipoCarga]);
 
-  // Só vale a pena ligar o GPS quando existe pelo menos uma entrega ainda
-  // sem chegada registrada E com coordenada cadastrada — caso contrário não
-  // há nada pra comparar a posição do motorista.
-  const temPendenteComLocalizacao = useMemo(
-    () => entregas.some((e) => !e.chegadaLoja && !e.saidaLoja && localizacaoPorCodigo[e.loja.loja]),
-    [entregas, localizacaoPorCodigo]
-  );
+  // Liga o GPS sempre que houver alguma entrega em aberto (chegada ou saída
+  // ainda pendente) — tanto pra destacar o botão quando a loja tem
+  // coordenada cadastrada (geofence) quanto pra já ter uma posição pronta
+  // pra gravar junto no momento em que o motorista tocar em "Registrar
+  // Chegada"/"Registrar Saída" (ver aoRegistrar), mesmo quando a loja não
+  // tem coordenada cadastrada.
+  const temEntregaPendente = useMemo(() => entregas.some((e) => !e.saidaLoja), [entregas]);
 
   useEffect(() => {
-    if (!temPendenteComLocalizacao) {
+    if (!temEntregaPendente) {
       setStatusLocalizacao('inativo');
       return undefined;
     }
@@ -104,7 +104,19 @@ export default function DriversPage() {
       { enableHighAccuracy: true, maximumAge: 15000, timeout: 20000 }
     );
     return () => navigator.geolocation.clearWatch(watchId);
-  }, [temPendenteComLocalizacao]);
+  }, [temEntregaPendente]);
+
+  // Registra chegada/saída anexando a posição do GPS já disponível (a
+  // mesma usada pro destaque do botão) — sem posição (GPS desligado, sem
+  // permissão, ou ainda buscando), registra normalmente, só sem localização
+  // anexada, pra nunca travar o motorista por causa disso.
+  function aoRegistrar(acaoFn, protocoloId) {
+    acaoFn(protocoloId, undefined, posicaoAtual || undefined);
+  }
+
+  function urlMapa(localizacao) {
+    return `https://www.google.com/maps?q=${localizacao.latitude},${localizacao.longitude}`;
+  }
 
   function aoBuscar(evento) {
     evento.preventDefault();
@@ -219,12 +231,32 @@ export default function DriversPage() {
                       <span>
                         Chegada:{' '}
                         <strong className="text-slate-700 dark:text-slate-200">{formatarHora(entrega.chegadaLoja)}</strong>
+                        {entrega.localizacaoChegada && (
+                          <a
+                            href={urlMapa(entrega.localizacaoChegada)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="ml-1.5 inline-flex items-center gap-0.5 text-brand-600 hover:underline dark:text-brand-400"
+                          >
+                            <MapPin size={11} /> mapa
+                          </a>
+                        )}
                       </span>
                     )}
                     {entrega.saidaLoja && (
                       <span>
                         Saída:{' '}
                         <strong className="text-slate-700 dark:text-slate-200">{formatarHora(entrega.saidaLoja)}</strong>
+                        {entrega.localizacaoSaida && (
+                          <a
+                            href={urlMapa(entrega.localizacaoSaida)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="ml-1.5 inline-flex items-center gap-0.5 text-brand-600 hover:underline dark:text-brand-400"
+                          >
+                            <MapPin size={11} /> mapa
+                          </a>
+                        )}
                       </span>
                     )}
                     {permanenciaMs != null && (
@@ -246,7 +278,7 @@ export default function DriversPage() {
                           </p>
                         )}
                         <button
-                          onClick={() => actions.registrarChegadaLoja(entrega.id)}
+                          onClick={() => aoRegistrar(actions.registrarChegadaLoja, entrega.id)}
                           className={`flex w-full items-center justify-center gap-2 rounded-lg px-4 py-3.5 text-base font-semibold text-white transition-colors ${
                             pertoDaLoja
                               ? 'animate-pulse bg-emerald-600 ring-4 ring-emerald-300 hover:bg-emerald-700 active:bg-emerald-800 dark:ring-emerald-700/60'
@@ -273,7 +305,7 @@ export default function DriversPage() {
                     ) : (
                       <>
                         <button
-                          onClick={() => actions.registrarSaidaLoja(entrega.id)}
+                          onClick={() => aoRegistrar(actions.registrarSaidaLoja, entrega.id)}
                           className="flex w-full items-center justify-center gap-2 rounded-lg bg-amber-600 px-4 py-3.5 text-base font-semibold text-white transition-colors hover:bg-amber-700 active:bg-amber-800"
                         >
                           <LogOut size={20} /> Registrar Saída da Loja

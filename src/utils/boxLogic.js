@@ -333,9 +333,43 @@ export function getStatusBox(box, lojasPorId) {
   };
 }
 
-export function getResumoBox(box) {
+// Ordem de exibição das lojas dentro de um box (telas de Boxes & Vagas e
+// Dashboard): segue a mesma ordem do fluxo operacional, que também é a
+// ordem física real de ocupação das vagas —
+//   Em Execução, Conferência Finalizada e Agrupando ocupam as PRIMEIRAS
+//   vagas do box (numeração crescente, ver alocarVagasApontamento acima);
+//   Agrupada e Em Carregamento ocupam as ÚLTIMAS vagas (numeração
+//   decrescente, ver alocarVagasAgrupamento acima).
+// Uma loja "Finalizada" já liberou suas vagas, então não aparece mais aqui.
+const ORDEM_STATUS_NO_BOX = {
+  apontada: 0,
+  conferencia_finalizada: 1,
+  em_agrupamento: 2,
+  agrupada: 3,
+  carregando: 4,
+};
+
+// Ordena os ids de loja de um box pela ordem acima e, dentro do mesmo
+// status, sempre pela carga/loja (numérico, ex.: "0403" antes de "0410") —
+// pedido explícito do usuário pra manter a lista sempre previsível.
+function ordenarLojasDoBox(lojasIds, lojasPorId) {
+  return [...lojasIds].sort((idA, idB) => {
+    const lojaA = lojasPorId?.[idA];
+    const lojaB = lojasPorId?.[idB];
+    const ordemA = ORDEM_STATUS_NO_BOX[lojaA?.status] ?? 99;
+    const ordemB = ORDEM_STATUS_NO_BOX[lojaB?.status] ?? 99;
+    if (ordemA !== ordemB) return ordemA - ordemB;
+    const opcoes = { numeric: true, sensitivity: 'base' };
+    const cargaA = lojaA?.carga || '';
+    const cargaB = lojaB?.carga || '';
+    if (cargaA !== cargaB) return cargaA.localeCompare(cargaB, 'pt-BR', opcoes);
+    return (lojaA?.loja || '').localeCompare(lojaB?.loja || '', 'pt-BR', opcoes);
+  });
+}
+
+export function getResumoBox(box, lojasPorId) {
   const ocupadas = box.vagas.filter((v) => v.ocupada);
-  const lojasIds = [...new Set(ocupadas.map((v) => v.lojaId))];
+  const lojasIds = ordenarLojasDoBox([...new Set(ocupadas.map((v) => v.lojaId))], lojasPorId);
   return {
     totalVagas: box.totalVagas,
     ocupadas: ocupadas.length,

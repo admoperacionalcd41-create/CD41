@@ -17,6 +17,15 @@ import {
   getNomeBox,
 } from '../utils/boxLogic';
 
+// Descreve um número de palete junto com sua composição (quando os
+// agrupadores juntaram lotes diferentes nele — ver ConcludeGroupingModal),
+// ex.: "2 (lotes 2 + 5)" — usado no protocolo (ver FINALIZAR_CARREGAMENTO)
+// pra registrar exatamente qual combinação ficou de saldo.
+function descreverPalete(composicao, numero) {
+  const texto = (composicao || [])[numero - 1];
+  return texto && texto.trim() ? `${numero} (lotes ${texto.trim()})` : `${numero}`;
+}
+
 // Status em que a loja realmente ocupa vagas físicas em um box (portanto,
 // pode ser movida de box). "finalizada" fica de fora pois suas vagas já
 // foram liberadas na conclusão do carregamento.
@@ -167,7 +176,7 @@ function aplicarAcao(state, acao) {
     // final; a loja fica pronta para gerar etiqueta e seguir para o
     // carregamento.
     case 'CONCLUIR_AGRUPAMENTO': {
-      const { lojaId, quantidadePaletes } = acao.payload;
+      const { lojaId, quantidadePaletes, composicaoPaletes } = acao.payload;
       const loja = state.lojas.find((l) => l.id === lojaId);
       if (!loja || loja.status !== 'em_agrupamento') {
         return { ...state, ultimoErro: 'Esta loja precisa estar em agrupamento para ser concluída.' };
@@ -180,6 +189,17 @@ function aplicarAcao(state, acao) {
         return { ...state, ultimoErro: resultado.erro };
       }
 
+      // Composição de cada palete final (ex.: palete 2 = lote "2 + 5" —
+      // ver ConcludeGroupingModal) — normalizada pro mesmo tamanho da
+      // quantidade confirmada, com '' para paletes sem combinação
+      // informada. Usada na etiqueta e, se sobrar saldo no carregamento,
+      // pra identificar exatamente qual combinação ficou (ver
+      // LoadingProtocolForm e FINALIZAR_CARREGAMENTO).
+      const composicaoNormalizada = Array.from(
+        { length: quantidade },
+        (_, i) => (composicaoPaletes && composicaoPaletes[i]) || ''
+      );
+
       return {
         ...state,
         boxes: state.boxes.map((b) => (b.numero === loja.boxNumero ? resultado.box : b)),
@@ -191,6 +211,7 @@ function aplicarAcao(state, acao) {
                 vagasOcupadas: resultado.vagasAlocadas,
                 paletesAgrupados: quantidade,
                 paletesNoAgrupamento: quantidade,
+                composicaoPaletes: composicaoNormalizada,
                 dataAgrupamento: new Date().toISOString(),
               }
             : l
@@ -319,12 +340,13 @@ function aplicarAcao(state, acao) {
     }
 
     case 'FINALIZAR_CARREGAMENTO': {
-      const { lojaId, placa, motorista, lacres, statusEnvio, paletesEnviados } = acao.payload;
+      const { lojaId, placa, motorista, lacres, statusEnvio, paletesEnviados, lotesRestantes } = acao.payload;
       const loja = state.lojas.find((l) => l.id === lojaId);
       if (!loja || loja.boxNumero == null) {
         return { ...state, ultimoErro: 'Loja inválida para finalização de carregamento.' };
       }
       const box = state.boxes.find((b) => b.numero === loja.boxNumero);
+      const composicaoAnterior = loja.composicaoPaletes || [];
 
       const envioCompleto = statusEnvio === 'completo' || paletesEnviados >= loja.paletesAgrupados;
 
@@ -355,6 +377,17 @@ function aplicarAcao(state, acao) {
         lacres,
         statusEnvio: envioCompleto ? 'completo' : 'saldo',
         paletesEnviados,
+        // Números dos paletes (impressos nas etiquetas, ver LabelGenerator)
+        // que o operador marcou como "ficando" no box — só relevante em
+        // envio parcial; usado na mensagem de WhatsApp pra equipe saber
+        // exatamente qual palete separar do que já saiu.
+        lotesRestantes: envioCompleto ? [] : lotesRestantes || [],
+        // Mesma informação, já com a composição de cada palete (ver
+        // descreverPalete) — histórico fica correto mesmo depois que a
+        // loja renumerar seus paletes restantes abaixo.
+        lotesRestantesDescricao: envioCompleto
+          ? []
+          : (lotesRestantes || []).map((n) => descreverPalete(composicaoAnterior, n)),
         dataHora: new Date().toISOString(),
         boxNumero: loja.boxNumero,
         vagasLiberadas,
@@ -368,11 +401,17 @@ function aplicarAcao(state, acao) {
           protocolos: [...loja.protocolos, protocolo],
         };
       } else {
+        // Os paletes que ficaram (lotesRestantes) são renumerados de 1 em
+        // diante pra esse novo ciclo — cada um carrega a composição que já
+        // tinha (ex.: o palete "2 (lotes 2 + 5)" que ficou vira o novo
+        // palete 1, mas continua sabendo que é composto pelos lotes 2 e 5).
+        const composicaoRestante = (lotesRestantes || []).map((n) => composicaoAnterior[n - 1] || '');
         novaLojaState = {
           ...loja,
           status: 'agrupada', // volta para a fila de carregamento com o saldo restante
           paletesAgrupados: loja.paletesAgrupados - paletesEnviados,
           vagasOcupadas: vagasRestantesParciais,
+          composicaoPaletes: composicaoRestante,
           protocolos: [...loja.protocolos, protocolo],
         };
       }
@@ -401,7 +440,7 @@ function aplicarAcao(state, acao) {
     // loja continua com seu próprio registro de protocolo, então nada mais
     // no restante do app precisa saber sobre carregamentos em lote.
     case 'FINALIZAR_CARREGAMENTO_MULTIPLO': {
-      const { lojaIds, placa, motorista, lacres, quantidades = {}, ordemCarregamento } = acao.payload;
+      const { lojaIds, placa, motorista, lacres, quantidades = {}, ordemCarregamento, lotesRestantesPorLoja = {} } = acao.payload;
       const lojasSelecionadas = lojaIds
         .map((id) => state.lojas.find((l) => l.id === id))
         .filter((l) => l && l.boxNumero != null);
@@ -436,6 +475,8 @@ function aplicarAcao(state, acao) {
           : loja.paletesAgrupados;
         const envioCompleto = quantidade >= loja.paletesAgrupados;
         const box = boxesAtualizados.find((b) => b.numero === loja.boxNumero);
+        const composicaoAnteriorLoja = loja.composicaoPaletes || [];
+        const restantesLoja = lotesRestantesPorLoja[loja.id] || [];
 
         const vagasLiberadas = envioCompleto
           ? box.vagas.filter((v) => v.ocupada && v.lojaId === loja.id).map((v) => v.numero)
@@ -457,6 +498,10 @@ function aplicarAcao(state, acao) {
           lacres,
           statusEnvio: envioCompleto ? 'completo' : 'saldo',
           paletesEnviados: quantidade,
+          lotesRestantes: envioCompleto ? [] : restantesLoja,
+          lotesRestantesDescricao: envioCompleto
+            ? []
+            : restantesLoja.map((n) => descreverPalete(composicaoAnteriorLoja, n)),
           dataHora: agora,
           viagemId,
           boxNumero: loja.boxNumero,
@@ -487,6 +532,7 @@ function aplicarAcao(state, acao) {
             status: 'agrupada', // volta para a fila de carregamento com o saldo restante
             paletesAgrupados: loja.paletesAgrupados - quantidade,
             vagasOcupadas: resultado.vagasRestantes,
+            composicaoPaletes: restantesLoja.map((n) => composicaoAnteriorLoja[n - 1] || ''),
             protocolos: [...loja.protocolos, protocolo],
           };
         }
@@ -579,7 +625,11 @@ function aplicarAcao(state, acao) {
       // `dataHora` é opcional — quando o motorista esquece de sinalizar na
       // hora certa, a tela de Registro de Chegada e Saída permite informar
       // manualmente o horário real em vez de usar o momento atual.
-      const { protocoloId, dataHora } = acao.payload;
+      // `localizacao` ({ latitude, longitude }) é a posição do GPS do
+      // navegador do motorista no momento do toque — só vem preenchida no
+      // registro pelo botão (nunca no manual, feito depois/por outra
+      // pessoa, quando o motorista não está mais necessariamente lá).
+      const { protocoloId, dataHora, localizacao } = acao.payload;
       const protocolo = state.protocolos.find((p) => p.id === protocoloId);
       if (!protocolo) {
         return { ...state, ultimoErro: 'Protocolo não encontrado.' };
@@ -594,7 +644,8 @@ function aplicarAcao(state, acao) {
         return { ...state, ultimoErro: 'O horário de chegada não pode ser antes da saída do CD.' };
       }
 
-      const atualizarProtocolo = (p) => (p.id === protocoloId ? { ...p, chegadaLoja: agora } : p);
+      const atualizarProtocolo = (p) =>
+        p.id === protocoloId ? { ...p, chegadaLoja: agora, localizacaoChegada: localizacao || null } : p;
 
       return {
         ...state,
@@ -612,8 +663,9 @@ function aplicarAcao(state, acao) {
 
     case 'REGISTRAR_SAIDA_LOJA': {
       // Mesma ideia do caso acima: `dataHora` manual cobre o motorista que
-      // esqueceu de sinalizar a saída na hora.
-      const { protocoloId, dataHora } = acao.payload;
+      // esqueceu de sinalizar a saída na hora, e `localizacao` é a posição
+      // do GPS no momento do toque (só no registro pelo botão).
+      const { protocoloId, dataHora, localizacao } = acao.payload;
       const protocolo = state.protocolos.find((p) => p.id === protocoloId);
       if (!protocolo) {
         return { ...state, ultimoErro: 'Protocolo não encontrado.' };
@@ -631,7 +683,8 @@ function aplicarAcao(state, acao) {
         return { ...state, ultimoErro: 'O horário de saída não pode ser antes da chegada.' };
       }
 
-      const atualizarProtocolo = (p) => (p.id === protocoloId ? { ...p, saidaLoja: agora } : p);
+      const atualizarProtocolo = (p) =>
+        p.id === protocoloId ? { ...p, saidaLoja: agora, localizacaoSaida: localizacao || null } : p;
 
       return {
         ...state,
@@ -950,10 +1003,10 @@ export function AppProvider({ children }) {
       finalizarCarregamento: (payload) => dispatch({ tipo: 'FINALIZAR_CARREGAMENTO', payload }),
       finalizarCarregamentoMultiplo: (payload) => dispatch({ tipo: 'FINALIZAR_CARREGAMENTO_MULTIPLO', payload }),
       cancelarProtocolo: (protocoloId) => dispatch({ tipo: 'CANCELAR_PROTOCOLO', payload: { protocoloId } }),
-      registrarChegadaLoja: (protocoloId, dataHora) =>
-        dispatch({ tipo: 'REGISTRAR_CHEGADA_LOJA', payload: { protocoloId, dataHora } }),
-      registrarSaidaLoja: (protocoloId, dataHora) =>
-        dispatch({ tipo: 'REGISTRAR_SAIDA_LOJA', payload: { protocoloId, dataHora } }),
+      registrarChegadaLoja: (protocoloId, dataHora, localizacao) =>
+        dispatch({ tipo: 'REGISTRAR_CHEGADA_LOJA', payload: { protocoloId, dataHora, localizacao } }),
+      registrarSaidaLoja: (protocoloId, dataHora, localizacao) =>
+        dispatch({ tipo: 'REGISTRAR_SAIDA_LOJA', payload: { protocoloId, dataHora, localizacao } }),
       encerrarDia: () => dispatch({ tipo: 'ENCERRAR_DIA' }),
       restaurarDadosExemplo: () => dispatch({ tipo: 'RESTAURAR_DADOS_EXEMPLO' }),
       limparTudo: () => dispatch({ tipo: 'LIMPAR_TUDO' }),

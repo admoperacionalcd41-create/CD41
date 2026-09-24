@@ -65,7 +65,7 @@ export default function Dashboard({ irPara }) {
   const ocupacaoBoxes = useMemo(
     () =>
       state.boxes.map((box) => {
-        const resumoBox = getResumoBox(box);
+        const resumoBox = getResumoBox(box, lojasPorId);
         const lojas = resumoBox.lojasIds
           .map((id) => lojasPorId[id])
           .filter(Boolean)
