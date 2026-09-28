@@ -722,7 +722,10 @@ function aplicarAcaoInterna(state, acao) {
       // Mesma ideia do caso acima: `dataHora` manual cobre o motorista que
       // esqueceu de sinalizar a saída na hora, e `localizacao` é a posição
       // do GPS no momento do toque (só no registro pelo botão).
-      const { protocoloId, dataHora, localizacao } = acao.payload;
+      // `observacao` é opcional — um relato curto do motorista sobre algo
+      // que aconteceu na parada (fila, recusa de carga, atraso etc.), que
+      // fica visível depois no relatório de Tempo de Permanência.
+      const { protocoloId, dataHora, localizacao, observacao } = acao.payload;
       const protocolo = state.protocolos.find((p) => p.id === protocoloId);
       if (!protocolo) {
         return { ...state, ultimoErro: 'Protocolo não encontrado.' };
@@ -740,8 +743,11 @@ function aplicarAcaoInterna(state, acao) {
         return { ...state, ultimoErro: 'O horário de saída não pode ser antes da chegada.' };
       }
 
+      const observacaoLimpa = (observacao || '').trim();
       const atualizarProtocolo = (p) =>
-        p.id === protocoloId ? { ...p, saidaLoja: agora, localizacaoSaida: localizacao || null } : p;
+        p.id === protocoloId
+          ? { ...p, saidaLoja: agora, localizacaoSaida: localizacao || null, observacaoSaida: observacaoLimpa || null }
+          : p;
 
       return {
         ...state,
@@ -754,6 +760,65 @@ function aplicarAcaoInterna(state, acao) {
           hour: '2-digit',
           minute: '2-digit',
         })}.`,
+      };
+    }
+
+    // Desfaz um registro de chegada/saída feito por engano (botão errado,
+    // toque acidental) — cobre o que a correção manual (acima) não cobre:
+    // ela só troca o HORÁRIO de um registro que deveria mesmo existir; isto
+    // aqui apaga o registro inteiro, voltando a entrega pro estado anterior.
+    // Usado pela tela de Registro de Chegada e Saída, que mostra um
+    // "Desfazer" logo ao lado do horário registrado.
+    case 'DESFAZER_CHEGADA_LOJA': {
+      const { protocoloId } = acao.payload;
+      const protocolo = state.protocolos.find((p) => p.id === protocoloId);
+      if (!protocolo) {
+        return { ...state, ultimoErro: 'Protocolo não encontrado.' };
+      }
+      if (!protocolo.chegadaLoja) {
+        return { ...state, ultimoErro: 'Esta entrega ainda não tem chegada registrada.' };
+      }
+      if (protocolo.saidaLoja) {
+        return { ...state, ultimoErro: 'Desfaça a saída antes de desfazer a chegada.' };
+      }
+
+      const loja = state.lojas.find((l) => l.id === protocolo.lojaId);
+      const atualizarProtocolo = (p) =>
+        p.id === protocoloId ? { ...p, chegadaLoja: null, localizacaoChegada: null } : p;
+
+      return {
+        ...state,
+        protocolos: state.protocolos.map(atualizarProtocolo),
+        lojas: state.lojas.map((l) =>
+          l.id === protocolo.lojaId ? { ...l, protocolos: l.protocolos.map(atualizarProtocolo) } : l
+        ),
+        ultimoErro: null,
+        ultimoAviso: `Chegada desfeita na loja ${loja?.loja ?? ''}.`,
+      };
+    }
+
+    case 'DESFAZER_SAIDA_LOJA': {
+      const { protocoloId } = acao.payload;
+      const protocolo = state.protocolos.find((p) => p.id === protocoloId);
+      if (!protocolo) {
+        return { ...state, ultimoErro: 'Protocolo não encontrado.' };
+      }
+      if (!protocolo.saidaLoja) {
+        return { ...state, ultimoErro: 'Esta entrega ainda não tem saída registrada.' };
+      }
+
+      const loja = state.lojas.find((l) => l.id === protocolo.lojaId);
+      const atualizarProtocolo = (p) =>
+        p.id === protocoloId ? { ...p, saidaLoja: null, localizacaoSaida: null, observacaoSaida: null } : p;
+
+      return {
+        ...state,
+        protocolos: state.protocolos.map(atualizarProtocolo),
+        lojas: state.lojas.map((l) =>
+          l.id === protocolo.lojaId ? { ...l, protocolos: l.protocolos.map(atualizarProtocolo) } : l
+        ),
+        ultimoErro: null,
+        ultimoAviso: `Saída desfeita na loja ${loja?.loja ?? ''}.`,
       };
     }
 
@@ -933,6 +998,59 @@ function aplicarAcaoInterna(state, acao) {
         [entidade]: (state[entidade] || []).filter((v) => v !== valor),
         ultimoErro: null,
         ultimoAviso: `"${valor}" removido do cadastro.`,
+      };
+    }
+
+    // Corrige um item já cadastrado sem precisar apagar e recadastrar (o que
+    // faria perder o item da lista por um instante e reordenaria a posição
+    // dele igual a um cadastro novo). Colaboradores/Motoristas/Placas são só
+    // sugestão automática (datalist) nos formulários — nunca uma chave
+    // estrangeira —, então renomear aqui não precisa mexer em nenhum
+    // protocolo ou loja já registrada com o nome antigo.
+    case 'EDITAR_ITEM': {
+      const { entidade, valorAntigo, valorNovo } = acao.payload;
+      if (!CADASTROS_VALIDOS.includes(entidade)) {
+        return { ...state, ultimoErro: 'Tipo de cadastro inválido.' };
+      }
+
+      if (entidade === 'placasCadastradas') {
+        const placaNovaLimpa = (valorNovo?.placa || '').trim().toUpperCase();
+        if (!placaNovaLimpa) {
+          return { ...state, ultimoErro: 'Informe uma placa válida.' };
+        }
+        const listaAtual = state.placasCadastradas || [];
+        if (placaNovaLimpa !== valorAntigo && listaAtual.some((p) => p.placa === placaNovaLimpa)) {
+          return { ...state, ultimoErro: 'Já existe outra placa cadastrada com este valor.' };
+        }
+        return {
+          ...state,
+          placasCadastradas: listaAtual
+            .map((p) => (p.placa === valorAntigo ? { placa: placaNovaLimpa, possuiPlataforma: !!valorNovo?.possuiPlataforma } : p))
+            .sort((a, b) => a.placa.localeCompare(b.placa, 'pt-BR')),
+          ultimoErro: null,
+          ultimoAviso: `Placa "${valorAntigo}" atualizada para "${placaNovaLimpa}".`,
+        };
+      }
+
+      const valorNovoLimpo = (valorNovo || '').trim();
+      if (!valorNovoLimpo) {
+        return { ...state, ultimoErro: 'Informe um valor válido para o cadastro.' };
+      }
+      const listaAtual = state[entidade] || [];
+      if (
+        valorNovoLimpo.toLowerCase() !== (valorAntigo || '').toLowerCase() &&
+        listaAtual.some((v) => v.toLowerCase() === valorNovoLimpo.toLowerCase())
+      ) {
+        return { ...state, ultimoErro: 'Já existe outro item cadastrado com este valor.' };
+      }
+
+      return {
+        ...state,
+        [entidade]: listaAtual
+          .map((v) => (v === valorAntigo ? valorNovoLimpo : v))
+          .sort((a, b) => a.localeCompare(b, 'pt-BR')),
+        ultimoErro: null,
+        ultimoAviso: `"${valorAntigo}" atualizado para "${valorNovoLimpo}".`,
       };
     }
 
@@ -1120,14 +1238,18 @@ export function AppProvider({ children }) {
       cancelarProtocolo: (protocoloId) => dispatch({ tipo: 'CANCELAR_PROTOCOLO', payload: { protocoloId } }),
       registrarChegadaLoja: (protocoloId, dataHora, localizacao) =>
         dispatch({ tipo: 'REGISTRAR_CHEGADA_LOJA', payload: { protocoloId, dataHora, localizacao } }),
-      registrarSaidaLoja: (protocoloId, dataHora, localizacao) =>
-        dispatch({ tipo: 'REGISTRAR_SAIDA_LOJA', payload: { protocoloId, dataHora, localizacao } }),
+      registrarSaidaLoja: (protocoloId, dataHora, localizacao, observacao) =>
+        dispatch({ tipo: 'REGISTRAR_SAIDA_LOJA', payload: { protocoloId, dataHora, localizacao, observacao } }),
+      desfazerChegadaLoja: (protocoloId) => dispatch({ tipo: 'DESFAZER_CHEGADA_LOJA', payload: { protocoloId } }),
+      desfazerSaidaLoja: (protocoloId) => dispatch({ tipo: 'DESFAZER_SAIDA_LOJA', payload: { protocoloId } }),
       encerrarDia: () => dispatch({ tipo: 'ENCERRAR_DIA' }),
       restaurarDadosExemplo: () => dispatch({ tipo: 'RESTAURAR_DADOS_EXEMPLO' }),
       limparTudo: () => dispatch({ tipo: 'LIMPAR_TUDO' }),
       limparMensagens: () => dispatch({ tipo: 'LIMPAR_MENSAGENS' }),
       cadastrarItem: (entidade, valor) => dispatch({ tipo: 'CADASTRAR_ITEM', payload: { entidade, valor } }),
       removerItem: (entidade, valor) => dispatch({ tipo: 'REMOVER_ITEM', payload: { entidade, valor } }),
+      editarItem: (entidade, valorAntigo, valorNovo) =>
+        dispatch({ tipo: 'EDITAR_ITEM', payload: { entidade, valorAntigo, valorNovo } }),
     }),
     [dispatch]
   );

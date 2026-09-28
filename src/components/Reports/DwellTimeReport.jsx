@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Clock, AlertTriangle } from 'lucide-react';
+import { Clock, AlertTriangle, MessageSquareWarning } from 'lucide-react';
 import { useApp } from '../../context/AppContext.jsx';
 import { getPermanenciasRegistradas } from '../../utils/selectors';
 import { formatarHora, formatarData, formatarDuracao, eHoje, eEsteMes } from '../../utils/dateHelpers';
@@ -63,7 +63,7 @@ export default function DwellTimeReport() {
             </p>
           </div>
         </div>
-        <div className="flex overflow-hidden rounded-md border border-slate-200 text-xs dark:border-slate-600">
+        <div className="flex overflow-hidden rounded-md border border-slate-200 text-xs dark:border-slate-600 print:hidden">
           {[
             { chave: 'hoje', rotulo: 'Hoje' },
             { chave: 'mes', rotulo: 'Este mês' },
@@ -139,6 +139,15 @@ export default function DwellTimeReport() {
                           <TipoCargaBadge tipo={p.loja.tipoCarga} />
                         </p>
                         <p className="text-slate-400 dark:text-slate-500">{formatarData(p.saidaLoja.slice(0, 10))}</p>
+                        {/* Observação opcional deixada pelo motorista ao registrar a
+                            saída (ver DriversPage.jsx) — normalmente é o motivo de uma
+                            permanência mais longa (fila, recusa de carga, atraso etc.). */}
+                        {p.observacaoSaida && (
+                          <p className="mt-1 flex items-start gap-1 text-[11px] font-normal text-amber-600 dark:text-amber-400">
+                            <MessageSquareWarning size={12} className="mt-px flex-shrink-0" />
+                            <span>{p.observacaoSaida}</span>
+                          </p>
+                        )}
                       </td>
                       <td className="py-2 pr-3 text-slate-600 dark:text-slate-300">{p.motorista}</td>
                       <td className="py-2 pr-3 font-mono text-slate-600 dark:text-slate-300">{p.placa}</td>

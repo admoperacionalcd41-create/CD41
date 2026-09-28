@@ -1,20 +1,42 @@
-import React, { useEffect, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useState } from 'react';
+import { Loader2 } from 'lucide-react';
 import Sidebar from './components/Layout/Sidebar.jsx';
 import Header from './components/Layout/Header.jsx';
 import ConnectionStatus from './components/Layout/ConnectionStatus.jsx';
-import Dashboard from './components/Dashboard/Dashboard.jsx';
-import DataImport from './components/Import/DataImport.jsx';
-import BoxGrid from './components/Boxes/BoxGrid.jsx';
-import GroupingPage from './components/Grouping/GroupingPage.jsx';
-import LoadingPage from './components/Loading/LoadingPage.jsx';
-import DriversPage from './components/Drivers/DriversPage.jsx';
-import ReportsPage from './components/Reports/ReportsPage.jsx';
-import RegistrationsPage from './components/Registrations/RegistrationsPage.jsx';
 import LoginPage from './components/Auth/LoginPage.jsx';
 import TelaCarregando from './components/Auth/TelaCarregando.jsx';
 import AcessoNegado from './components/Auth/AcessoNegado.jsx';
 import { useAuth } from './context/AuthContext.jsx';
 import { SUPABASE_CONFIGURADO } from './lib/supabaseClient';
+
+// Cada aba agora só é baixada quando o usuário realmente abre ela (em vez de
+// tudo entrar no mesmo arquivo .js inicial) — o Vite/React separa cada uma
+// num pedaço (chunk) próprio, carregado sob demanda. Isso reduz bastante o
+// tamanho do carregamento inicial do app (o chunk principal vinha passando
+// dos 900kB, o que o próprio Vite avisa no build), já que a maior parte do
+// código de abas como Relatórios ou Agrupamento não é necessária só para
+// abrir o app e ver a tela de Boxes & Vagas, que é a aba inicial.
+const Dashboard = lazy(() => import('./components/Dashboard/Dashboard.jsx'));
+const DataImport = lazy(() => import('./components/Import/DataImport.jsx'));
+const BoxGrid = lazy(() => import('./components/Boxes/BoxGrid.jsx'));
+const GroupingPage = lazy(() => import('./components/Grouping/GroupingPage.jsx'));
+const LoadingPage = lazy(() => import('./components/Loading/LoadingPage.jsx'));
+const DriversPage = lazy(() => import('./components/Drivers/DriversPage.jsx'));
+const ReportsPage = lazy(() => import('./components/Reports/ReportsPage.jsx'));
+const RegistrationsPage = lazy(() => import('./components/Registrations/RegistrationsPage.jsx'));
+
+// Indicador leve mostrado só durante a curta espera do download do chunk da
+// aba (geralmente imperceptível numa conexão normal, mas evita a tela ficar
+// em branco caso demore) — diferente da TelaCarregando de tela cheia usada
+// no carregamento inicial da sessão/login, este fica contido dentro da área
+// de conteúdo, sem empurrar o cabeçalho/menu.
+function CarregandoAba() {
+  return (
+    <div className="flex h-64 items-center justify-center text-slate-400 dark:text-slate-500">
+      <Loader2 size={24} className="animate-spin" />
+    </div>
+  );
+}
 
 // `grupos` lista quem pode ver cada aba — motorista só tem acesso à tela
 // que ele realmente usa no dia a dia (registrar chegada/saída);
@@ -111,7 +133,7 @@ function AppLogado({ grupo }) {
               escura vazia nas laterais numa TV/monitor 4K, sem nenhum
               ganho de legibilidade. */}
           <div className={`mx-auto max-w-7xl 2xl:max-w-[1600px] ${abaAtiva === 'boxes' ? 'h-full' : ''}`}>
-            {renderConteudo()}
+            <Suspense fallback={<CarregandoAba />}>{renderConteudo()}</Suspense>
           </div>
         </main>
       </div>

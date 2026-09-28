@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowRight, AlertTriangle } from 'lucide-react';
+import { ArrowRight, AlertTriangle, Package, Truck, MapPinned, CheckCircle2 } from 'lucide-react';
 import { useApp } from '../../context/AppContext.jsx';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
 import { eHoje, formatarHora, formatarDuracao } from '../../utils/dateHelpers';
@@ -14,28 +14,55 @@ const CHAVE_TEMPO_LIMITE = 'doca-manager:tempo-limite-loja-min';
 // carregamento (placa/motorista) e dos horários de chegada/saída na loja
 // de destino informados na aba Motoristas. As variantes "_atrasada" só
 // entram em jogo quando um tempo-limite é configurado e ultrapassado.
+// `Icone` de cada status — usado como um segundo sinal visual além da cor
+// (o badge de texto continua existindo), pra dar pra reconhecer o estágio
+// de uma entrega num piscar de olhos, sem precisar ler a palavra — útil
+// numa grade com vários veículos ao mesmo tempo, como na aba Boxes & Vagas.
 const STATUS_ENTREGA = {
   aguardando: {
     texto: 'A caminho',
+    Icone: Truck,
     corBadge: 'bg-slate-100 text-slate-500 dark:border dark:border-slate-600 dark:bg-transparent dark:text-slate-400',
+    corIcone: 'text-slate-400 dark:text-slate-500',
   },
   na_loja: {
     texto: 'Na loja',
+    Icone: MapPinned,
     corBadge: 'bg-amber-50 text-amber-600 dark:border dark:border-current dark:bg-amber-500/10 dark:text-amber-300',
+    corIcone: 'text-amber-500 dark:text-amber-400',
   },
   na_loja_atrasada: {
     texto: 'Na loja (atrasada)',
+    Icone: AlertTriangle,
     corBadge: 'bg-red-50 text-red-600 dark:border dark:border-current dark:bg-red-500/10 dark:text-red-300',
+    corIcone: 'text-red-500 dark:text-red-400',
   },
   concluida: {
     texto: 'Entregue',
+    Icone: CheckCircle2,
     corBadge: 'bg-emerald-50 text-emerald-600 dark:border dark:border-current dark:bg-emerald-500/10 dark:text-emerald-300',
+    corIcone: 'text-emerald-500 dark:text-emerald-400',
   },
   concluida_atrasada: {
     texto: 'Entregue',
+    Icone: CheckCircle2,
     corBadge: 'bg-red-50 text-red-600 dark:border dark:border-current dark:bg-red-500/10 dark:text-red-300',
+    corIcone: 'text-red-500 dark:text-red-400',
   },
 };
+
+// Cor de destaque na borda esquerda de cada card de veículo — dá pra
+// escanear a grade toda e achar quem precisa de atenção (atrasado) sem ler
+// nada, e diferenciar de longe quem já terminou (verde) de quem ainda está
+// em andamento (âmbar/neutro). Usa o "pior" status entre as entregas do
+// veículo: atrasada > na loja > a caminho > tudo entregue.
+function corBordaVeiculo(entregas, agoraMs, limiteMs) {
+  const chaves = entregas.map((e) => getStatusEntrega(e, agoraMs, limiteMs));
+  if (chaves.includes('na_loja_atrasada')) return 'border-l-red-400 dark:border-l-red-500';
+  if (chaves.includes('na_loja')) return 'border-l-amber-400 dark:border-l-amber-500';
+  if (chaves.includes('aguardando')) return 'border-l-slate-300 dark:border-l-slate-600';
+  return 'border-l-emerald-400 dark:border-l-emerald-500';
+}
 
 // `agoraMs` é o "agora" corrente (atualizado periodicamente, ver useEffect
 // com setInterval) — necessário para saber se uma entrega ainda em
@@ -189,47 +216,95 @@ export default function AndamentoEntregasCard({ irPara, compacto = false }) {
 
       {resumoEntregas.total > 0 && (
         <div className={`flex-shrink-0 ${compacto ? 'mb-2 pb-2' : 'mb-4 pb-4'} border-b border-slate-100 dark:border-slate-700`}>
-          <div className={`grid grid-cols-2 ${gapStats} sm:grid-cols-4`}>
-            <div className={`rounded-lg border border-slate-100 ${padStat} dark:border-slate-700`}>
-              <p className="text-[11px] font-medium text-slate-400 dark:text-slate-500">Total hoje</p>
-              <p className={`mt-0.5 ${textStat} font-bold text-slate-800 dark:text-slate-100`}>{resumoEntregas.total}</p>
+          {/* Cada estatística agora tem um ícone (num círculo colorido igual
+              ao da métrica) além do número — dá pra reconhecer "a caminho" x
+              "na loja" x "entregue" pela cor/ícone à distância, sem precisar
+              ler o rótulo pequeno, o que ajuda numa tela cheia de números
+              como essa. */}
+          <div className={`grid grid-cols-2 ${gapStats} sm:grid-cols-3 lg:grid-cols-5`}>
+            <div className={`flex items-center gap-2 rounded-lg border border-slate-100 ${padStat} dark:border-slate-700`}>
+              <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-300">
+                <Package size={14} />
+              </span>
+              <span>
+                <p className="text-[11px] font-medium text-slate-400 dark:text-slate-500">Total hoje</p>
+                <p className={`${textStat} font-bold leading-tight text-slate-800 dark:text-slate-100`}>{resumoEntregas.total}</p>
+              </span>
             </div>
-            <div className={`rounded-lg border border-slate-100 ${padStat} dark:border-slate-700`}>
-              <p className="text-[11px] font-medium text-slate-400 dark:text-slate-500">A caminho</p>
-              <p className={`mt-0.5 ${textStat} font-bold text-slate-600 dark:text-slate-300`}>{resumoEntregas.aguardando}</p>
+            <div className={`flex items-center gap-2 rounded-lg border border-slate-100 ${padStat} dark:border-slate-700`}>
+              <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-300">
+                <Truck size={14} />
+              </span>
+              <span>
+                <p className="text-[11px] font-medium text-slate-400 dark:text-slate-500">A caminho</p>
+                <p className={`${textStat} font-bold leading-tight text-slate-600 dark:text-slate-300`}>{resumoEntregas.aguardando}</p>
+              </span>
             </div>
-            <div className={`rounded-lg border border-slate-100 ${padStat} dark:border-slate-700`}>
-              <p className="text-[11px] font-medium text-slate-400 dark:text-slate-500">Na loja</p>
-              <p className={`mt-0.5 ${textStat} font-bold text-amber-600 dark:text-amber-400`}>{resumoEntregas.naLoja}</p>
+            <div className={`flex items-center gap-2 rounded-lg border border-slate-100 ${padStat} dark:border-slate-700`}>
+              <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-amber-50 text-amber-500 dark:bg-amber-500/10 dark:text-amber-400">
+                <MapPinned size={14} />
+              </span>
+              <span>
+                <p className="text-[11px] font-medium text-slate-400 dark:text-slate-500">Na loja</p>
+                <p className={`${textStat} font-bold leading-tight text-amber-600 dark:text-amber-400`}>{resumoEntregas.naLoja}</p>
+              </span>
             </div>
-            <div className={`rounded-lg border border-slate-100 ${padStat} dark:border-slate-700`}>
-              <p className="text-[11px] font-medium text-slate-400 dark:text-slate-500">Entregues</p>
-              <p className={`mt-0.5 ${textStat} font-bold text-emerald-600 dark:text-emerald-400`}>{resumoEntregas.concluida}</p>
+            <div className={`flex items-center gap-2 rounded-lg border border-slate-100 ${padStat} dark:border-slate-700`}>
+              <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-500 dark:bg-emerald-500/10 dark:text-emerald-400">
+                <CheckCircle2 size={14} />
+              </span>
+              <span>
+                <p className="text-[11px] font-medium text-slate-400 dark:text-slate-500">Entregues</p>
+                <p className={`${textStat} font-bold leading-tight text-emerald-600 dark:text-emerald-400`}>{resumoEntregas.concluida}</p>
+              </span>
+            </div>
+            {/* Pedido do usuário: "Atrasado" como um status a mais nessa
+                fileira, ao lado dos outros — antes só aparecia escondido
+                dentro do aviso vermelho abaixo (que só existe quando há pelo
+                menos uma entrega atrasada). Agora sempre aparece aqui, com
+                contagem 0 quando não há nenhuma, do mesmo jeito que as
+                outras estatísticas. */}
+            <div className={`flex items-center gap-2 rounded-lg border ${padStat} ${resumoEntregas.atrasadas > 0 ? 'border-red-200 dark:border-red-900/60' : 'border-slate-100 dark:border-slate-700'}`}>
+              <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-red-50 text-red-500 dark:bg-red-500/10 dark:text-red-400">
+                <AlertTriangle size={14} />
+              </span>
+              <span>
+                <p className="text-[11px] font-medium text-slate-400 dark:text-slate-500">Atrasadas</p>
+                <p className={`${textStat} font-bold leading-tight text-red-600 dark:text-red-400`}>{resumoEntregas.atrasadas}</p>
+              </span>
             </div>
           </div>
 
-          <div className={`${compacto ? 'mt-2' : 'mt-3'} flex h-2.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-700`}>
-            {resumoEntregas.aguardando > 0 && (
-              <div
-                className="h-full bg-slate-300 dark:bg-slate-500"
-                style={{ width: `${(resumoEntregas.aguardando / resumoEntregas.total) * 100}%` }}
-                title={`${resumoEntregas.aguardando} a caminho`}
-              />
-            )}
-            {resumoEntregas.naLoja > 0 && (
-              <div
-                className="h-full bg-amber-400"
-                style={{ width: `${(resumoEntregas.naLoja / resumoEntregas.total) * 100}%` }}
-                title={`${resumoEntregas.naLoja} na loja`}
-              />
-            )}
-            {resumoEntregas.concluida > 0 && (
-              <div
-                className="h-full bg-emerald-400"
-                style={{ width: `${(resumoEntregas.concluida / resumoEntregas.total) * 100}%` }}
-                title={`${resumoEntregas.concluida} entregues`}
-              />
-            )}
+          {/* Barra de progresso com o percentual concluído por extenso ao
+              lado — antes só dava pra estimar "quanto falta" olhando o
+              tamanho do trecho verde a olho. */}
+          <div className={`${compacto ? 'mt-2' : 'mt-3'} flex items-center gap-2`}>
+            <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-700">
+              {resumoEntregas.aguardando > 0 && (
+                <div
+                  className="h-full bg-slate-300 dark:bg-slate-500"
+                  style={{ width: `${(resumoEntregas.aguardando / resumoEntregas.total) * 100}%` }}
+                  title={`${resumoEntregas.aguardando} a caminho`}
+                />
+              )}
+              {resumoEntregas.naLoja > 0 && (
+                <div
+                  className="h-full bg-amber-400"
+                  style={{ width: `${(resumoEntregas.naLoja / resumoEntregas.total) * 100}%` }}
+                  title={`${resumoEntregas.naLoja} na loja`}
+                />
+              )}
+              {resumoEntregas.concluida > 0 && (
+                <div
+                  className="h-full bg-emerald-400"
+                  style={{ width: `${(resumoEntregas.concluida / resumoEntregas.total) * 100}%` }}
+                  title={`${resumoEntregas.concluida} entregues`}
+                />
+              )}
+            </div>
+            <span className="flex-shrink-0 text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+              {Math.round((resumoEntregas.concluida / resumoEntregas.total) * 100)}%
+            </span>
           </div>
 
           {resumoEntregas.atrasadas > 0 && (
@@ -265,12 +340,23 @@ export default function AndamentoEntregasCard({ irPara, compacto = false }) {
           {entregasPorVeiculo.map((veiculo) => (
             <div
               key={`${veiculo.placa}|${veiculo.motorista}`}
-              className={`rounded-lg border border-slate-100 ${padVeiculo} dark:border-slate-700`}
+              // Borda esquerda colorida = o "pior" status entre as entregas
+              // desse veículo (atrasada > na loja > a caminho > tudo
+              // entregue) — dá pra escanear a grade e achar quem precisa de
+              // atenção sem ler nenhum texto.
+              className={`rounded-lg border border-l-4 border-slate-100 ${padVeiculo} dark:border-slate-700 ${corBordaVeiculo(veiculo.entregas, agoraMs, limiteMs)}`}
             >
-              <p className="truncate text-sm font-bold text-slate-800 dark:text-slate-100" title={veiculo.motorista}>
-                {veiculo.motorista}
-              </p>
-              <p className="font-mono text-xs text-slate-400 dark:text-slate-500">{veiculo.placa}</p>
+              <div className="flex items-center gap-2">
+                <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-300">
+                  <Truck size={14} />
+                </span>
+                <span className="min-w-0">
+                  <p className="truncate text-sm font-bold text-slate-800 dark:text-slate-100" title={veiculo.motorista}>
+                    {veiculo.motorista}
+                  </p>
+                  <p className="font-mono text-xs text-slate-400 dark:text-slate-500">{veiculo.placa}</p>
+                </span>
+              </div>
 
               <div className="mt-2.5 space-y-1.5 border-t border-slate-100 pt-2.5 dark:border-slate-700">
                 {veiculo.entregas.map((entrega) => {
@@ -283,20 +369,23 @@ export default function AndamentoEntregasCard({ irPara, compacto = false }) {
                   return (
                     <div key={entrega.id} className="flex items-center justify-between gap-2 text-xs">
                       <span
-                        className="truncate text-slate-600 dark:text-slate-300"
+                        className="flex min-w-0 items-center gap-1.5 truncate text-slate-600 dark:text-slate-300"
                         title={`${entrega.loja.loja} — ${entrega.loja.nomeLoja}`}
                       >
-                        {entrega.loja.loja}
-                        {permanenciaMs != null && (
-                          <span className="ml-1.5 text-[10px] text-slate-400 dark:text-slate-500">
-                            ({formatarDuracao(permanenciaMs)})
-                          </span>
-                        )}
-                        {emAndamento && (
-                          <span className="ml-1.5 text-[10px] text-slate-400 dark:text-slate-500">
-                            desde {formatarHora(entrega.chegadaLoja)}
-                          </span>
-                        )}
+                        <status.Icone size={12} className={`flex-shrink-0 ${status.corIcone}`} />
+                        <span className="truncate">
+                          {entrega.loja.loja}
+                          {permanenciaMs != null && (
+                            <span className="ml-1.5 text-[10px] text-slate-400 dark:text-slate-500">
+                              ({formatarDuracao(permanenciaMs)})
+                            </span>
+                          )}
+                          {emAndamento && (
+                            <span className="ml-1.5 text-[10px] text-slate-400 dark:text-slate-500">
+                              desde {formatarHora(entrega.chegadaLoja)}
+                            </span>
+                          )}
+                        </span>
                       </span>
                       <span
                         className={`flex-shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${status.corBadge}`}

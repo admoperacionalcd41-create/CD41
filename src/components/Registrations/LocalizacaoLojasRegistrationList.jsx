@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { MapPin, Plus, Trash2, LocateFixed } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { MapPin, Plus, Trash2, LocateFixed, Search } from 'lucide-react';
 import { useApp } from '../../context/AppContext.jsx';
 
 // Cadastro de coordenadas das lojas — usado pra detectar automaticamente
@@ -14,8 +14,16 @@ export default function LocalizacaoLojasRegistrationList() {
   const [longitude, setLongitude] = useState('');
   const [erroLocal, setErroLocal] = useState('');
   const [buscandoLocalizacao, setBuscandoLocalizacao] = useState(false);
+  const [busca, setBusca] = useState('');
 
   const lista = state.localizacaoLojas || [];
+  const listaFiltrada = useMemo(() => {
+    const termo = busca.trim().toLowerCase();
+    if (!termo) return lista;
+    return lista.filter(
+      (item) => item.codigo.toLowerCase().includes(termo) || (item.nomeLoja || '').toLowerCase().includes(termo)
+    );
+  }, [lista, busca]);
 
   function aoAdicionar(e) {
     e.preventDefault();
@@ -132,12 +140,28 @@ export default function LocalizacaoLojasRegistrationList() {
       </form>
       {erroLocal && <p className="mt-2 text-xs font-medium text-red-500">{erroLocal}</p>}
 
+      {lista.length > 5 && (
+        <div className="relative mt-2">
+          <Search size={13} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
+          <input
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            placeholder={`Buscar em ${lista.length} lojas...`}
+            className="w-full rounded-md border border-slate-200 bg-white py-1.5 pl-8 pr-2.5 text-xs text-slate-700 placeholder:text-slate-400 focus:border-brand-400 focus:outline-none dark:border-slate-600 dark:bg-slate-900/40 dark:text-slate-200 dark:placeholder:text-slate-500"
+          />
+        </div>
+      )}
+
       <div className="mt-3 border-t border-slate-100 pt-3 dark:border-slate-700">
         {lista.length === 0 ? (
           <p className="py-4 text-center text-xs text-slate-400 dark:text-slate-500">Nenhuma loja com localização cadastrada ainda.</p>
+        ) : listaFiltrada.length === 0 ? (
+          <p className="py-4 text-center text-xs text-slate-400 dark:text-slate-500">
+            Nenhuma loja encontrada para "{busca}".
+          </p>
         ) : (
           <ul className="max-h-72 space-y-0.5 overflow-y-auto">
-            {lista.map((item) => (
+            {listaFiltrada.map((item) => (
               <li
                 key={item.codigo}
                 className="flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-sm text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-700/50"

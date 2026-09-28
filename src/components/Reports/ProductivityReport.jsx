@@ -62,7 +62,7 @@ export default function ProductivityReport() {
           <BarChart3 size={18} className="text-brand-600 dark:text-brand-400" />
           <h2 className="text-sm font-bold text-slate-700 dark:text-slate-200">Produtividade por Colaborador</h2>
         </div>
-        <div className="flex overflow-hidden rounded-md border border-slate-200 text-xs dark:border-slate-600">
+        <div className="flex overflow-hidden rounded-md border border-slate-200 text-xs dark:border-slate-600 print:hidden">
           {[
             { chave: 'hoje', rotulo: 'Hoje' },
             { chave: 'mes', rotulo: 'Este mês' },

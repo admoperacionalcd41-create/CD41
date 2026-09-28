@@ -195,6 +195,7 @@ export function getPermanenciasRegistradas(state, tipoCarga) {
       motorista: protocolo.motorista,
       chegadaLoja: protocolo.chegadaLoja,
       saidaLoja: protocolo.saidaLoja,
+      observacaoSaida: protocolo.observacaoSaida || null,
       permanenciaMs: new Date(protocolo.saidaLoja) - new Date(protocolo.chegadaLoja),
     }));
 }

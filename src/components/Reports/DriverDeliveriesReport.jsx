@@ -34,7 +34,7 @@ export default function DriverDeliveriesReport() {
             </p>
           </div>
         </div>
-        <div className="flex overflow-hidden rounded-md border border-slate-200 text-xs dark:border-slate-600">
+        <div className="flex overflow-hidden rounded-md border border-slate-200 text-xs dark:border-slate-600 print:hidden">
           {[
             { chave: 'hoje', rotulo: 'Hoje' },
             { chave: 'mes', rotulo: 'Este mês' },

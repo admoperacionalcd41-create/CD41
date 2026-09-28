@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { LogIn, LogOut, CheckCircle2, LocateFixed, MapPinOff, Clock, MapPin } from 'lucide-react';
+import { LogIn, LogOut, CheckCircle2, LocateFixed, MapPinOff, Clock, MapPin, Undo2, MessageSquareText, History, ChevronDown, ChevronUp } from 'lucide-react';
 import { useApp } from '../../context/AppContext.jsx';
-import { formatarHora, formatarDuracao, paraDataHoraLocalInput, deDataHoraLocalInput } from '../../utils/dateHelpers';
+import { formatarHora, formatarData, formatarDuracao, paraDataHoraLocalInput, deDataHoraLocalInput, eHoje } from '../../utils/dateHelpers';
 import TipoCargaBadge from '../Shared/TipoCargaBadge.jsx';
 import { lojaPassaFiltroTipoCarga } from '../../utils/tipoCarga';
 import { calcularDistanciaMetros, formatarDistancia, RAIO_GEOFENCE_METROS, buscarEnderecoPorCoordenada } from '../../utils/geo';
@@ -37,6 +37,24 @@ export default function DriversPage() {
   // lançar o horário real depois.
   const [manualAberto, setManualAberto] = useState({});
   const [valorManual, setValorManual] = useState({});
+
+  // Confirmação (chave `${entregaId}-chegada`/`-saida`) antes de desfazer um
+  // registro feito sem querer — evita apagar chegada/saída com um toque só,
+  // já que essa ação some com o registro por completo (diferente da correção
+  // manual acima, que só troca o horário de algo que deveria mesmo existir).
+  const [confirmandoDesfazer, setConfirmandoDesfazer] = useState(null);
+
+  // Observação opcional (fila, recusa de carga, atraso etc.) que o motorista
+  // pode deixar ao registrar a saída — guardada por entrega enquanto ele
+  // ainda não confirmou, pra não se perder se ele digitar antes de tocar no
+  // botão.
+  const [observacaoPorEntrega, setObservacaoPorEntrega] = useState({});
+
+  // Entregas concluídas em dias anteriores ficam escondidas atrás deste
+  // interruptor por padrão — só as de hoje (e as ainda pendentes) aparecem
+  // de cara, pra lista não crescer sem fim conforme o motorista acumula
+  // entregas ao longo do tempo.
+  const [mostrarHistorico, setMostrarHistorico] = useState(false);
 
   function alternarManual(chave) {
     setManualAberto((atual) => ({ ...atual, [chave]: !atual[chave] }));
@@ -79,6 +97,20 @@ export default function DriversPage() {
         return new Date(b.dataHora) - new Date(a.dataHora);
       });
   }, [state.protocolos, lojasPorId, motoristaBuscado, filtroTipoCarga]);
+
+  // Separa as entregas já concluídas em dias anteriores — ficam escondidas
+  // atrás do botão "Ver histórico" por padrão, pra lista de hoje não vir
+  // misturada com entregas antigas conforme elas se acumulam com o tempo.
+  // Pendentes e as concluídas hoje continuam sempre visíveis, na mesma
+  // ordem que `entregas` já define.
+  const entregasVisiveis = useMemo(
+    () => entregas.filter((e) => !e.saidaLoja || eHoje(e.saidaLoja)),
+    [entregas]
+  );
+  const entregasAntigas = useMemo(
+    () => entregas.filter((e) => e.saidaLoja && !eHoje(e.saidaLoja)),
+    [entregas]
+  );
 
   // Liga o GPS sempre que houver alguma entrega em aberto (chegada ou saída
   // ainda pendente) — tanto pra destacar o botão quando a loja tem
@@ -142,6 +174,17 @@ export default function DriversPage() {
   function aoRegistrar(acaoFn, protocoloId) {
     const localizacao = posicaoAtual ? { ...posicaoAtual, endereco: enderecoAtual || null } : undefined;
     acaoFn(protocoloId, undefined, localizacao);
+  }
+
+  function aoRegistrarSaida(protocoloId) {
+    const localizacao = posicaoAtual ? { ...posicaoAtual, endereco: enderecoAtual || null } : undefined;
+    actions.registrarSaidaLoja(protocoloId, undefined, localizacao, observacaoPorEntrega[protocoloId]);
+    setObservacaoPorEntrega((atual) => ({ ...atual, [protocoloId]: '' }));
+  }
+
+  function aoDesfazer(chave, protocoloId, acaoFn) {
+    acaoFn(protocoloId);
+    setConfirmandoDesfazer((atual) => (atual === chave ? null : atual));
   }
 
   function urlMapa(localizacao) {
@@ -214,152 +257,309 @@ export default function DriversPage() {
             </div>
           )}
 
-          {entregas.map((entrega) => {
-            const permanenciaMs =
-              entrega.chegadaLoja && entrega.saidaLoja
-                ? new Date(entrega.saidaLoja) - new Date(entrega.chegadaLoja)
-                : null;
-            const concluida = Boolean(entrega.saidaLoja);
+          {entregasVisiveis.map((entrega) => (
+            <CartaoEntrega
+              key={entrega.id}
+              entrega={entrega}
+              localizacaoPorCodigo={localizacaoPorCodigo}
+              posicaoAtual={posicaoAtual}
+              actions={actions}
+              manualAberto={manualAberto}
+              valorManual={valorManual}
+              alternarManual={alternarManual}
+              confirmarManual={confirmarManual}
+              setValorManual={setValorManual}
+              confirmandoDesfazer={confirmandoDesfazer}
+              setConfirmandoDesfazer={setConfirmandoDesfazer}
+              observacaoPorEntrega={observacaoPorEntrega}
+              setObservacaoPorEntrega={setObservacaoPorEntrega}
+              aoRegistrar={aoRegistrar}
+              aoRegistrarSaida={aoRegistrarSaida}
+              aoDesfazer={aoDesfazer}
+              urlMapa={urlMapa}
+            />
+          ))}
 
-            const localizacaoLoja = localizacaoPorCodigo[entrega.loja.loja];
-            const distanciaMetros =
-              !entrega.chegadaLoja && localizacaoLoja && posicaoAtual
-                ? calcularDistanciaMetros(
-                    posicaoAtual.latitude,
-                    posicaoAtual.longitude,
-                    localizacaoLoja.latitude,
-                    localizacaoLoja.longitude
-                  )
-                : null;
-            const pertoDaLoja = distanciaMetros != null && distanciaMetros <= RAIO_GEOFENCE_METROS;
-
-            return (
-              <div
-                key={entrega.id}
-                className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800"
+          {/* Entregas concluídas em dias anteriores (ver entregasAntigas) —
+              escondidas atrás deste botão por padrão, pra lista de hoje não
+              crescer sem fim conforme o motorista acumula entregas com o
+              tempo. */}
+          {entregasAntigas.length > 0 && (
+            <div>
+              <button
+                type="button"
+                onClick={() => setMostrarHistorico((atual) => !atual)}
+                className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-slate-300 bg-white py-2.5 text-xs font-semibold text-slate-500 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700"
               >
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <p className="flex flex-wrap items-center gap-1.5 text-base font-bold text-slate-800 dark:text-slate-100">
-                      <span className="font-mono">{entrega.loja.loja}</span> — {entrega.loja.nomeLoja}
-                      <TipoCargaBadge tipo={entrega.loja.tipoCarga} />
-                    </p>
-                    <p className="mt-0.5 text-xs text-slate-400 dark:text-slate-500">
-                      Placa <span className="font-mono font-semibold text-slate-500 dark:text-slate-400">{entrega.placa}</span> — Saiu do CD às {formatarHora(entrega.dataHora)}
-                    </p>
-                  </div>
-                  {concluida && (
-                    <span className="flex flex-shrink-0 items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-600 dark:border dark:border-current dark:bg-emerald-500/10 dark:text-emerald-300">
-                      <CheckCircle2 size={14} /> Concluída
-                    </span>
-                  )}
+                <History size={13} />
+                {mostrarHistorico
+                  ? 'Esconder histórico'
+                  : `Ver histórico (${entregasAntigas.length} entrega${entregasAntigas.length !== 1 ? 's' : ''} de dias anteriores)`}
+                {mostrarHistorico ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+              </button>
+              {mostrarHistorico && (
+                <div className="mt-3 space-y-3">
+                  {entregasAntigas.map((entrega) => (
+                    <CartaoEntrega
+                      key={entrega.id}
+                      entrega={entrega}
+                      localizacaoPorCodigo={localizacaoPorCodigo}
+                      posicaoAtual={posicaoAtual}
+                      actions={actions}
+                      manualAberto={manualAberto}
+                      valorManual={valorManual}
+                      alternarManual={alternarManual}
+                      confirmarManual={confirmarManual}
+                      setValorManual={setValorManual}
+                      confirmandoDesfazer={confirmandoDesfazer}
+                      setConfirmandoDesfazer={setConfirmandoDesfazer}
+                      observacaoPorEntrega={observacaoPorEntrega}
+                      setObservacaoPorEntrega={setObservacaoPorEntrega}
+                      aoRegistrar={aoRegistrar}
+                      aoRegistrarSaida={aoRegistrarSaida}
+                      aoDesfazer={aoDesfazer}
+                      urlMapa={urlMapa}
+                    />
+                  ))}
                 </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
-                {(entrega.chegadaLoja || entrega.saidaLoja) && (
-                  <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 border-t border-slate-100 pt-3 text-xs text-slate-500 dark:border-slate-700 dark:text-slate-400">
-                    {entrega.chegadaLoja && (
-                      <span>
-                        Chegada:{' '}
-                        <strong className="text-slate-700 dark:text-slate-200">{formatarHora(entrega.chegadaLoja)}</strong>
-                        {entrega.localizacaoChegada && (
-                          <a
-                            href={urlMapa(entrega.localizacaoChegada)}
-                            target="_blank"
-                            rel="noreferrer"
-                            title="Abrir no mapa"
-                            className="ml-1.5 inline-flex items-center gap-1 text-brand-600 hover:underline dark:text-brand-400"
-                          >
-                            <MapPin size={11} className="flex-shrink-0" />
-                            {entrega.localizacaoChegada.endereco || 'mapa'}
-                          </a>
-                        )}
-                      </span>
-                    )}
-                    {entrega.saidaLoja && (
-                      <span>
-                        Saída:{' '}
-                        <strong className="text-slate-700 dark:text-slate-200">{formatarHora(entrega.saidaLoja)}</strong>
-                        {entrega.localizacaoSaida && (
-                          <a
-                            href={urlMapa(entrega.localizacaoSaida)}
-                            target="_blank"
-                            rel="noreferrer"
-                            title="Abrir no mapa"
-                            className="ml-1.5 inline-flex items-center gap-1 text-brand-600 hover:underline dark:text-brand-400"
-                          >
-                            <MapPin size={11} className="flex-shrink-0" />
-                            {entrega.localizacaoSaida.endereco || 'mapa'}
-                          </a>
-                        )}
-                      </span>
-                    )}
-                    {permanenciaMs != null && (
-                      <span>
-                        Permanência:{' '}
-                        <strong className="text-slate-700 dark:text-slate-200">{formatarDuracao(permanenciaMs)}</strong>
-                      </span>
-                    )}
-                  </div>
-                )}
+// Botão discreto que pede confirmação inline antes de desfazer um registro
+// (ver aoDesfazer em DriversPage) — nunca usa window.confirm() porque a
+// prévia de Artifact bloqueia esse tipo de diálogo silenciosamente.
+function BotaoDesfazer({ chave, rotulo, confirmandoDesfazer, setConfirmandoDesfazer, aoConfirmar }) {
+  if (confirmandoDesfazer === chave) {
+    return (
+      <span className="ml-1.5 inline-flex items-center gap-1 rounded-md border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-amber-700 dark:border-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+        Desfazer?
+        <button
+          type="button"
+          onClick={aoConfirmar}
+          className="rounded bg-amber-600 px-1.5 py-0.5 font-semibold text-white hover:bg-amber-700"
+        >
+          Sim
+        </button>
+        <button
+          type="button"
+          onClick={() => setConfirmandoDesfazer(null)}
+          className="rounded px-1.5 py-0.5 font-medium text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700"
+        >
+          Não
+        </button>
+      </span>
+    );
+  }
+  return (
+    <button
+      type="button"
+      onClick={() => setConfirmandoDesfazer(chave)}
+      title={rotulo}
+      className="ml-1.5 inline-flex items-center gap-1 text-slate-300 hover:text-red-500 dark:text-slate-600 dark:hover:text-red-400"
+    >
+      <Undo2 size={12} /> desfazer
+    </button>
+  );
+}
 
-                {!concluida && (
-                  <div className="mt-3">
-                    {!entrega.chegadaLoja ? (
-                      <>
-                        {pertoDaLoja && (
-                          <p className="mb-1.5 flex items-center justify-center gap-1 text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                            <LocateFixed size={13} /> Você está na loja ({formatarDistancia(distanciaMetros)}) — confirme a chegada
-                          </p>
-                        )}
-                        <button
-                          onClick={() => aoRegistrar(actions.registrarChegadaLoja, entrega.id)}
-                          className={`flex w-full items-center justify-center gap-2 rounded-lg px-4 py-3.5 text-base font-semibold text-white transition-colors ${
-                            pertoDaLoja
-                              ? 'animate-pulse bg-emerald-600 ring-4 ring-emerald-300 hover:bg-emerald-700 active:bg-emerald-800 dark:ring-emerald-700/60'
-                              : 'bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800'
-                          }`}
-                        >
-                          <LogIn size={20} /> Registrar Chegada na Loja
-                        </button>
-                        {!pertoDaLoja && distanciaMetros != null && (
-                          <p className="mt-1.5 text-center text-[11px] text-slate-400 dark:text-slate-500">
-                            Você está a {formatarDistancia(distanciaMetros)} da loja
-                          </p>
-                        )}
-                        <RegistroManual
-                          chave={`${entrega.id}-chegada`}
-                          aberto={Boolean(manualAberto[`${entrega.id}-chegada`])}
-                          valor={valorManual[`${entrega.id}-chegada`]}
-                          aoAlternar={alternarManual}
-                          aoMudarValor={(chave, valor) => setValorManual((atual) => ({ ...atual, [chave]: valor }))}
-                          aoConfirmar={(chave) => confirmarManual(chave, (dataHora) => actions.registrarChegadaLoja(entrega.id, dataHora))}
-                          rotulo="Motorista esqueceu de registrar a chegada? Informar horário manualmente"
-                        />
-                      </>
-                    ) : (
-                      <>
-                        <button
-                          onClick={() => aoRegistrar(actions.registrarSaidaLoja, entrega.id)}
-                          className="flex w-full items-center justify-center gap-2 rounded-lg bg-amber-600 px-4 py-3.5 text-base font-semibold text-white transition-colors hover:bg-amber-700 active:bg-amber-800"
-                        >
-                          <LogOut size={20} /> Registrar Saída da Loja
-                        </button>
-                        <RegistroManual
-                          chave={`${entrega.id}-saida`}
-                          aberto={Boolean(manualAberto[`${entrega.id}-saida`])}
-                          valor={valorManual[`${entrega.id}-saida`]}
-                          aoAlternar={alternarManual}
-                          aoMudarValor={(chave, valor) => setValorManual((atual) => ({ ...atual, [chave]: valor }))}
-                          aoConfirmar={(chave) => confirmarManual(chave, (dataHora) => actions.registrarSaidaLoja(entrega.id, dataHora))}
-                          rotulo="Motorista esqueceu de registrar a saída? Informar horário manualmente"
-                        />
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+// Cartão de uma entrega — extraído do map principal porque agora é
+// renderizado em dois lugares (lista de hoje e o histórico escondido atrás
+// do botão "Ver histórico").
+function CartaoEntrega({
+  entrega,
+  localizacaoPorCodigo,
+  posicaoAtual,
+  actions,
+  manualAberto,
+  valorManual,
+  alternarManual,
+  confirmarManual,
+  setValorManual,
+  confirmandoDesfazer,
+  setConfirmandoDesfazer,
+  observacaoPorEntrega,
+  setObservacaoPorEntrega,
+  aoRegistrar,
+  aoRegistrarSaida,
+  aoDesfazer,
+  urlMapa,
+}) {
+  const permanenciaMs =
+    entrega.chegadaLoja && entrega.saidaLoja ? new Date(entrega.saidaLoja) - new Date(entrega.chegadaLoja) : null;
+  const concluida = Boolean(entrega.saidaLoja);
+
+  const localizacaoLoja = localizacaoPorCodigo[entrega.loja.loja];
+  const distanciaMetros =
+    !entrega.chegadaLoja && localizacaoLoja && posicaoAtual
+      ? calcularDistanciaMetros(posicaoAtual.latitude, posicaoAtual.longitude, localizacaoLoja.latitude, localizacaoLoja.longitude)
+      : null;
+  const pertoDaLoja = distanciaMetros != null && distanciaMetros <= RAIO_GEOFENCE_METROS;
+
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <p className="flex flex-wrap items-center gap-1.5 text-base font-bold text-slate-800 dark:text-slate-100">
+            <span className="font-mono">{entrega.loja.loja}</span> — {entrega.loja.nomeLoja}
+            <TipoCargaBadge tipo={entrega.loja.tipoCarga} />
+          </p>
+          <p className="mt-0.5 text-xs text-slate-400 dark:text-slate-500">
+            Placa <span className="font-mono font-semibold text-slate-500 dark:text-slate-400">{entrega.placa}</span> — Saiu do CD às {formatarHora(entrega.dataHora)}
+            {concluida && !eHoje(entrega.saidaLoja) && <> — {formatarData(entrega.saidaLoja.slice(0, 10))}</>}
+          </p>
+        </div>
+        {concluida && (
+          <span className="flex flex-shrink-0 items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-600 dark:border dark:border-current dark:bg-emerald-500/10 dark:text-emerald-300">
+            <CheckCircle2 size={14} /> Concluída
+          </span>
+        )}
+      </div>
+
+      {(entrega.chegadaLoja || entrega.saidaLoja) && (
+        <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 border-t border-slate-100 pt-3 text-xs text-slate-500 dark:border-slate-700 dark:text-slate-400">
+          {entrega.chegadaLoja && (
+            <span className="inline-flex items-center">
+              Chegada:{' '}
+              <strong className="ml-1 text-slate-700 dark:text-slate-200">{formatarHora(entrega.chegadaLoja)}</strong>
+              {entrega.localizacaoChegada && (
+                <a
+                  href={urlMapa(entrega.localizacaoChegada)}
+                  target="_blank"
+                  rel="noreferrer"
+                  title="Abrir no mapa"
+                  className="ml-1.5 inline-flex items-center gap-1 text-brand-600 hover:underline dark:text-brand-400"
+                >
+                  <MapPin size={11} className="flex-shrink-0" />
+                  {entrega.localizacaoChegada.endereco || 'mapa'}
+                </a>
+              )}
+              {/* Só oferece desfazer a chegada enquanto a saída ainda não foi
+                  registrada — não faz sentido "não ter chegado" numa entrega
+                  que já saiu. */}
+              {!concluida && (
+                <BotaoDesfazer
+                  chave={`${entrega.id}-chegada`}
+                  rotulo="Desfazer chegada (registrado sem querer)"
+                  confirmandoDesfazer={confirmandoDesfazer}
+                  setConfirmandoDesfazer={setConfirmandoDesfazer}
+                  aoConfirmar={() => aoDesfazer(`${entrega.id}-chegada`, entrega.id, actions.desfazerChegadaLoja)}
+                />
+              )}
+            </span>
+          )}
+          {entrega.saidaLoja && (
+            <span className="inline-flex items-center">
+              Saída:{' '}
+              <strong className="ml-1 text-slate-700 dark:text-slate-200">{formatarHora(entrega.saidaLoja)}</strong>
+              {entrega.localizacaoSaida && (
+                <a
+                  href={urlMapa(entrega.localizacaoSaida)}
+                  target="_blank"
+                  rel="noreferrer"
+                  title="Abrir no mapa"
+                  className="ml-1.5 inline-flex items-center gap-1 text-brand-600 hover:underline dark:text-brand-400"
+                >
+                  <MapPin size={11} className="flex-shrink-0" />
+                  {entrega.localizacaoSaida.endereco || 'mapa'}
+                </a>
+              )}
+              <BotaoDesfazer
+                chave={`${entrega.id}-saida`}
+                rotulo="Desfazer saída (registrado sem querer)"
+                confirmandoDesfazer={confirmandoDesfazer}
+                setConfirmandoDesfazer={setConfirmandoDesfazer}
+                aoConfirmar={() => aoDesfazer(`${entrega.id}-saida`, entrega.id, actions.desfazerSaidaLoja)}
+              />
+            </span>
+          )}
+          {permanenciaMs != null && (
+            <span>
+              Permanência:{' '}
+              <strong className="text-slate-700 dark:text-slate-200">{formatarDuracao(permanenciaMs)}</strong>
+            </span>
+          )}
+        </div>
+      )}
+
+      {entrega.observacaoSaida && (
+        <p className="mt-2 flex items-start gap-1.5 rounded-md bg-amber-50 px-2 py-1.5 text-xs text-amber-700 dark:bg-amber-950/20 dark:text-amber-300">
+          <MessageSquareText size={13} className="mt-px flex-shrink-0" />
+          {entrega.observacaoSaida}
+        </p>
+      )}
+
+      {!concluida && (
+        <div className="mt-3">
+          {!entrega.chegadaLoja ? (
+            <>
+              {pertoDaLoja && (
+                <p className="mb-1.5 flex items-center justify-center gap-1 text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                  <LocateFixed size={13} /> Você está na loja ({formatarDistancia(distanciaMetros)}) — confirme a chegada
+                </p>
+              )}
+              <button
+                onClick={() => aoRegistrar(actions.registrarChegadaLoja, entrega.id)}
+                className={`flex w-full items-center justify-center gap-2 rounded-lg px-4 py-3.5 text-base font-semibold text-white transition-colors ${
+                  pertoDaLoja
+                    ? 'animate-pulse bg-emerald-600 ring-4 ring-emerald-300 hover:bg-emerald-700 active:bg-emerald-800 dark:ring-emerald-700/60'
+                    : 'bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800'
+                }`}
+              >
+                <LogIn size={20} /> Registrar Chegada na Loja
+              </button>
+              {!pertoDaLoja && distanciaMetros != null && (
+                <p className="mt-1.5 text-center text-[11px] text-slate-400 dark:text-slate-500">
+                  Você está a {formatarDistancia(distanciaMetros)} da loja
+                </p>
+              )}
+              <RegistroManual
+                chave={`${entrega.id}-chegada`}
+                aberto={Boolean(manualAberto[`${entrega.id}-chegada`])}
+                valor={valorManual[`${entrega.id}-chegada`]}
+                aoAlternar={alternarManual}
+                aoMudarValor={(chave, valor) => setValorManual((atual) => ({ ...atual, [chave]: valor }))}
+                aoConfirmar={(chave) => confirmarManual(chave, (dataHora) => actions.registrarChegadaLoja(entrega.id, dataHora))}
+                rotulo="Motorista esqueceu de registrar a chegada? Informar horário manualmente"
+              />
+            </>
+          ) : (
+            <>
+              {/* Observação opcional — não bloqueia o registro da saída, só
+                  fica junto se o motorista quiser deixar algum relato (fila,
+                  recusa de carga, atraso etc.), visível depois no relatório
+                  de Tempo de Permanência. */}
+              <textarea
+                value={observacaoPorEntrega[entrega.id] || ''}
+                onChange={(evento) =>
+                  setObservacaoPorEntrega((atual) => ({ ...atual, [entrega.id]: evento.target.value }))
+                }
+                placeholder="Alguma observação? (opcional — fila, atraso, recusa de carga...)"
+                rows={2}
+                className="mb-2 w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 placeholder:text-slate-400 focus:border-brand-400 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:placeholder:text-slate-500"
+              />
+              <button
+                onClick={() => aoRegistrarSaida(entrega.id)}
+                className="flex w-full items-center justify-center gap-2 rounded-lg bg-amber-600 px-4 py-3.5 text-base font-semibold text-white transition-colors hover:bg-amber-700 active:bg-amber-800"
+              >
+                <LogOut size={20} /> Registrar Saída da Loja
+              </button>
+              <RegistroManual
+                chave={`${entrega.id}-saida`}
+                aberto={Boolean(manualAberto[`${entrega.id}-saida`])}
+                valor={valorManual[`${entrega.id}-saida`]}
+                aoAlternar={alternarManual}
+                aoMudarValor={(chave, valor) => setValorManual((atual) => ({ ...atual, [chave]: valor }))}
+                aoConfirmar={(chave) => confirmarManual(chave, (dataHora) => actions.registrarSaidaLoja(entrega.id, dataHora))}
+                rotulo="Motorista esqueceu de registrar a saída? Informar horário manualmente"
+              />
+            </>
+          )}
         </div>
       )}
     </div>
