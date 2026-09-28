@@ -137,26 +137,15 @@ export default function DailyProcessReport() {
   const comCarregamento = linhas.filter((l) => l.carregamentoFeito).length;
   const completas = linhas.filter((l) => l.completo).length;
 
-  // Agrupa pelo "grupo" da loja — o campo que mostra nomes como CARUARU,
-  // BELO JARDIM... (é `loja.nomeLoja`; várias lojas costumam compartilhar o
-  // mesmo grupo/praça). Os grupos aparecem em ordem alfabética; dentro de
-  // cada grupo, mantém a mesma ordenação de antes (pendente primeiro,
-  // depois por código da loja).
-  const grupos = useMemo(() => {
-    const mapa = new Map();
-    linhas.forEach((linha) => {
-      const nomeGrupo = linha.nomeLoja || 'Sem grupo';
-      if (!mapa.has(nomeGrupo)) mapa.set(nomeGrupo, []);
-      mapa.get(nomeGrupo).push(linha);
-    });
-    return Array.from(mapa.entries())
-      .map(([nome, itens]) => ({
-        nome,
-        itens,
-        completos: itens.filter((i) => i.completo).length,
-      }))
-      .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' }));
-  }, [linhas]);
+  // Não agrupa mais por praça/cidade (`nomeLoja`) — o pedido foi tirar essa
+  // organização. Em vez disso, separa só em duas faixas visuais (o que
+  // ainda falta x o que já foi concluído), já que `linhas` vem ordenada
+  // assim (pendente primeiro — ver sort no useMemo acima): uma cabeceira de
+  // seção com contagem marca a virada entre as duas faixas, o suficiente
+  // pra escanear rápido uma lista longa sem reintroduzir agrupamento por
+  // localização.
+  const pendentes = linhas.filter((l) => !l.completo);
+  const concluidas = linhas.filter((l) => l.completo);
 
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
@@ -208,115 +197,118 @@ export default function DailyProcessReport() {
             aba Importar Dados.
           </p>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="max-h-[70vh] overflow-auto rounded-lg border border-slate-100 dark:border-slate-700">
             <table className="w-full text-left text-xs">
-              <thead className="text-slate-500 dark:text-slate-400">
-                <tr className="border-b border-slate-100 dark:border-slate-700">
-                  <th className="py-2 pr-3 font-semibold">Loja</th>
+              {/* Cabeçalho fixo (sticky) — com uma lista de 28+ lojas rolando
+                  dentro do card, vale sempre poder ver o nome das colunas
+                  sem precisar voltar pro topo. */}
+              <thead className="sticky top-0 z-10 bg-white text-slate-500 shadow-sm dark:bg-slate-800 dark:text-slate-400">
+                <tr className="border-b border-slate-200 dark:border-slate-700">
+                  <th className="py-2 pl-3 pr-3 font-semibold">Loja</th>
                   <th className="px-2 py-2 text-center font-semibold">Apontamento</th>
                   <th className="px-2 py-2 text-center font-semibold">Carregamento</th>
                 </tr>
               </thead>
-              {grupos.map((grupo) => (
-                <tbody key={grupo.nome}>
-                  {/* Linha de cabeçalho do grupo (praça/cidade da loja) —
-                      mostra o nome e quantas lojas do grupo já concluíram o
-                      processo, pra dar uma visão rápida grupo a grupo antes
-                      de entrar no detalhe de cada loja. */}
-                  <tr>
-                    <td colSpan={3} className="bg-slate-50 px-2 py-1.5 dark:bg-slate-900/40">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                          {grupo.nome}
-                        </span>
-                        <span
-                          className={`text-[11px] font-semibold ${
-                            grupo.completos === grupo.itens.length
-                              ? 'text-emerald-600 dark:text-emerald-400'
-                              : 'text-slate-400 dark:text-slate-500'
-                          }`}
-                        >
-                          {grupo.completos}/{grupo.itens.length} completas
-                        </span>
-                      </div>
-                    </td>
-                  </tr>
-                  {grupo.itens.map((loja) => {
-                    const multiplasCargas = loja.cargas.length > 1;
-                    return (
-                      <tr
-                        key={loja.codigo}
-                        className={`border-b border-slate-50 last:border-0 dark:border-slate-700/60 ${
-                          !loja.completo ? 'bg-amber-50/40 dark:bg-amber-950/10' : ''
+              {[
+                { chave: 'pendentes', rotulo: 'Ainda pendente', itens: pendentes },
+                { chave: 'concluidas', rotulo: 'Processo completo', itens: concluidas },
+              ]
+                .filter((secao) => secao.itens.length > 0)
+                .map((secao) => (
+                  <tbody key={secao.chave}>
+                    {/* Sem mais agrupamento por praça/cidade — só essa
+                        cabeceira de seção (pendente x completo) pra separar
+                        visualmente o que precisa de atenção do que já foi
+                        resolvido, já que a lista inteira normalmente não
+                        cabe numa tela só. */}
+                    <tr>
+                      <td
+                        colSpan={3}
+                        className={`px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide ${
+                          secao.chave === 'pendentes'
+                            ? 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300'
+                            : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300'
                         }`}
                       >
-                        <td className="py-2 pr-3">
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-mono font-semibold text-slate-700 dark:text-slate-200">{loja.codigo}</span>
-                            <span className="text-slate-500 dark:text-slate-400">{loja.nomeLoja}</span>
-                            {loja.tiposCarga.map((tipo) => (
-                              <TipoCargaBadge key={tipo} tipo={tipo} />
-                            ))}
-                          </div>
-                          {/* Detalhe por carga só aparece quando a loja tem mais de
-                              uma no dia — é o que justifica não confiar num status
-                              único por linha (ver comentário acima do useMemo). Uma
-                              loja fixa sem nenhuma carga importada hoje (ver useMemo)
-                              mostra um aviso em vez de "Carga undefined". */}
-                          {loja.cargas.length === 0 ? (
-                            <div className="font-medium text-amber-600 dark:text-amber-400">
-                              Nenhuma carga importada hoje
-                            </div>
-                          ) : multiplasCargas ? (
-                            <div className="mt-0.5 flex flex-wrap gap-x-2 gap-y-0.5 text-slate-400 dark:text-slate-500">
-                              {loja.cargas.map((carga) => (
-                                <span key={carga.numero} className="inline-flex items-center gap-1">
-                                  Carga {carga.numero}
-                                  {ICONE_CARREGAMENTO[carga.situacao.chave]}
-                                </span>
+                        {secao.rotulo} ({secao.itens.length})
+                      </td>
+                    </tr>
+                    {secao.itens.map((loja, indice) => {
+                      const multiplasCargas = loja.cargas.length > 1;
+                      return (
+                        <tr
+                          key={loja.codigo}
+                          className={`border-b border-slate-50 last:border-0 dark:border-slate-700/60 ${
+                            indice % 2 === 1 ? 'bg-slate-50/60 dark:bg-slate-900/20' : ''
+                          }`}
+                        >
+                          <td className="py-2 pl-3 pr-3">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-mono font-semibold text-slate-700 dark:text-slate-200">{loja.codigo}</span>
+                              <span className="text-slate-500 dark:text-slate-400">{loja.nomeLoja}</span>
+                              {loja.tiposCarga.map((tipo) => (
+                                <TipoCargaBadge key={tipo} tipo={tipo} />
                               ))}
                             </div>
-                          ) : (
-                            <div className="text-slate-400 dark:text-slate-500">Carga {loja.cargas[0]?.numero}</div>
-                          )}
-                        </td>
-                        <td className="px-2 py-2 text-center">
-                          <div className="flex flex-col items-center gap-0.5">
-                            {loja.apontamentoFeito ? (
-                              <CheckCircle2 size={14} className="text-emerald-500" />
+                            {/* Detalhe por carga só aparece quando a loja tem mais de
+                                uma no dia — é o que justifica não confiar num status
+                                único por linha (ver comentário acima do useMemo). Uma
+                                loja fixa sem nenhuma carga importada hoje (ver useMemo)
+                                mostra um aviso em vez de "Carga undefined". */}
+                            {loja.cargas.length === 0 ? (
+                              <div className="font-medium text-amber-600 dark:text-amber-400">
+                                Nenhuma carga importada hoje
+                              </div>
+                            ) : multiplasCargas ? (
+                              <div className="mt-0.5 flex flex-wrap gap-x-2 gap-y-0.5 text-slate-400 dark:text-slate-500">
+                                {loja.cargas.map((carga) => (
+                                  <span key={carga.numero} className="inline-flex items-center gap-1">
+                                    Carga {carga.numero}
+                                    {ICONE_CARREGAMENTO[carga.situacao.chave]}
+                                  </span>
+                                ))}
+                              </div>
                             ) : (
-                              <XCircle size={14} className="text-slate-300 dark:text-slate-600" />
+                              <div className="text-slate-400 dark:text-slate-500">Carga {loja.cargas[0]?.numero}</div>
                             )}
-                            <span
-                              className={
-                                loja.apontamentoFeito
-                                  ? 'text-emerald-600 dark:text-emerald-400'
-                                  : 'text-slate-400 dark:text-slate-500'
-                              }
-                            >
-                              {loja.apontamentoFeito ? 'Sim' : 'Pendente'}
-                              {multiplasCargas && ` (${loja.apontamentoContagem}/${loja.cargas.length})`}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="px-2 py-2 text-center">
-                          <div className="flex flex-col items-center gap-0.5">
-                            {ICONE_CARREGAMENTO[loja.carregamentoFeito ? 'completo' : 'pendente']}
-                            <span
-                              className={
-                                COR_TEXTO_CARREGAMENTO[loja.carregamentoFeito ? 'completo' : 'pendente']
-                              }
-                            >
-                              {loja.carregamentoFeito ? 'Sim' : 'Pendente'}
-                              {multiplasCargas && ` (${loja.carregamentoContagem}/${loja.cargas.length})`}
-                            </span>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              ))}
+                          </td>
+                          <td className="px-2 py-2 text-center">
+                            <div className="flex flex-col items-center gap-0.5">
+                              {loja.apontamentoFeito ? (
+                                <CheckCircle2 size={14} className="text-emerald-500" />
+                              ) : (
+                                <XCircle size={14} className="text-slate-300 dark:text-slate-600" />
+                              )}
+                              <span
+                                className={
+                                  loja.apontamentoFeito
+                                    ? 'text-emerald-600 dark:text-emerald-400'
+                                    : 'text-slate-400 dark:text-slate-500'
+                                }
+                              >
+                                {loja.apontamentoFeito ? 'Sim' : 'Pendente'}
+                                {multiplasCargas && ` (${loja.apontamentoContagem}/${loja.cargas.length})`}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-2 py-2 text-center">
+                            <div className="flex flex-col items-center gap-0.5">
+                              {ICONE_CARREGAMENTO[loja.carregamentoFeito ? 'completo' : 'pendente']}
+                              <span
+                                className={
+                                  COR_TEXTO_CARREGAMENTO[loja.carregamentoFeito ? 'completo' : 'pendente']
+                                }
+                              >
+                                {loja.carregamentoFeito ? 'Sim' : 'Pendente'}
+                                {multiplasCargas && ` (${loja.carregamentoContagem}/${loja.cargas.length})`}
+                              </span>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                ))}
             </table>
           </div>
         )}

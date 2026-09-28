@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Menu, RotateCcw, Trash2, CalendarClock, X, CheckCircle2, AlertTriangle, Sun, Moon, Lock } from 'lucide-react';
+import { Menu, RotateCcw, Trash2, CalendarClock, X, CheckCircle2, AlertTriangle, Sun, Moon, Lock, Maximize, Minimize } from 'lucide-react';
 import { useApp } from '../../context/AppContext.jsx';
 import { useDarkMode } from '../../hooks/useDarkMode.js';
+import { useFullscreen } from '../../hooks/useFullscreen.js';
 import { formatarData } from '../../utils/dateHelpers';
 import { TIPOS_CARGA } from '../../utils/tipoCarga';
 
@@ -27,6 +28,7 @@ const SENHA_CONFIRMACAO = import.meta.env.VITE_SENHA_CONFIRMACAO_RESET || '9516'
 export default function Header({ tituloAba, abaAtiva, onAbrirMenu }) {
   const { state, actions, filtroTipoCarga, setFiltroTipoCarga } = useApp();
   const { escuro, alternarTema } = useDarkMode();
+  const { emTelaCheia, alternarTelaCheia, suportado: telaCheiaSuportada } = useFullscreen();
   const [confirmando, setConfirmando] = useState(null); // null | 'restaurar' | 'zerar'
   const [senhaDigitada, setSenhaDigitada] = useState('');
   const [senhaErrada, setSenhaErrada] = useState(false);
@@ -117,6 +119,22 @@ export default function Header({ tituloAba, abaAtiva, onAbrirMenu }) {
           >
             {escuro ? <Sun size={14} /> : <Moon size={14} />}
           </button>
+
+          {/* Alternativa ao F11 — útil sobretudo pra quem deixa o Doca
+              Manager aberto num monitor/TV fixo no pátio, onde a barra do
+              navegador só atrapalha. Some sozinho se o navegador bloquear a
+              API de tela cheia (ex.: dentro de um iframe sem permissão),
+              em vez de aparecer sem funcionar. */}
+          {telaCheiaSuportada && (
+            <button
+              onClick={alternarTelaCheia}
+              title={emTelaCheia ? 'Sair da tela cheia' : 'Expandir para tela cheia'}
+              aria-label={emTelaCheia ? 'Sair da tela cheia' : 'Expandir para tela cheia'}
+              className="flex items-center justify-center rounded-md border border-slate-200 bg-white p-1.5 text-slate-500 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600"
+            >
+              {emTelaCheia ? <Minimize size={14} /> : <Maximize size={14} />}
+            </button>
+          )}
 
           {abaAtiva === 'importar' && (
             <>
