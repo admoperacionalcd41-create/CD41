@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { useApp } from '../../context/AppContext.jsx';
+import { boxEhEspecial } from '../../utils/boxLogic';
 import BoxCard from './BoxCard.jsx';
 import AndamentoEntregasCard from '../Dashboard/AndamentoEntregasCard.jsx';
 
@@ -18,10 +19,41 @@ export default function BoxGrid({ irPara, aoAbrirAgrupamento }) {
     return mapa;
   }, [state.lojas]);
 
+  // Ordem de EXIBIÇÃO nesta tela (pedido do usuário): Box 2 ao Box 13
+  // primeiro, e só depois os boxes "especiais" (BLOCADO 1, BLOCADO 2, Box
+  // Frios) por último. Não muda o `numero` interno de cada box (usado em
+  // toda alocação/movimentação de vaga) — só a ordem em que os cards
+  // aparecem aqui.
+  const boxesOrdenados = useMemo(
+    () =>
+      state.boxes.slice().sort((a, b) => {
+        const especialA = boxEhEspecial(a.nome) ? 1 : 0;
+        const especialB = boxEhEspecial(b.nome) ? 1 : 0;
+        if (especialA !== especialB) return especialA - especialB;
+        return a.numero - b.numero;
+      }),
+    [state.boxes]
+  );
+
+  // Pedido do usuário: em telas de notebook/desktop (xl pra cima), todos os
+  // quadros (boxes) em APENAS DUAS LINHAS — 8 colunas de largura igual
+  // (1fr), que é o número de colunas que cabe os 15 boxes em exatamente 2
+  // linhas de 8+7. Cada card ocupa uma coluna, preenchendo a grade na mesma
+  // ordem de cima. Os boxes especiais continuam identificáveis pela cor
+  // (borda/fundo rosado no BoxCard), sem seção/divisor próprio (criaria
+  // linhas extras).
+  //
+  // Em telas menores, 8 colunas fixas deixava cada card espremido demais
+  // pra ler (celular/tablet) — por isso o número de colunas agora responde
+  // ao tamanho da tela: menos colunas (e portanto mais linhas, com rolagem
+  // vertical normal) quanto menor a tela. Precisa ser classes Tailwind
+  // normais (não um valor calculado em JS/inline) porque só assim o
+  // Tailwind aplica um breakpoint por vez — um `gridTemplateColumns`
+  // calculado em JS não tem como variar por media query.
   return (
     <div className="flex h-full min-h-0 flex-col gap-2">
-      <div className="flex-shrink-0 grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-8 xl:grid-cols-8 2xl:grid-cols-10">
-        {state.boxes.map((box) => (
+      <div className="grid flex-shrink-0 grid-cols-3 gap-1.5 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8">
+        {boxesOrdenados.map((box) => (
           <BoxCard key={box.numero} box={box} lojasPorId={lojasPorId} aoSelecionarLoja={aoAbrirAgrupamento} />
         ))}
       </div>

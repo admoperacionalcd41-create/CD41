@@ -97,14 +97,22 @@ function AppLogado({ grupo }) {
           abaAtiva={abaAtiva}
           onAbrirMenu={() => setMenuAberto(true)}
         />
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6">
+        <main className="flex-1 overflow-y-auto p-3 sm:p-4 lg:p-6">
           {/* Na aba Boxes & Vagas, o conteúdo preenche toda a altura
               disponível (h-full) e se organiza em flex-col internamente, pra
               a lista de veículos do card "Andamento das Entregas" ganhar
               rolagem própria dentro do espaço que sobra — em vez de a
               página inteira precisar rolar. Nas outras abas o wrapper
-              continua sem altura fixa, do jeito que sempre foi. */}
-          <div className={`mx-auto max-w-7xl ${abaAtiva === 'boxes' ? 'h-full' : ''}`}>{renderConteudo()}</div>
+              continua sem altura fixa, do jeito que sempre foi.
+
+              A largura máxima do conteúdo cresce um pouco em telas bem
+              grandes (2xl — monitores grandes/TV) em vez de ficar sempre
+              travada em max-w-7xl (1280px): sem isso, sobrava muita área
+              escura vazia nas laterais numa TV/monitor 4K, sem nenhum
+              ganho de legibilidade. */}
+          <div className={`mx-auto max-w-7xl 2xl:max-w-[1600px] ${abaAtiva === 'boxes' ? 'h-full' : ''}`}>
+            {renderConteudo()}
+          </div>
         </main>
       </div>
 
