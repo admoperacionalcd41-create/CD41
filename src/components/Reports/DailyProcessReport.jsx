@@ -3,7 +3,7 @@ import { ListChecks, CheckCircle2, XCircle, Loader2, Clock } from 'lucide-react'
 import { useApp } from '../../context/AppContext.jsx';
 import { getLojasDoDia } from '../../utils/selectors';
 import { lojaPassaFiltroTipoCarga } from '../../utils/tipoCarga';
-import { formatarHora, formatarData } from '../../utils/dateHelpers';
+import { formatarHora, formatarData, eHoje } from '../../utils/dateHelpers';
 import TipoCargaBadge from '../Shared/TipoCargaBadge.jsx';
 
 const ROTULO_TIPO = {
@@ -18,14 +18,22 @@ const ROTULO_TIPO = {
 // que já saiu carga dela hoje. Por isso também olha os protocolos daquela
 // carga: se algum for "saldo", o carregamento já começou mesmo que ainda
 // não tenha fechado.
+//
+// Só conta como "completo"/"parcial" quando o registro (dataCarregamento ou
+// a data do protocolo de saldo) é de HOJE de verdade (relógio real, ver
+// eHoje) — não do dia operacional (`state.diaAtual`), que só avança quando
+// alguém clica em "Encerrar Dia" e pode ficar parado por mais de um dia. Sem
+// esse cuidado, um carregamento feito há alguns dias, mas ainda dentro do
+// mesmo dia operacional em aberto, continuaria "validando" o processo de
+// hoje mesmo sem nenhuma ação de verdade ter acontecido hoje.
 function situacaoCarregamento(loja, protocolosDaLoja) {
-  if (loja.status === 'finalizada') {
+  if (loja.status === 'finalizada' && eHoje(loja.dataCarregamento)) {
     return {
       chave: 'completo',
       texto: `Finalizado às ${formatarHora(loja.dataCarregamento)}`,
     };
   }
-  if (protocolosDaLoja.some((p) => p.statusEnvio === 'saldo')) {
+  if (protocolosDaLoja.some((p) => p.statusEnvio === 'saldo' && eHoje(p.dataHora))) {
     return { chave: 'parcial', texto: 'Saiu parcial — aguardando saldo' };
   }
   if (loja.status === 'carregando') {
@@ -59,40 +67,62 @@ export default function DailyProcessReport() {
   // ALGUMA carga da loja já foi apontada e se ALGUMA já foi carregada, não
   // cada carga separadamente. Por isso agrupa tudo pelo código da loja
   // antes de montar as linhas, em vez de uma linha por carga.
+  //
+  // A COLUNA LOJA precisa ter sempre as lojas fixas, mesmo quando nenhuma
+  // carga foi importada hoje pra alguma delas — senão uma loja esquecida na
+  // importação simplesmente some do relatório, em vez de aparecer pendente
+  // chamando atenção. Como o sistema não tem um cadastro à parte com as 28
+  // lojas fixas, a lista vem do HISTÓRICO: todo código de loja que já
+  // apareceu em qualquer importação anterior (não só hoje) conta como uma
+  // loja fixa — usa o nome/tipo de carga da importação mais recente daquele
+  // código como referência para quando não há carga dela hoje.
   const linhas = useMemo(() => {
-    const porCodigo = new Map();
-    getLojasDoDia(state)
-      .filter((l) => lojaPassaFiltroTipoCarga(l, filtroTipoCarga))
-      .forEach((loja) => {
-        const protocolosDaLoja = state.protocolos.filter((p) => p.lojaId === loja.id);
-        const situacao = situacaoCarregamento(loja, protocolosDaLoja);
-        const carga = {
-          numero: loja.carga,
-          tipoCarga: loja.tipoCarga,
-          apontada: loja.status !== 'pendente',
-          situacao,
-        };
-        if (!porCodigo.has(loja.loja)) {
-          porCodigo.set(loja.loja, { codigo: loja.loja, nomeLoja: loja.nomeLoja, cargas: [] });
-        }
-        porCodigo.get(loja.loja).cargas.push(carga);
-      });
+    const lojasConhecidas = new Map();
+    state.lojas.forEach((l) => {
+      const atual = lojasConhecidas.get(l.loja);
+      if (!atual || new Date(l.dataImportacao) >= new Date(atual.dataImportacao)) {
+        lojasConhecidas.set(l.loja, { nomeLoja: l.nomeLoja, tipoCarga: l.tipoCarga || 'seca' });
+      }
+    });
 
-    return Array.from(porCodigo.values())
-      .map((loja) => {
-        const apontamentoFeito = loja.cargas.some((c) => c.apontada);
-        const apontamentoContagem = loja.cargas.filter((c) => c.apontada).length;
-        const carregamentoFeito = loja.cargas.some((c) => c.situacao.chave === 'completo' || c.situacao.chave === 'parcial');
-        const carregamentoContagem = loja.cargas.filter(
+    const cargasHojePorCodigo = new Map();
+    getLojasDoDia(state).forEach((loja) => {
+      const protocolosDaLoja = state.protocolos.filter((p) => p.lojaId === loja.id);
+      const situacao = situacaoCarregamento(loja, protocolosDaLoja);
+      const carga = {
+        numero: loja.carga,
+        tipoCarga: loja.tipoCarga,
+        // Só conta como apontada "hoje" quando dataApontamento é de hoje de
+        // verdade — não basta o status ter avançado, se isso aconteceu num
+        // dia anterior dentro do mesmo dia operacional ainda aberto.
+        apontada: loja.status !== 'pendente' && eHoje(loja.dataApontamento),
+        situacao,
+      };
+      if (!cargasHojePorCodigo.has(loja.loja)) cargasHojePorCodigo.set(loja.loja, []);
+      cargasHojePorCodigo.get(loja.loja).push(carga);
+    });
+
+    return Array.from(lojasConhecidas.entries())
+      .map(([codigo, info]) => {
+        const cargas = cargasHojePorCodigo.get(codigo) || [];
+        // Sem nenhuma carga hoje, usa o tipo de carga da última importação
+        // conhecida dessa loja só pra decidir se ela passa no filtro
+        // Seca/Resfriada do cabeçalho — não tem carga de hoje pra olhar.
+        const tiposCarga = cargas.length > 0 ? [...new Set(cargas.map((c) => c.tipoCarga))] : [info.tipoCarga];
+        const apontamentoFeito = cargas.some((c) => c.apontada);
+        const apontamentoContagem = cargas.filter((c) => c.apontada).length;
+        const carregamentoFeito = cargas.some((c) => c.situacao.chave === 'completo' || c.situacao.chave === 'parcial');
+        const carregamentoContagem = cargas.filter(
           (c) => c.situacao.chave === 'completo' || c.situacao.chave === 'parcial'
         ).length;
-        const tiposCarga = [...new Set(loja.cargas.map((c) => c.tipoCarga))];
         // "O que importa é se foi feito o processo da loja" — processo
-        // completo = teve alguma carga apontada E alguma carga carregada,
-        // sem exigir que TODAS as cargas do dia estejam finalizadas.
+        // completo = teve alguma carga apontada E alguma carga carregada
+        // hoje, sem exigir que TODAS as cargas do dia estejam finalizadas.
+        // Uma loja sem nenhuma carga hoje nunca fica completa.
         const completo = apontamentoFeito && carregamentoFeito;
-        return { ...loja, tiposCarga, apontamentoFeito, apontamentoContagem, carregamentoFeito, carregamentoContagem, completo };
+        return { codigo, nomeLoja: info.nomeLoja, cargas, tiposCarga, apontamentoFeito, apontamentoContagem, carregamentoFeito, carregamentoContagem, completo };
       })
+      .filter((loja) => loja.tiposCarga.some((tipo) => lojaPassaFiltroTipoCarga({ tipoCarga: tipo }, filtroTipoCarga)))
       .sort((a, b) => {
         // O que ainda falta (apontamento ou carregamento) aparece primeiro,
         // pra chamar atenção logo de cara.
@@ -136,9 +166,10 @@ export default function DailyProcessReport() {
           <div>
             <h2 className="text-sm font-bold text-slate-700 dark:text-slate-200">Processo do Dia — {rotuloTipo}</h2>
             <p className="text-xs text-slate-400 dark:text-slate-500">
-              Dia operacional: <span className="font-semibold">{formatarData(state.diaAtual)}</span> — uma linha por
-              loja, mesmo quando ela tem mais de uma carga hoje: o que importa é se a loja teve alguma carga apontada
-              e alguma carga carregada
+              Dia operacional: <span className="font-semibold">{formatarData(state.diaAtual)}</span> — a coluna Loja
+              traz sempre as lojas fixas (todo código já visto em alguma importação), mesmo sem carga hoje; as
+              colunas Apontamento e Carregamento validam só o que foi feito hoje de verdade (registros de dias
+              anteriores não contam)
             </p>
           </div>
         </div>
@@ -229,8 +260,14 @@ export default function DailyProcessReport() {
                           </div>
                           {/* Detalhe por carga só aparece quando a loja tem mais de
                               uma no dia — é o que justifica não confiar num status
-                              único por linha (ver comentário acima do useMemo). */}
-                          {multiplasCargas ? (
+                              único por linha (ver comentário acima do useMemo). Uma
+                              loja fixa sem nenhuma carga importada hoje (ver useMemo)
+                              mostra um aviso em vez de "Carga undefined". */}
+                          {loja.cargas.length === 0 ? (
+                            <div className="font-medium text-amber-600 dark:text-amber-400">
+                              Nenhuma carga importada hoje
+                            </div>
+                          ) : multiplasCargas ? (
                             <div className="mt-0.5 flex flex-wrap gap-x-2 gap-y-0.5 text-slate-400 dark:text-slate-500">
                               {loja.cargas.map((carga) => (
                                 <span key={carga.numero} className="inline-flex items-center gap-1">
