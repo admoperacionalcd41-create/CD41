@@ -25,6 +25,12 @@ function montarHtmlProtocolo(protocolo, loja, outrasLojas) {
     th, td { text-align: left; border-bottom: 1px solid #e2e8f0; padding: 6px 8px; }
     th { color: #64748b; font-weight: 600; text-transform: uppercase; font-size: 10px; }
     tfoot td { font-weight: 700; border-top: 2px solid #1e293b; border-bottom: none; }
+    /* Campo em branco pra anotar à caneta o lacre de cada loja além da
+       primeira — quando o veículo leva mais de uma loja, cada uma é lacrada
+       separadamente e essa numeração só existe fisicamente depois da
+       impressão, então não dá pra vir preenchida (ver comentário acima de
+       montarHtmlProtocolo). */
+    .lacre-manual { display: inline-block; min-width: 70px; border-bottom: 1px solid #1e293b; }
     .assinaturas { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 48px; }
     .linha-assinatura { border-top: 1px solid #1e293b; padding-top: 6px; font-size: 11px; color: #64748b; text-align: center; }
     @media print { body { padding: 12px; } }
@@ -38,8 +44,13 @@ function montarHtmlProtocolo(protocolo, loja, outrasLojas) {
       paletesEnviados: protocolo.paletesEnviados,
       posicaoCarregamento: protocolo.posicaoCarregamento,
       posicaoEntrega: protocolo.posicaoEntrega,
+      // A primeira loja do protocolo é a única cujo(s) lacre(s) já vêm
+      // digitados (campo "Lacres" no formulário, impresso na grade acima) —
+      // as demais lojas do mesmo veículo são lacradas à parte, então ganham
+      // uma coluna em branco na tabela pra anotar à mão (ver .lacre-manual).
+      principal: true,
     },
-    ...outrasLojas,
+    ...outrasLojas.map((l) => ({ ...l, principal: false })),
   ];
   const totalPaletes = todasLojas.reduce((soma, l) => soma + l.paletesEnviados, 0);
   // Sequência de carregamento só faz sentido (e só existe) pra protocolo em
@@ -61,6 +72,7 @@ function montarHtmlProtocolo(protocolo, loja, outrasLojas) {
       <td>${l.loja}</td>
       <td>${l.nomeLoja}</td>
       <td>${l.paletesEnviados}</td>
+      ${todasLojas.length > 1 ? `<td>${l.principal ? '(ver acima)' : '<span class="lacre-manual">&nbsp;</span>'}</td>` : ''}
     </tr>`
     )
     .join('');
@@ -93,10 +105,11 @@ function montarHtmlProtocolo(protocolo, loja, outrasLojas) {
         <tr>
           ${temSequencia ? '<th>Entrega</th>' : ''}
           <th>Carga</th><th>Loja</th><th>Nome da Loja</th><th>Paletes</th>
+          ${todasLojas.length > 1 ? '<th>Lacre</th>' : ''}
         </tr>
       </thead>
       <tbody>${linhasLojas}</tbody>
-      ${todasLojas.length > 1 ? `<tfoot><tr><td colspan="${temSequencia ? 4 : 3}">Total</td><td>${totalPaletes}</td></tr></tfoot>` : ''}
+      ${todasLojas.length > 1 ? `<tfoot><tr><td colspan="${temSequencia ? 4 : 3}">Total</td><td>${totalPaletes}</td><td></td></tr></tfoot>` : ''}
     </table>
   </div>
 

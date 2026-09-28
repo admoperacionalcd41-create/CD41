@@ -77,7 +77,7 @@ function montarHtmlImpressao(loja, total) {
     * { box-sizing: border-box; }
     @page { size: ${LARGURA_ETIQUETA_MM}mm ${ALTURA_ETIQUETA_MM}mm; margin: 0; }
     html, body { margin: 0; padding: 0; }
-    body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; color: #0f172a; }
+    body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; color: #000; }
     .etiqueta {
       width: ${LARGURA_ETIQUETA_MM}mm;
       height: ${ALTURA_ETIQUETA_MM}mm;
@@ -93,24 +93,28 @@ function montarHtmlImpressao(loja, total) {
     }
     .etiqueta:last-child { page-break-after: auto; break-after: auto; }
     .cabecalho { display: flex; align-items: center; justify-content: space-between; border-bottom: 1pt solid #1e293b; padding-bottom: 1.5mm; }
-    .titulo { font-size: 9pt; font-weight: 800; letter-spacing: 0.5pt; color: #64748b; text-transform: uppercase; }
+    .titulo { font-size: 9pt; font-weight: 800; letter-spacing: 0.5pt; color: #000; text-transform: uppercase; }
     .caixa-box { background: #1e293b; color: #fff; font-size: 8pt; font-weight: 700; padding: 0.8mm 2.5mm; border-radius: 1mm; }
     .caixa-tipo { background: ${corTipo}; color: #fff; font-size: 8pt; font-weight: 700; padding: 0.8mm 2.5mm; border-radius: 1mm; margin-right: 1.5mm; }
     .grupo-badges { display: flex; align-items: center; }
 
     .loja-destaque { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-    .loja-rotulo { font-size: 7pt; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5pt; color: #64748b; margin: 0; }
-    .loja-valor { font-size: 44pt; font-weight: 900; line-height: 1; color: #0f172a; margin: 0.5mm 0 0; }
+    .loja-rotulo { font-size: 7pt; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5pt; color: #000; margin: 0; }
+    .loja-valor { font-size: 44pt; font-weight: 900; line-height: 1; color: #000; margin: 0.5mm 0 0; }
 
     .rodape-campos { display: flex; align-items: flex-end; gap: 3mm; }
     .rodape-campo { min-width: 0; }
     .rodape-campo.destaque { flex: 1; }
-    .rodape-rotulo { font-size: 6pt; text-transform: uppercase; color: #94a3b8; margin: 0; }
-    .rodape-valor { font-size: 8.5pt; font-weight: 700; margin: 0.3mm 0 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .rodape-rotulo { font-size: 6pt; text-transform: uppercase; color: #000; margin: 0; }
+    .rodape-valor { font-size: 8.5pt; font-weight: 700; color: #000; margin: 0.3mm 0 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    /* Nome da Loja é o campo de destaque do rodapé (maior espaço, ver
+       .rodape-campo.destaque) — pedido do usuário pra aumentar mais esse
+       valor especificamente, bem além do tamanho de Carga/Paletes. */
+    .rodape-valor-loja { font-size: 13pt; font-weight: 800; color: #000; margin: 0.3mm 0 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
     .segunda-linha { display: flex; align-items: flex-end; justify-content: space-between; gap: 3mm; margin-top: 1mm; }
-    .colaboradores { font-size: 7.5pt; font-weight: 600; color: #334155; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .data-agrupamento { flex-shrink: 0; font-size: 6pt; color: #94a3b8; white-space: nowrap; }
+    .colaboradores { font-size: 9.5pt; font-weight: 700; color: #000; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .data-agrupamento { flex-shrink: 0; font-size: 6pt; color: #000; white-space: nowrap; }
   `;
 
   const corpo = etiquetas
@@ -127,12 +131,12 @@ function montarHtmlImpressao(loja, total) {
       <div class="loja-destaque">
         <p class="loja-rotulo">Loja</p>
         <p class="loja-valor">${loja.loja}</p>
-        ${composicaoPaletes[n - 1] ? `<p style="margin:0.5mm 0 0;font-size:7pt;font-weight:700;color:#64748b;">Lotes: ${composicaoPaletes[n - 1]}</p>` : ''}
+        ${composicaoPaletes[n - 1] ? `<p style="margin:0.5mm 0 0;font-size:7pt;font-weight:700;color:#000;">Lotes: ${composicaoPaletes[n - 1]}</p>` : ''}
       </div>
       <div>
         <div class="rodape-campos">
           <div class="rodape-campo"><p class="rodape-rotulo">Carga</p><p class="rodape-valor">${loja.carga}</p></div>
-          <div class="rodape-campo destaque"><p class="rodape-rotulo">Nome da Loja</p><p class="rodape-valor">${loja.nomeLoja}</p></div>
+          <div class="rodape-campo destaque"><p class="rodape-rotulo">Nome da Loja</p><p class="rodape-valor-loja">${loja.nomeLoja}</p></div>
           <div class="rodape-campo"><p class="rodape-rotulo">Paletes</p><p class="rodape-valor">${total}</p></div>
         </div>
         <div class="segunda-linha">
