@@ -1,4 +1,5 @@
 import { eHoje } from './dateHelpers';
+import { lojaPassaFiltroTipoCarga } from './tipoCarga';
 
 /** Lojas cujo dia de referência é o dia operacional atual (state.diaAtual). */
 export function getLojasDoDia(state) {
@@ -142,6 +143,107 @@ export function getEntregaCodigoLojaNaData(state, codigo, dataISO, tipoCarga) {
   const temAtividade = importadaNoDia || protocolosNoDia.length > 0;
 
   return { temAtividade, entregue: protocolosNoDia.length > 0, paletes, parcial };
+}
+
+/**
+ * Soma peso/volume de um conjunto de lojas. Alguns registros importados
+ * podem não ter peso/volume informado (formato simplificado) — nesse caso o
+ * campo fica null e é ignorado na soma; `tem` decide se o dado deve aparecer
+ * na tela (para não mostrar "0 kg" quando ninguém informou esse dado).
+ * Compartilhado pelo Dashboard e pelo card de resumo operacional da aba
+ * Boxes & Vagas, pra não ter duas implementações que podem divergir.
+ */
+export function calcularPesoVolume(lojas) {
+  const peso = lojas.reduce((soma, l) => soma + (l.peso ?? 0), 0);
+  const volume = lojas.reduce((soma, l) => soma + (l.volume ?? 0), 0);
+  const tem = lojas.some((l) => l.peso != null || l.volume != null);
+  return { peso, volume, tem };
+}
+
+/**
+ * Uma linha por CÓDIGO de loja (não por carga — ver comentário em
+ * DailyProcessReport.jsx) com o apontamento/carregamento feitos hoje. Base
+ * do relatório "Processo do Dia" — extraído pra selectors.js pra poder ser
+ * reaproveitado também no card de resumo operacional da aba Boxes & Vagas,
+ * sem duplicar essa lógica (e sem os dois lugares divergindo com o tempo).
+ *
+ * A COLUNA LOJA sempre traz as lojas fixas (todo código já visto em alguma
+ * importação anterior, não só hoje — não existe cadastro à parte com as
+ * lojas fixas, então o histórico faz esse papel), mesmo sem carga
+ * importada hoje; apontamento/carregamento só validam o que foi feito hoje
+ * de verdade (relógio real, ver eHoje — não o dia operacional, que só
+ * avança ao clicar em "Encerrar Dia" e pode ficar parado por mais de um
+ * dia).
+ */
+export function getLinhasProcessoDoDia(state, filtroTipoCarga) {
+  const lojasConhecidas = new Map();
+  state.lojas.forEach((l) => {
+    const atual = lojasConhecidas.get(l.loja);
+    if (!atual || new Date(l.dataImportacao) >= new Date(atual.dataImportacao)) {
+      lojasConhecidas.set(l.loja, { nomeLoja: l.nomeLoja, tipoCarga: l.tipoCarga || 'seca' });
+    }
+  });
+
+  const cargasHojePorCodigo = new Map();
+  getLojasDoDia(state).forEach((loja) => {
+    const protocolosDaLoja = state.protocolos.filter((p) => p.lojaId === loja.id);
+    const situacaoChave =
+      loja.status === 'finalizada' && eHoje(loja.dataCarregamento)
+        ? 'completo'
+        : protocolosDaLoja.some((p) => p.statusEnvio === 'saldo' && eHoje(p.dataHora))
+        ? 'parcial'
+        : loja.status === 'carregando'
+        ? 'em_andamento'
+        : 'pendente';
+    const carga = {
+      numero: loja.carga,
+      tipoCarga: loja.tipoCarga,
+      apontada: loja.status !== 'pendente' && eHoje(loja.dataApontamento),
+      situacaoChave,
+    };
+    if (!cargasHojePorCodigo.has(loja.loja)) cargasHojePorCodigo.set(loja.loja, []);
+    cargasHojePorCodigo.get(loja.loja).push(carga);
+  });
+
+  return Array.from(lojasConhecidas.entries())
+    .map(([codigo, info]) => {
+      const cargas = cargasHojePorCodigo.get(codigo) || [];
+      const tiposCarga = cargas.length > 0 ? [...new Set(cargas.map((c) => c.tipoCarga))] : [info.tipoCarga];
+      const apontamentoFeito = cargas.some((c) => c.apontada);
+      const apontamentoContagem = cargas.filter((c) => c.apontada).length;
+      const carregamentoFeito = cargas.some((c) => c.situacaoChave === 'completo' || c.situacaoChave === 'parcial');
+      const carregamentoContagem = cargas.filter(
+        (c) => c.situacaoChave === 'completo' || c.situacaoChave === 'parcial'
+      ).length;
+      const completo = apontamentoFeito && carregamentoFeito;
+      return {
+        codigo,
+        nomeLoja: info.nomeLoja,
+        cargas,
+        tiposCarga,
+        apontamentoFeito,
+        apontamentoContagem,
+        carregamentoFeito,
+        carregamentoContagem,
+        completo,
+      };
+    })
+    .filter((loja) => loja.tiposCarga.some((tipo) => lojaPassaFiltroTipoCarga({ tipoCarga: tipo }, filtroTipoCarga)))
+    .sort((a, b) => {
+      if (a.completo !== b.completo) return a.completo ? 1 : -1;
+      return a.codigo.localeCompare(b.codigo, 'pt-BR', { numeric: true, sensitivity: 'base' });
+    });
+}
+
+/**
+ * Cargas do dia operacional atual que AINDA NÃO tiveram apontamento feito
+ * hoje de verdade — mesma regra de "apontada" usada em
+ * getLinhasProcessoDoDia (relógio real via eHoje, não o dia operacional).
+ * Usada pro peso/volume "pendente de apontamento" no card de resumo
+ * operacional da aba Boxes & Vagas.
+ */
+export function getLojasSemApontamentoHoje(state) {
+  return getLojasDoDia(state).filter((l) => !(l.status !== 'pendente' && eHoje(l.dataApontamento)));
 }
 
 export function getResumoDashboard(state) {

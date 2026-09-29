@@ -8,22 +8,12 @@ import {
   getPendentesHoje,
   getSaldoAnterior,
   getLojasEmCarregamento,
+  calcularPesoVolume,
 } from '../../utils/selectors';
 import SummaryCard from './SummaryCard.jsx';
 import AndamentoEntregasCard from './AndamentoEntregasCard.jsx';
 import { getResumoBox, getStatusBox, boxEhEspecial } from '../../utils/boxLogic';
 import { lojaPassaFiltroTipoCarga } from '../../utils/tipoCarga';
-
-// Soma peso/volume de um conjunto de lojas. Alguns registros importados
-// podem não ter peso/volume informado (formato simplificado) — nesse caso
-// o campo fica null e é ignorado na soma; `tem` decide se o dado aparece
-// no card (para não mostrar "0 kg" quando ninguém informou esse dado).
-function calcularPesoVolume(lojas) {
-  const peso = lojas.reduce((soma, l) => soma + (l.peso ?? 0), 0);
-  const volume = lojas.reduce((soma, l) => soma + (l.volume ?? 0), 0);
-  const tem = lojas.some((l) => l.peso != null || l.volume != null);
-  return { peso, volume, tem };
-}
 
 const ORDEM_STATUS_BOX = [
   { chave: 'ocupado', texto: 'Ocupados', corPonto: 'bg-red-500' },

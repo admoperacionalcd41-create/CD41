@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { useApp } from '../../context/AppContext.jsx';
 import { boxEhEspecial } from '../../utils/boxLogic';
 import BoxCard from './BoxCard.jsx';
+import ResumoProcessoCard from './ResumoProcessoCard.jsx';
 import AndamentoEntregasCard from '../Dashboard/AndamentoEntregasCard.jsx';
 
 // `aoAbrirAgrupamento` (obrigatório na prática): chamado com a loja
@@ -52,6 +53,12 @@ export default function BoxGrid({ irPara, aoAbrirAgrupamento }) {
   // calculado em JS não tem como variar por media query.
   return (
     <div className="flex h-full min-h-0 flex-col gap-2">
+      {/* Card pequeno pedido pelo usuário: junta o "Apontamento feito" do
+          relatório Processo do Dia com o peso/volume do que ainda falta
+          apontar hoje (estilo dos cards do Dashboard) — clicável, leva
+          direto pro relatório completo. */}
+      <ResumoProcessoCard irPara={irPara} />
+
       <div className="grid flex-shrink-0 grid-cols-3 gap-1.5 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8">
         {boxesOrdenados.map((box) => (
           <BoxCard key={box.numero} box={box} lojasPorId={lojasPorId} aoSelecionarLoja={aoAbrirAgrupamento} />
