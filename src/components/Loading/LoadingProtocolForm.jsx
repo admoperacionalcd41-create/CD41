@@ -126,7 +126,10 @@ export default function LoadingProtocolForm({ lojas, aoFechar, aoRegistrar }) {
         return;
       }
       const quantidades = Object.fromEntries(lojas.map((l) => [l.id, quantidadeEfetiva(l)]));
-      if (lojas.some((l) => quantidades[l.id] <= 0 || quantidades[l.id] > l.paletesAgrupados)) return;
+      // Sem mais teto em `l.paletesAgrupados` aqui — só exige quantidade
+      // positiva. Digitar mais do que foi agrupado é permitido de propósito
+      // (palete extra colocado manualmente na hora de carregar).
+      if (lojas.some((l) => quantidades[l.id] <= 0)) return;
       const placaFinal = placa.toUpperCase();
       actions.finalizarCarregamentoMultiplo({
         lojaIds: lojas.map((l) => l.id),
@@ -171,7 +174,10 @@ export default function LoadingProtocolForm({ lojas, aoFechar, aoRegistrar }) {
 
     const quantidade = Number(paletesEnviadosInput) || 0;
 
-    if (quantidade <= 0 || quantidade > loja.paletesAgrupados) return;
+    // Sem mais teto em `loja.paletesAgrupados` — digitar mais do que foi
+    // agrupado é permitido de propósito (palete extra colocado manualmente
+    // na hora de carregar).
+    if (quantidade <= 0) return;
 
     const placaFinal = placa.toUpperCase();
     actions.finalizarCarregamento({
@@ -256,7 +262,9 @@ export default function LoadingProtocolForm({ lojas, aoFechar, aoRegistrar }) {
                           <input
                             type="number"
                             min={1}
-                            max={l.paletesAgrupados}
+                            /* Sem `max` no agrupado — pode digitar mais do que
+                               foi agrupado quando sobra algum palete extra,
+                               colocado manualmente na hora de carregar. */
                             value={quantidadesInformadasPorLoja[l.id] || ''}
                             onChange={(e) => atualizarQuantidadeLoja(l.id, e.target.value)}
                             required
@@ -265,6 +273,12 @@ export default function LoadingProtocolForm({ lojas, aoFechar, aoRegistrar }) {
                           />
                         </label>
                       </div>
+                      {Number(quantidadesInformadasPorLoja[l.id]) > l.paletesAgrupados && (
+                        <p className="mt-1 text-[11px] text-amber-600 dark:text-amber-400">
+                          {Number(quantidadesInformadasPorLoja[l.id]) - l.paletesAgrupados} palete(s) a mais do que
+                          foi agrupado ({l.paletesAgrupados}).
+                        </p>
+                      )}
                       {statusLoja === 'saldo' && (
                         <div className="mt-2">
                           <p className="mb-1 text-[11px] text-slate-500 dark:text-slate-400">
@@ -405,13 +419,22 @@ export default function LoadingProtocolForm({ lojas, aoFechar, aoRegistrar }) {
                 <input
                   type="number"
                   min={1}
-                  max={loja.paletesAgrupados}
+                  /* Sem `max` no agrupado — pode digitar mais do que foi
+                     agrupado quando sobra algum palete extra, colocado
+                     manualmente na hora de carregar (ver enviar(), que não
+                     rejeita mais esse caso). */
                   value={paletesEnviadosInput}
                   onChange={(e) => setPaletesEnviadosInput(e.target.value)}
                   required
                   placeholder={`de ${loja.paletesAgrupados}`}
                   className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
                 />
+                {Number(paletesEnviadosInput) > loja.paletesAgrupados && (
+                  <p className="mt-1 text-[11px] text-amber-600 dark:text-amber-400">
+                    {Number(paletesEnviadosInput) - loja.paletesAgrupados} palete(s) a mais do que foi agrupado
+                    ({loja.paletesAgrupados}).
+                  </p>
+                )}
               </div>
             </div>
           )}
@@ -460,15 +483,10 @@ export default function LoadingProtocolForm({ lojas, aoFechar, aoRegistrar }) {
           disabled={
             emLote
               ? lojas.some((l) => statusPorLoja[l.id] === 'saldo' && (lotesRestantesPorLoja[l.id] || []).length === 0) ||
-                lojas.some((l) => {
-                  const q = Number(quantidadesInformadasPorLoja[l.id]) || 0;
-                  return q <= 0 || q > l.paletesAgrupados;
-                })
-              : (statusEnvio === 'saldo' && loteRestante.length === 0) ||
-                (() => {
-                  const q = Number(paletesEnviadosInput) || 0;
-                  return q <= 0 || q > loja.paletesAgrupados;
-                })()
+                // Sem mais teto em `l.paletesAgrupados` — só exige quantidade
+                // positiva (ver mesma decisão em enviar()).
+                lojas.some((l) => (Number(quantidadesInformadasPorLoja[l.id]) || 0) <= 0)
+              : (statusEnvio === 'saldo' && loteRestante.length === 0) || (Number(paletesEnviadosInput) || 0) <= 0
           }
           className="mt-5 w-full rounded-md bg-emerald-600 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300 dark:disabled:bg-slate-600"
         >

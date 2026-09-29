@@ -10,6 +10,12 @@
 // texto sobre um fundo quase transparente (em vez de uma chapa colorida) —
 // é o que dá a leitura de "etiqueta técnica" do painel escuro, mantendo o
 // claro como já era.
+//
+// `corTexto` é opcional — só "Agrupada" define (texto escuro sobre o próprio
+// fundo branco do status); os pontos onde `corSolida`/`corPonto` viram cor de
+// fundo de algo com texto por cima (ex.: número da vaga em BoxCard.jsx) usam
+// `corTexto || 'text-white'`, já que todo outro status tem fundo escuro o
+// bastante pra texto branco em cima.
 // ---------------------------------------------------------------------------
 
 export const STATUS_LOJA = {
@@ -22,24 +28,31 @@ export const STATUS_LOJA = {
   },
   conferencia_finalizada: {
     texto: 'Conferência Finalizada',
-    corBadge: 'bg-teal-50 text-teal-600 dark:border dark:border-current dark:bg-teal-500/10 dark:text-teal-300',
-    corSolida: 'bg-teal-500',
-    corPonto: 'bg-teal-500',
-    corBorda: 'border-teal-400 dark:border-teal-500',
+    corBadge: 'bg-emerald-50 text-emerald-600 dark:border dark:border-current dark:bg-emerald-500/10 dark:text-emerald-300',
+    corSolida: 'bg-emerald-500',
+    corPonto: 'bg-emerald-500',
+    corBorda: 'border-emerald-400 dark:border-emerald-500',
   },
   em_agrupamento: {
     texto: 'Agrupando',
-    corBadge: 'bg-indigo-50 text-indigo-600 dark:border dark:border-current dark:bg-indigo-500/10 dark:text-indigo-300',
-    corSolida: 'bg-indigo-500',
-    corPonto: 'bg-indigo-500',
-    corBorda: 'border-indigo-400 dark:border-indigo-500',
-  },
-  agrupada: {
-    texto: 'Agrupada',
     corBadge: 'bg-blue-50 text-blue-600 dark:border dark:border-current dark:bg-blue-500/10 dark:text-blue-300',
     corSolida: 'bg-blue-500',
     corPonto: 'bg-blue-500',
     corBorda: 'border-blue-400 dark:border-blue-500',
+  },
+  // "Branco" de propósito (pedido do usuário) — por não ter matiz própria,
+  // ganha um contorno fino (border/corTexto escuro) em vez de só uma cor
+  // sólida, pra não sumir contra um fundo claro (cards, coluna do quadro de
+  // Agrupamento etc.); fica sempre branco também no modo escuro, já que é a
+  // cor pedida, não um tema — o contorno garante que continue visível lá
+  // também.
+  agrupada: {
+    texto: 'Agrupada',
+    corBadge: 'bg-white text-slate-700 border border-slate-300 dark:border dark:border-slate-400 dark:bg-white/5 dark:text-slate-100',
+    corSolida: 'bg-white border border-slate-400',
+    corPonto: 'bg-white border border-slate-400',
+    corBorda: 'border-slate-300 dark:border-slate-400',
+    corTexto: 'text-slate-800',
   },
   carregando: {
     texto: 'Em carregamento',

@@ -164,15 +164,17 @@ export function getBoxPorNumero(state, numero) {
 }
 
 /**
- * Lojas que já têm colaboradores sinalizados no agrupamento (a partir do
- * início do agrupamento em diante) — usadas no relatório de produtividade.
- * Não inclui 'apontada', pois nessa etapa ainda não há colaboradores
- * definidos (apenas o box foi reservado).
+ * Lojas com o agrupamento já CONCLUÍDO (a partir de 'agrupada' em diante) —
+ * usadas no relatório de produtividade. Não inclui 'apontada' (ainda sem
+ * colaboradores definidos, só o box reservado) nem 'em_agrupamento' (os
+ * colaboradores já foram sinalizados no início, mas a produtividade só deve
+ * contar depois que o agrupamento realmente termina — ver Conclusão do
+ * Agrupamento, que é quando `paletesAgrupados`/`dataAgrupamento` ficam com
+ * os valores finais; contar antes disso credita paletes que ainda podem
+ * mudar, ou nem serem confirmados).
  */
 export function getLojasAgrupadasOuAlem(state) {
-  return state.lojas.filter((l) =>
-    ['em_agrupamento', 'agrupada', 'carregando', 'finalizada'].includes(l.status)
-  );
+  return state.lojas.filter((l) => ['agrupada', 'carregando', 'finalizada'].includes(l.status));
 }
 
 /**

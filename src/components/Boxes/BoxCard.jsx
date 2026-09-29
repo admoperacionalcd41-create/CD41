@@ -86,6 +86,15 @@ export default function BoxCard({ box, lojasPorId, aoSelecionarLoja }) {
           .map((vaga) => {
             const loja = vaga.lojaId ? lojasPorId[vaga.lojaId] : null;
             const statusVaga = loja ? getStatusLoja(loja.status) : null;
+            // Cor de fundo + texto da vaga ocupada vêm sempre juntas do
+            // status (em vez de "text-white" fixo por fora) porque o status
+            // "Agrupada" agora é branco (ver statusStyles.js) — precisa de
+            // texto escuro em cima pra não sumir, diferente de todos os
+            // outros status, que têm fundo escuro o bastante pra texto branco.
+            const corFundoVaga = vaga.ocupada ? statusVaga.corSolida : 'bg-slate-100 dark:bg-slate-700';
+            const corTextoVaga = vaga.ocupada
+              ? statusVaga.corTexto || 'text-white'
+              : 'text-slate-400 dark:text-slate-500';
             return (
               <button
                 key={vaga.numero}
@@ -95,9 +104,9 @@ export default function BoxCard({ box, lojasPorId, aoSelecionarLoja }) {
                     : `Vaga ${vaga.numero} — livre`
                 }
                 onClick={() => loja && aoSelecionarLoja && aoSelecionarLoja(loja)}
-                className={`flex items-center justify-center rounded text-xs font-semibold leading-none text-white ${
-                  vaga.ocupada ? statusVaga.corSolida : 'bg-slate-100 text-slate-400 dark:bg-slate-700 dark:text-slate-500'
-                } ${loja ? 'cursor-pointer hover:opacity-80' : 'cursor-default'}`}
+                className={`flex items-center justify-center rounded text-xs font-semibold leading-none ${corFundoVaga} ${corTextoVaga} ${
+                  loja ? 'cursor-pointer hover:opacity-80' : 'cursor-default'
+                }`}
               >
                 {vaga.numero}
               </button>

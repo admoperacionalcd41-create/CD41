@@ -527,9 +527,16 @@ function aplicarAcaoInterna(state, acao) {
 
       for (const loja of lojasSelecionadas) {
         const quantidadeSolicitada = Number(quantidades[loja.id]);
-        const quantidade = Number.isFinite(quantidadeSolicitada) && quantidadeSolicitada > 0
-          ? Math.min(quantidadeSolicitada, loja.paletesAgrupados)
-          : loja.paletesAgrupados;
+        // Sem mais teto em `loja.paletesAgrupados` — o operador pode
+        // informar mais paletes do que o agrupamento contava (ex.: um
+        // palete extra que só apareceu na hora de carregar o caminhão,
+        // colocado manualmente). Ver mesma decisão em FINALIZAR_CARREGAMENTO
+        // (loja única) e em LoadingProtocolForm.jsx, que não limita mais o
+        // campo de quantidade a esse valor.
+        const quantidade =
+          Number.isFinite(quantidadeSolicitada) && quantidadeSolicitada > 0
+            ? quantidadeSolicitada
+            : loja.paletesAgrupados;
         const envioCompleto = quantidade >= loja.paletesAgrupados;
         const box = boxesAtualizados.find((b) => b.numero === loja.boxNumero);
         const composicaoAnteriorLoja = loja.composicaoPaletes || [];
