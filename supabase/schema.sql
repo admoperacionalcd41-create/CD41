@@ -40,17 +40,20 @@ create policy "Usuário lê o próprio perfil"
 -- =========================================================================
 -- 2) app_state — dados do sistema
 -- =========================================================================
--- Guarda o estado inteiro do Doca Manager (lojas, boxes, motoristas,
--- carregamentos, cadastros etc.) como um único registro JSON (id
--- "estado-v1"), compartilhado entre todos os usuários em tempo real —
+-- Guarda o estado do Doca Manager (lojas, boxes, motoristas, carregamentos,
+-- cadastros etc.), compartilhado entre todos os usuários em tempo real —
 -- substitui o armazenamento local do navegador (localStorage) usado antes.
 --
--- Nota: uma otimização que dividia esse estado em pedaços (linhas
--- separadas por id — "lojas"/"protocolos"/"boxes"/"cadastros") chegou a
--- ser publicada e foi revertida (causou tela branca em produção, ainda
--- não diagnosticado) — ver histórico do git em
--- src/hooks/useSyncedAppState.js. Por ora o app usa só o registro único
--- de novo.
+-- O estado é dividido em PEDAÇOS — cada um sua própria linha nesta mesma
+-- tabela, id "lojas" | "protocolos" | "boxes" | "cadastros" — em vez de um
+-- único registro com tudo junto (ver src/hooks/useSyncedAppState.js). Isso
+-- faz com que uma ação que só muda uma parte (ex.: registrar a saída de um
+-- motorista) grave e retransmita só aquele pedaço pros outros usuários, em
+-- vez do estado inteiro do sistema a cada ação. Nenhuma mudança de schema
+-- foi necessária pra isso (o id já era um texto livre); o valor default
+-- abaixo ("estado-v1") é só um resquício do formato usado antes dessa
+-- otimização, mantido pra compatibilidade — o app sempre informa o id
+-- explicitamente, então esse default nunca é usado de fato.
 
 create table if not exists public.app_state (
   id text primary key default 'estado-v1',
