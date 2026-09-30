@@ -236,14 +236,19 @@ export function getLinhasProcessoDoDia(state, filtroTipoCarga) {
 }
 
 /**
- * Cargas do dia operacional atual que AINDA NÃO tiveram apontamento feito
- * hoje de verdade — mesma regra de "apontada" usada em
- * getLinhasProcessoDoDia (relógio real via eHoje, não o dia operacional).
- * Usada pro peso/volume "pendente de apontamento" no card de resumo
- * operacional da aba Boxes & Vagas.
+ * Cargas IMPORTADAS hoje de verdade (dataImportacao no calendário real, via
+ * eHoje — não o dia operacional/diaReferencia, que só avança quando alguém
+ * aciona "avançar dia" e por isso pode misturar cargas importadas ontem
+ * ainda dentro do mesmo ciclo operacional) que AINDA NÃO tiveram apontamento
+ * feito hoje. Usada pro peso/volume "pendente de apontamento" no card de
+ * resumo operacional da aba Boxes & Vagas — pedido do usuário pra validar
+ * só as cargas realmente importadas hoje, e não o saldo de dias anteriores
+ * que porventura ainda esteja no mesmo dia operacional.
  */
 export function getLojasSemApontamentoHoje(state) {
-  return getLojasDoDia(state).filter((l) => !(l.status !== 'pendente' && eHoje(l.dataApontamento)));
+  return state.lojas
+    .filter((l) => eHoje(l.dataImportacao))
+    .filter((l) => !(l.status !== 'pendente' && eHoje(l.dataApontamento)));
 }
 
 export function getResumoDashboard(state) {
