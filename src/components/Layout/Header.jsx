@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Menu, RotateCcw, Trash2, CalendarClock, X, CheckCircle2, AlertTriangle, Sun, Moon, Lock, Maximize, Minimize } from 'lucide-react';
+import { Menu, RotateCcw, Trash2, CalendarClock, X, CheckCircle2, AlertTriangle, Sun, Moon, Lock, Maximize, Minimize, RefreshCw } from 'lucide-react';
 import { useApp } from '../../context/AppContext.jsx';
 import { useDarkMode } from '../../hooks/useDarkMode.js';
 import { useFullscreen } from '../../hooks/useFullscreen.js';
@@ -118,6 +118,20 @@ export default function Header({ tituloAba, abaAtiva, onAbrirMenu }) {
             className="flex items-center justify-center rounded-md border border-slate-200 bg-white p-1.5 text-slate-500 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600"
           >
             {escuro ? <Sun size={14} /> : <Moon size={14} />}
+          </button>
+
+          {/* Atualiza a página inteira (F5) — jeito rápido de garantir que a
+              tela mostra a versão mais nova do sistema e os dados mais
+              recentes, sem precisar saber o atalho de teclado. Útil
+              sobretudo em tablet/monitor fixo, onde não dá pra usar F5
+              diretamente. */}
+          <button
+            onClick={() => window.location.reload()}
+            title="Atualizar a página"
+            aria-label="Atualizar a página"
+            className="flex items-center justify-center rounded-md border border-slate-200 bg-white p-1.5 text-slate-500 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600"
+          >
+            <RefreshCw size={14} />
           </button>
 
           {/* Alternativa ao F11 — útil sobretudo pra quem deixa o Doca
