@@ -410,7 +410,7 @@ function CartaoEntrega({
             <TipoCargaBadge tipo={entrega.loja.tipoCarga} />
           </p>
           <p className="mt-0.5 text-xs text-slate-400 dark:text-slate-500">
-            Placa <span className="font-mono font-semibold text-slate-500 dark:text-slate-400">{entrega.placa}</span> — Saiu do CD às {formatarHora(entrega.dataHora)}
+            Placa <span className="font-mono font-semibold text-slate-500 dark:text-slate-400">{entrega.placa}</span>
             {concluida && !eHoje(entrega.saidaLoja) && <> — {formatarData(entrega.saidaLoja.slice(0, 10))}</>}
           </p>
         </div>

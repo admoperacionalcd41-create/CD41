@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowRight, AlertTriangle, Package, Truck, MapPinned, CheckCircle2 } from 'lucide-react';
 import { useApp } from '../../context/AppContext.jsx';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
-import { eHoje, formatarHora, formatarDuracao } from '../../utils/dateHelpers';
+import { eHoje, formatarHora, formatarData, formatarDuracao } from '../../utils/dateHelpers';
 import { lojaPassaFiltroTipoCarga } from '../../utils/tipoCarga';
 
 // Chave usada para lembrar o tempo-limite configurado (fica salvo no
@@ -123,14 +123,21 @@ export default function AndamentoEntregasCard({ irPara, compacto = false }) {
     return mapa;
   }, [state.lojas]);
 
-  // Agrupa os protocolos de carregamento finalizados hoje por placa +
-  // motorista, para mostrar o andamento da entrega (a caminho / na loja /
-  // entregue) de cada veículo — alimentado pelos registros de chegada e
-  // saída feitos na aba Motoristas.
+  // Agrupa os protocolos de carregamento por placa + motorista, para mostrar
+  // o andamento da entrega (a caminho / na loja / entregue) de cada veículo
+  // — alimentado pelos registros de chegada e saída feitos na aba
+  // Motoristas.
+  //
+  // Entra tanto protocolo de HOJE quanto qualquer protocolo mais antigo que
+  // ainda esteja pendente (sem saída registrada) — pedido do usuário: uma
+  // entrega que não fechou no mesmo dia (o motorista esqueceu de registrar a
+  // saída, por exemplo) não pode simplesmente sumir do card à meia-noite,
+  // já que continua sendo uma pendência de verdade. Só sai daqui quando a
+  // saída for registrada (ou até lá, continua aparecendo dia após dia).
   const entregasPorVeiculo = useMemo(() => {
     const grupos = {};
     state.protocolos
-      .filter((p) => eHoje(p.dataHora))
+      .filter((p) => eHoje(p.dataHora) || !p.saidaLoja)
       .forEach((p) => {
         const loja = lojasPorId[p.lojaId];
         if (!loja || !lojaPassaFiltroTipoCarga(loja, filtroTipoCarga)) return;
@@ -227,7 +234,10 @@ export default function AndamentoEntregasCard({ irPara, compacto = false }) {
                 <Package size={14} />
               </span>
               <span>
-                <p className="text-[11px] font-medium text-slate-400 dark:text-slate-500">Total hoje</p>
+                {/* Era "Total hoje" — mudou pra "Total" puro porque agora
+                    inclui também pendências de dias anteriores (ver
+                    comentário no useMemo acima). */}
+                <p className="text-[11px] font-medium text-slate-400 dark:text-slate-500">Total</p>
                 <p className={`${textStat} font-bold leading-tight text-slate-800 dark:text-slate-100`}>{resumoEntregas.total}</p>
               </span>
             </div>
@@ -319,8 +329,9 @@ export default function AndamentoEntregasCard({ irPara, compacto = false }) {
 
       {entregasPorVeiculo.length === 0 ? (
         <p className="text-sm text-slate-400 dark:text-slate-500">
-          Nenhum carregamento finalizado hoje ainda — as entregas aparecem aqui assim que um protocolo for
-          registrado na aba Carregamento.
+          Nenhum carregamento hoje nem pendência de dias anteriores ainda — as entregas aparecem aqui assim que um
+          protocolo for registrado na aba Carregamento, e continuam aparecendo enquanto a saída da loja não for
+          registrada.
         </p>
       ) : (
         <div
@@ -366,6 +377,11 @@ export default function AndamentoEntregasCard({ irPara, compacto = false }) {
                   const permanenciaMs = entrega.chegadaLoja
                     ? (entrega.saidaLoja ? new Date(entrega.saidaLoja) : agoraMs) - new Date(entrega.chegadaLoja)
                     : null;
+                  // Pendência arrastada de um dia anterior (ver useMemo
+                  // acima) — mostra a data do carregamento pra deixar claro
+                  // que não é de hoje, já que sem isso ficaria parecendo uma
+                  // entrega de hoje igual às outras.
+                  const deOutroDia = !eHoje(entrega.dataHora);
                   return (
                     <div key={entrega.id} className="flex items-center justify-between gap-2 text-xs">
                       <span
@@ -375,6 +391,11 @@ export default function AndamentoEntregasCard({ irPara, compacto = false }) {
                         <status.Icone size={12} className={`flex-shrink-0 ${status.corIcone}`} />
                         <span className="truncate">
                           {entrega.loja.loja}
+                          {deOutroDia && (
+                            <span className="ml-1.5 text-[10px] font-semibold text-amber-600 dark:text-amber-400">
+                              carregado {formatarData(entrega.dataHora.slice(0, 10))}
+                            </span>
+                          )}
                           {permanenciaMs != null && (
                             <span className="ml-1.5 text-[10px] text-slate-400 dark:text-slate-500">
                               ({formatarDuracao(permanenciaMs)})
