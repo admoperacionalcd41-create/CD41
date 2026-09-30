@@ -102,6 +102,29 @@ function aplicarAcaoInterna(state, acao) {
       };
     }
 
+    // Define (ou limpa, se o texto vier vazio) a observação manual de uma
+    // loja — pedidos do dia a dia feitos pela loja (ex.: "colocar bag",
+    // "material extra por fora"), registrados a qualquer momento, com a
+    // loja em QUALQUER status (inclusive "pendente", ainda sem box/vaga —
+    // ver botão "Observações das Lojas" no cabeçalho). Mostrada depois como
+    // lembrete ao abrir o protocolo de carregamento dessa loja.
+    case 'DEFINIR_OBSERVACAO_LOJA': {
+      const { lojaId, texto } = acao.payload;
+      const loja = state.lojas.find((l) => l.id === lojaId);
+      if (!loja) {
+        return { ...state, ultimoErro: 'Loja não encontrada.' };
+      }
+      const textoLimpo = (texto || '').trim();
+      return {
+        ...state,
+        lojas: state.lojas.map((l) => (l.id === lojaId ? { ...l, observacaoLoja: textoLimpo || null } : l)),
+        ultimoErro: null,
+        ultimoAviso: textoLimpo
+          ? `Observação salva para a loja ${loja.loja}.`
+          : `Observação removida da loja ${loja.loja}.`,
+      };
+    }
+
     // Etapa 1 — Apontamento: aponta manualmente a loja para um box, apenas
     // reservando as vagas físicas em ordem CRESCENTE (estimativa rápida,
     // antes da conferência física). Sinaliza que a loja está "em execução"
@@ -1232,6 +1255,7 @@ export function AppProvider({ children }) {
     () => ({
       importarLojas: (registros) => dispatch({ tipo: 'IMPORTAR_LOJAS', payload: registros }),
       excluirLoja: (lojaId) => dispatch({ tipo: 'EXCLUIR_LOJA', payload: { lojaId } }),
+      definirObservacaoLoja: (lojaId, texto) => dispatch({ tipo: 'DEFINIR_OBSERVACAO_LOJA', payload: { lojaId, texto } }),
       apontarBox: (payload) => dispatch({ tipo: 'APONTAR_BOX', payload }),
       concluirConferencia: (lojaId) => dispatch({ tipo: 'CONCLUIR_CONFERENCIA', payload: { lojaId } }),
       iniciarAgrupamento: (payload) => dispatch({ tipo: 'INICIAR_AGRUPAMENTO', payload }),

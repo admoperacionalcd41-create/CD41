@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Truck } from 'lucide-react';
+import { X, Truck, MessageSquareText } from 'lucide-react';
 import { useApp } from '../../context/AppContext.jsx';
 import { getNomeBox } from '../../utils/boxLogic';
 import { montarMensagemProtocolo } from '../../utils/notificacoes';
@@ -230,6 +230,35 @@ export default function LoadingProtocolForm({ lojas, aoFechar, aoRegistrar }) {
             <X size={18} />
           </button>
         </div>
+
+        {/* Lembrete de pedidos da loja (ex.: "colocar bag", "material extra
+            por fora") anotados a qualquer momento do dia — ver botão
+            "Observações das Lojas" no cabeçalho (Header.jsx) e
+            ObservacoesLojaModal.jsx. Só aparece quando existe observação
+            (nenhuma loja da viagem com observacaoLoja preenchido = nenhum
+            aviso), pra não virar ruído em toda entrega. */}
+        {(() => {
+          const lojasComObservacao = lojas.filter((l) => l.observacaoLoja);
+          if (lojasComObservacao.length === 0) return null;
+          return (
+            <div className="mb-3 rounded-lg bg-amber-50 p-2.5 text-xs text-amber-700 dark:border dark:border-current dark:bg-amber-500/10 dark:text-amber-300">
+              <p className="mb-1 flex items-center gap-1.5 font-semibold">
+                <MessageSquareText size={13} />
+                {lojasComObservacao.length > 1
+                  ? 'Observações registradas para estas lojas:'
+                  : 'Observação registrada para esta loja:'}
+              </p>
+              <ul className="space-y-0.5">
+                {lojasComObservacao.map((l) => (
+                  <li key={l.id}>
+                    {emLote && <span className="font-medium">Loja {l.loja}: </span>}
+                    {l.observacaoLoja}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          );
+        })()}
 
         <div className="space-y-3">
           {emLote && (

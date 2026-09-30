@@ -73,6 +73,13 @@ function novaLoja({
     vagasOcupadas: [],
     colaboradores: [],
     protocolos: [],
+    // Observação manual de pedido da loja (ex.: "colocar bag", "material
+    // extra por fora"), registrada a qualquer momento do dia — não depende
+    // da loja já estar apontada num box (ver botão "Observações das Lojas"
+    // no cabeçalho). Mostrada como lembrete ao abrir o protocolo de
+    // carregamento dessa loja (ver LoadingProtocolForm.jsx). null = sem
+    // observação (nenhum lembrete aparece).
+    observacaoLoja: null,
     dataImportacao: new Date().toISOString(),
     dataApontamento: null,
     dataConferencia: null,

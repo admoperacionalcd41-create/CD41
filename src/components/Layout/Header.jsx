@@ -1,10 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Menu, RotateCcw, Trash2, CalendarClock, X, CheckCircle2, AlertTriangle, Sun, Moon, Lock, Maximize, Minimize, RefreshCw } from 'lucide-react';
+import { Menu, RotateCcw, Trash2, CalendarClock, X, CheckCircle2, AlertTriangle, Sun, Moon, Lock, Maximize, Minimize, RefreshCw, MessageSquareText } from 'lucide-react';
 import { useApp } from '../../context/AppContext.jsx';
 import { useDarkMode } from '../../hooks/useDarkMode.js';
 import { useFullscreen } from '../../hooks/useFullscreen.js';
-import { formatarData } from '../../utils/dateHelpers';
+import { formatarData, eHoje } from '../../utils/dateHelpers';
 import { TIPOS_CARGA } from '../../utils/tipoCarga';
+import ObservacoesLojaModal from '../Shared/ObservacoesLojaModal.jsx';
 
 const CONFIRMACOES = {
   restaurar: {
@@ -33,6 +34,12 @@ export default function Header({ tituloAba, abaAtiva, onAbrirMenu }) {
   const [senhaDigitada, setSenhaDigitada] = useState('');
   const [senhaErrada, setSenhaErrada] = useState(false);
   const inputSenhaRef = useRef(null);
+  const [mostrarObservacoes, setMostrarObservacoes] = useState(false);
+
+  // Quantas lojas de hoje já têm observação registrada — só para o
+  // indicadorzinho no botão do cabeçalho, avisando que há pedidos anotados
+  // mesmo sem abrir a busca.
+  const quantidadeComObservacao = state.lojas.filter((l) => eHoje(l.dataImportacao) && l.observacaoLoja).length;
 
   function cancelarConfirmacao() {
     setConfirmando(null);
@@ -118,6 +125,24 @@ export default function Header({ tituloAba, abaAtiva, onAbrirMenu }) {
             className="flex items-center justify-center rounded-md border border-slate-200 bg-white p-1.5 text-slate-500 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600"
           >
             {escuro ? <Sun size={14} /> : <Moon size={14} />}
+          </button>
+
+          {/* Botão global (aparece em qualquer aba) pra registrar/consultar
+              pedidos da loja (ex.: "colocar bag", "material extra por
+              fora") — de propósito fora das telas de Boxes/Agrupamento,
+              pois o pedido da loja pode chegar antes dela ser apontada num
+              box. Ver ObservacoesLojaModal.jsx. O ponto laranja avisa que
+              já existe alguma observação anotada hoje. */}
+          <button
+            onClick={() => setMostrarObservacoes(true)}
+            title="Observações das Lojas"
+            aria-label="Observações das Lojas"
+            className="relative flex items-center justify-center rounded-md border border-slate-200 bg-white p-1.5 text-slate-500 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600"
+          >
+            <MessageSquareText size={14} />
+            {quantidadeComObservacao > 0 && (
+              <span className="absolute -right-0.5 -top-0.5 flex h-2 w-2 rounded-full bg-amber-500" />
+            )}
           </button>
 
           {/* Atualiza a página inteira (F5) — jeito rápido de garantir que a
@@ -241,6 +266,8 @@ export default function Header({ tituloAba, abaAtiva, onAbrirMenu }) {
           </button>
         </div>
       )}
+
+      {mostrarObservacoes && <ObservacoesLojaModal aoFechar={() => setMostrarObservacoes(false)} />}
     </header>
   );
 }
