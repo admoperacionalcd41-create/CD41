@@ -38,6 +38,10 @@ function normalizarEstadoRecebido(dados) {
     placasCadastradas: placasBrutas.map((p) => (typeof p === 'string' ? { placa: p, possuiPlataforma: false } : p)),
     contatosNotificacao: Array.isArray(dados.contatosNotificacao) ? dados.contatosNotificacao : [],
     localizacaoLojas: Array.isArray(dados.localizacaoLojas) ? dados.localizacaoLojas : [],
+    // Valor pago por palete agrupado (ver ValoresConfigCard.jsx) — mesmo
+    // padrão de 0,58 usado em SINCRONIZAR_CADASTROS/mockData.js, pro caso de
+    // chegar aqui um estado compartilhado salvo antes desse campo existir.
+    valorPaletesAgrupamento: typeof dados.valorPaletesAgrupamento === 'number' ? dados.valorPaletesAgrupamento : 0.58,
   };
 }
 

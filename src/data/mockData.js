@@ -297,6 +297,10 @@ export function gerarDadosIniciais() {
     placasCadastradas: PLACAS_CADASTRADAS,
     contatosNotificacao: [],
     localizacaoLojas: [],
+    // Valor pago por palete agrupado (ver ValoresConfigCard.jsx, aba
+    // Cadastros) — usado no relatório de Produtividade. Editável a
+    // qualquer momento, sem precisar mexer em código quando reajustar.
+    valorPaletesAgrupamento: 0.58,
     ultimoErro: null,
   };
 }

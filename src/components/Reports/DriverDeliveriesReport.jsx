@@ -1,8 +1,9 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { Truck } from 'lucide-react';
 import { useApp } from '../../context/AppContext.jsx';
 import { getEntregasPorMotorista } from '../../utils/selectors';
-import { eHoje, eEsteMes } from '../../utils/dateHelpers';
+import { usePeriodoRelatorio } from '../../hooks/usePeriodoRelatorio';
+import FiltroPeriodo from './FiltroPeriodo.jsx';
 
 // Quantas lojas cada motorista entregou — conta protocolos completos e
 // parciais/saldo (se ele levou parte da carga pra loja, ela conta como
@@ -10,13 +11,13 @@ import { eHoje, eEsteMes } from '../../utils/dateHelpers';
 // motorista.
 export default function DriverDeliveriesReport() {
   const { state, filtroTipoCarga } = useApp();
-  const [periodo, setPeriodo] = useState('mes'); // 'mes' | 'hoje'
+  const { periodo, setPeriodo, mesEscolhido, setMesEscolhido, passaPeriodo } = usePeriodoRelatorio();
   const tipo = filtroTipoCarga && filtroTipoCarga !== 'todos' ? filtroTipoCarga : undefined;
 
   const entregasPorMotorista = useMemo(() => {
-    const filtroData = periodo === 'hoje' ? (dataHora) => eHoje(dataHora) : (dataHora) => eEsteMes(dataHora);
-    return getEntregasPorMotorista(state, tipo, filtroData);
-  }, [state, tipo, periodo]);
+    return getEntregasPorMotorista(state, tipo, passaPeriodo);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state, tipo, periodo, mesEscolhido]);
 
   const maiorValor = Math.max(1, ...entregasPorMotorista.map((m) => m.lojasEntregues));
   const totalLojas = entregasPorMotorista.reduce((soma, m) => soma + m.lojasEntregues, 0);
@@ -34,24 +35,12 @@ export default function DriverDeliveriesReport() {
             </p>
           </div>
         </div>
-        <div className="flex overflow-hidden rounded-md border border-slate-200 text-xs dark:border-slate-600 print:hidden">
-          {[
-            { chave: 'hoje', rotulo: 'Hoje' },
-            { chave: 'mes', rotulo: 'Este mês' },
-          ].map((opcao) => (
-            <button
-              key={opcao.chave}
-              onClick={() => setPeriodo(opcao.chave)}
-              className={`px-3 py-1.5 font-medium ${
-                periodo === opcao.chave
-                  ? 'bg-brand-600 text-white'
-                  : 'bg-white text-slate-500 hover:bg-slate-50 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700'
-              }`}
-            >
-              {opcao.rotulo}
-            </button>
-          ))}
-        </div>
+        <FiltroPeriodo
+          periodo={periodo}
+          setPeriodo={setPeriodo}
+          mesEscolhido={mesEscolhido}
+          setMesEscolhido={setMesEscolhido}
+        />
       </div>
 
       {entregasPorMotorista.length === 0 ? (

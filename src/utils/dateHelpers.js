@@ -79,6 +79,17 @@ export function eEsteMes(isoCompleto) {
   return isoCompleto.slice(0, 7) === mesAtualISO();
 }
 
+/**
+ * Verifica se um timestamp ISO completo cai num mês qualquer, informado no
+ * formato "YYYY-MM" (o mesmo valor que um <input type="month"> usa) — para
+ * os relatórios enxergarem dados de meses anteriores, não só hoje/mês atual
+ * (ver usePeriodoRelatorio.js).
+ */
+export function eNoMes(isoCompleto, mesAno) {
+  if (!isoCompleto || !mesAno) return false;
+  return isoCompleto.slice(0, 7) === mesAno;
+}
+
 const DIAS_SEMANA_ABREV = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
 /** Nome curto do dia da semana (Seg, Ter, ...) a partir de uma data YYYY-MM-DD. */

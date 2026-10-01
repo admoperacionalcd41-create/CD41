@@ -1,9 +1,11 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { Clock, AlertTriangle, MessageSquareWarning } from 'lucide-react';
 import { useApp } from '../../context/AppContext.jsx';
 import { getPermanenciasRegistradas } from '../../utils/selectors';
-import { formatarHora, formatarData, formatarDuracao, eHoje, eEsteMes } from '../../utils/dateHelpers';
+import { formatarHora, formatarData, formatarDuracao } from '../../utils/dateHelpers';
+import { usePeriodoRelatorio } from '../../hooks/usePeriodoRelatorio';
 import TipoCargaBadge from '../Shared/TipoCargaBadge.jsx';
+import FiltroPeriodo from './FiltroPeriodo.jsx';
 
 // Tempo de permanência = intervalo entre o motorista registrar chegada e
 // saída na loja (aba Motoristas). Ajuda a enxergar lojas/motoristas com
@@ -17,23 +19,20 @@ function formatarPermanenciaMedia(msArray) {
 
 export default function DwellTimeReport() {
   const { state, filtroTipoCarga } = useApp();
-  const [periodo, setPeriodo] = useState('mes'); // 'mes' | 'hoje'
+  const { periodo, setPeriodo, mesEscolhido, setMesEscolhido, passaPeriodo } = usePeriodoRelatorio();
   const tipo = filtroTipoCarga && filtroTipoCarga !== 'todos' ? filtroTipoCarga : undefined;
 
   const permanencias = useMemo(() => {
     let lista = getPermanenciasRegistradas(state, tipo);
-    if (periodo === 'hoje') {
-      lista = lista.filter((p) => eHoje(p.saidaLoja));
-    } else {
-      lista = lista.filter((p) => eEsteMes(p.saidaLoja));
-    }
+    lista = lista.filter((p) => passaPeriodo(p.saidaLoja));
     // Ordenado por data de entrega (saída da loja) — da mais recente pra
     // mais antiga. Em caso de empate na mesma data/hora, a maior
     // permanência aparece primeiro, como critério de desempate.
     return lista.sort(
       (a, b) => new Date(b.saidaLoja) - new Date(a.saidaLoja) || b.permanenciaMs - a.permanenciaMs
     );
-  }, [state, tipo, periodo]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state, tipo, periodo, mesEscolhido]);
 
   const mediaMs = useMemo(() => {
     if (permanencias.length === 0) return 0;
@@ -63,24 +62,12 @@ export default function DwellTimeReport() {
             </p>
           </div>
         </div>
-        <div className="flex overflow-hidden rounded-md border border-slate-200 text-xs dark:border-slate-600 print:hidden">
-          {[
-            { chave: 'hoje', rotulo: 'Hoje' },
-            { chave: 'mes', rotulo: 'Este mês' },
-          ].map((opcao) => (
-            <button
-              key={opcao.chave}
-              onClick={() => setPeriodo(opcao.chave)}
-              className={`px-3 py-1.5 font-medium ${
-                periodo === opcao.chave
-                  ? 'bg-brand-600 text-white'
-                  : 'bg-white text-slate-500 hover:bg-slate-50 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700'
-              }`}
-            >
-              {opcao.rotulo}
-            </button>
-          ))}
-        </div>
+        <FiltroPeriodo
+          periodo={periodo}
+          setPeriodo={setPeriodo}
+          mesEscolhido={mesEscolhido}
+          setMesEscolhido={setMesEscolhido}
+        />
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">

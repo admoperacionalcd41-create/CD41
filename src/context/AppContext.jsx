@@ -1103,6 +1103,33 @@ function aplicarAcaoInterna(state, acao) {
         placasCadastradas: placasNormalizadas,
         contatosNotificacao: state.contatosNotificacao || [],
         localizacaoLojas: state.localizacaoLojas || [],
+        // Valor pago por palete agrupado (ver ValoresConfigCard.jsx, aba
+        // Cadastros, e o relatório de Produtividade) — 0,58 é só o padrão
+        // pra estados salvos antes desse campo existir; o valor de verdade
+        // fica em `state.valorPaletesAgrupamento` dali em diante.
+        valorPaletesAgrupamento:
+          typeof state.valorPaletesAgrupamento === 'number' ? state.valorPaletesAgrupamento : 0.58,
+      };
+    }
+
+    // Atualiza o valor pago por palete agrupado — usado no relatório de
+    // Produtividade pra calcular a coluna "Valor" de cada colaborador. Fica
+    // editável na aba Cadastros (ver ValoresConfigCard.jsx) porque esse
+    // valor muda de tempos em tempos (reajuste), sem precisar mexer em
+    // código pra isso.
+    case 'DEFINIR_VALOR_PALETE_AGRUPAMENTO': {
+      const valorNumerico = Number(acao.payload.valor);
+      if (!Number.isFinite(valorNumerico) || valorNumerico < 0) {
+        return { ...state, ultimoErro: 'Informe um valor válido (maior ou igual a zero) para o palete.' };
+      }
+      return {
+        ...state,
+        valorPaletesAgrupamento: valorNumerico,
+        ultimoErro: null,
+        ultimoAviso: `Valor por palete de agrupamento atualizado para ${valorNumerico.toLocaleString('pt-BR', {
+          style: 'currency',
+          currency: 'BRL',
+        })}.`,
       };
     }
 
@@ -1281,6 +1308,8 @@ export function AppProvider({ children }) {
       removerItem: (entidade, valor) => dispatch({ tipo: 'REMOVER_ITEM', payload: { entidade, valor } }),
       editarItem: (entidade, valorAntigo, valorNovo) =>
         dispatch({ tipo: 'EDITAR_ITEM', payload: { entidade, valorAntigo, valorNovo } }),
+      definirValorPaleteAgrupamento: (valor) =>
+        dispatch({ tipo: 'DEFINIR_VALOR_PALETE_AGRUPAMENTO', payload: { valor } }),
     }),
     [dispatch]
   );

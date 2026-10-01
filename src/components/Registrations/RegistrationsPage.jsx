@@ -4,6 +4,7 @@ import RegistrationList from './RegistrationList.jsx';
 import PlacasRegistrationList from './PlacasRegistrationList.jsx';
 import ContatosNotificacaoList from './ContatosNotificacaoList.jsx';
 import LocalizacaoLojasRegistrationList from './LocalizacaoLojasRegistrationList.jsx';
+import ValoresConfigCard from './ValoresConfigCard.jsx';
 
 export default function RegistrationsPage() {
   return (
@@ -15,7 +16,9 @@ export default function RegistrationsPage() {
         placa) — sem impedir a digitação livre de um nome ou placa ainda não cadastrado. Os
         contatos de <strong>Notificação (WhatsApp)</strong> são quem recebe o aviso ao concluir um
         agrupamento. A <strong>Localização das Lojas</strong> destaca automaticamente (por GPS) o
-        botão de Registrar Chegada na aba Motoristas quando o motorista estiver perto da loja.
+        botão de Registrar Chegada na aba Motoristas quando o motorista estiver perto da loja. Em{' '}
+        <strong>Valores</strong>, o valor pago por palete agrupado alimenta o cálculo da coluna
+        "Valor" no relatório de Produtividade.
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-4">
@@ -34,6 +37,7 @@ export default function RegistrationsPage() {
         <PlacasRegistrationList />
         <ContatosNotificacaoList />
         <LocalizacaoLojasRegistrationList />
+        <ValoresConfigCard />
       </div>
     </div>
   );

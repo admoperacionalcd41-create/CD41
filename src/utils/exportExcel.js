@@ -106,6 +106,10 @@ function construirPlanilhaLojasPorMotorista(state, tipo) {
 
 function construirPlanilhaProdutividade(state, filtroTipoCarga) {
   const lojasConsideradas = getLojasAgrupadasOuAlem(state).filter((l) => lojaPassaFiltroTipoCarga(l, filtroTipoCarga));
+  // Valor pago por palete agrupado, cadastrado na aba Cadastros (ver
+  // ValoresConfigCard.jsx) — mesmo valor usado na coluna "Valor" da tela de
+  // Produtividade (ver ProductivityReport.jsx).
+  const valorPorPalete = Number(state.valorPaletesAgrupamento) || 0.58;
 
   const mapa = new Map();
   lojasConsideradas.forEach((loja) => {
@@ -128,10 +132,11 @@ function construirPlanilhaProdutividade(state, filtroTipoCarga) {
       'Lojas Atendidas': c.lojas,
       'Total de Paletes': Number(c.paletes.toFixed(1)),
       'Média Paletes/Loja': Number((c.paletes / c.lojas).toFixed(1)),
+      'Valor (R$)': Number((c.paletes * valorPorPalete).toFixed(2)),
     }));
 
   const planilha = XLSX.utils.json_to_sheet(linhas);
-  definirLargurasColunas(planilha, [24, 16, 16, 18]);
+  definirLargurasColunas(planilha, [24, 16, 16, 18, 14]);
   return planilha;
 }
 

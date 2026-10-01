@@ -1,9 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { BarChart3, Users } from 'lucide-react';
 import { useApp } from '../../context/AppContext.jsx';
 import { getLojasAgrupadasOuAlem } from '../../utils/selectors';
-import { eHoje, eEsteMes } from '../../utils/dateHelpers';
 import { lojaPassaFiltroTipoCarga } from '../../utils/tipoCarga';
+import { usePeriodoRelatorio } from '../../hooks/usePeriodoRelatorio';
+import FiltroPeriodo from './FiltroPeriodo.jsx';
 
 // Formata contagem de paletes no padrão pt-BR, com até 1 casa decimal —
 // necessário porque, ao dividir os paletes de uma loja entre os
@@ -13,23 +14,28 @@ function formatarPaletes(valor) {
   return valor.toLocaleString('pt-BR', { maximumFractionDigits: 1 });
 }
 
+function formatarMoeda(valor) {
+  return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
 export default function ProductivityReport() {
   // O filtro Seca/Resfriada é global agora (seletor no cabeçalho — ver
   // Header.jsx), válido em todas as abas; este relatório só mantém seu
-  // próprio filtro de período (hoje / este mês).
+  // próprio filtro de período (hoje / este mês / um mês escolhido).
   const { state, filtroTipoCarga } = useApp();
-  const [filtro, setFiltro] = useState('mes'); // 'mes' | 'hoje'
+  const { periodo, setPeriodo, mesEscolhido, setMesEscolhido, passaPeriodo } = usePeriodoRelatorio();
+  // Valor pago por palete agrupado, cadastrado na aba Cadastros (ver
+  // ValoresConfigCard.jsx) — com um padrão de segurança caso o estado ainda
+  // não tenha esse campo (estado salvo antes dele existir).
+  const valorPorPalete = Number(state.valorPaletesAgrupamento) || 0.58;
 
   const lojasConsideradas = useMemo(() => {
     let base = getLojasAgrupadasOuAlem(state);
-    if (filtro === 'hoje') {
-      base = base.filter((l) => eHoje(l.dataAgrupamento || l.dataInicioAgrupamento));
-    } else {
-      base = base.filter((l) => eEsteMes(l.dataAgrupamento || l.dataInicioAgrupamento));
-    }
+    base = base.filter((l) => passaPeriodo(l.dataAgrupamento || l.dataInicioAgrupamento));
     base = base.filter((l) => lojaPassaFiltroTipoCarga(l, filtroTipoCarga));
     return base;
-  }, [state, filtro, filtroTipoCarga]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state, periodo, mesEscolhido, filtroTipoCarga]);
 
   const estatisticasPorColaborador = useMemo(() => {
     const mapa = new Map();
@@ -62,22 +68,12 @@ export default function ProductivityReport() {
           <BarChart3 size={18} className="text-brand-600 dark:text-brand-400" />
           <h2 className="text-sm font-bold text-slate-700 dark:text-slate-200">Produtividade por Colaborador</h2>
         </div>
-        <div className="flex overflow-hidden rounded-md border border-slate-200 text-xs dark:border-slate-600 print:hidden">
-          {[
-            { chave: 'hoje', rotulo: 'Hoje' },
-            { chave: 'mes', rotulo: 'Este mês' },
-          ].map((opcao) => (
-            <button
-              key={opcao.chave}
-              onClick={() => setFiltro(opcao.chave)}
-              className={`px-3 py-1.5 font-medium ${
-                filtro === opcao.chave ? 'bg-brand-600 text-white' : 'bg-white text-slate-500 hover:bg-slate-50 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700'
-              }`}
-            >
-              {opcao.rotulo}
-            </button>
-          ))}
-        </div>
+        <FiltroPeriodo
+          periodo={periodo}
+          setPeriodo={setPeriodo}
+          mesEscolhido={mesEscolhido}
+          setMesEscolhido={setMesEscolhido}
+        />
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -126,7 +122,15 @@ export default function ProductivityReport() {
       </div>
 
       <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
-        <h3 className="mb-3 text-sm font-bold text-slate-700 dark:text-slate-200">Detalhamento</h3>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-sm font-bold text-slate-700 dark:text-slate-200">Detalhamento</h3>
+          {/* Valor por palete cadastrado na aba Cadastros (ver
+              ValoresConfigCard.jsx) — mostrado aqui pra deixar claro de onde
+              vem o cálculo da coluna "Valor" logo abaixo. */}
+          <span className="text-[11px] text-slate-400 dark:text-slate-500">
+            Valor por palete agrupado: <strong>{formatarMoeda(valorPorPalete)}</strong>
+          </span>
+        </div>
         {estatisticasPorColaborador.length === 0 ? (
           <p className="text-sm text-slate-400 dark:text-slate-500">Sem dados para exibir.</p>
         ) : (
@@ -138,6 +142,7 @@ export default function ProductivityReport() {
                   <th className="py-2 pr-3 font-semibold">Lojas Atendidas</th>
                   <th className="py-2 pr-3 font-semibold">Total de Paletes</th>
                   <th className="py-2 pr-3 font-semibold">Média Paletes/Loja</th>
+                  <th className="py-2 pr-3 font-semibold">Valor</th>
                 </tr>
               </thead>
               <tbody>
@@ -147,6 +152,9 @@ export default function ProductivityReport() {
                     <td className="py-2 pr-3">{c.lojas}</td>
                     <td className="py-2 pr-3">{formatarPaletes(c.paletes)}</td>
                     <td className="py-2 pr-3">{formatarPaletes(c.paletes / c.lojas)}</td>
+                    <td className="py-2 pr-3 font-semibold text-emerald-600 dark:text-emerald-400">
+                      {formatarMoeda(c.paletes * valorPorPalete)}
+                    </td>
                   </tr>
                 ))}
               </tbody>
