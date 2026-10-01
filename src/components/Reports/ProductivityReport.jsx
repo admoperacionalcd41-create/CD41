@@ -3,8 +3,6 @@ import { BarChart3, Users } from 'lucide-react';
 import { useApp } from '../../context/AppContext.jsx';
 import { getLojasAgrupadasOuAlem } from '../../utils/selectors';
 import { lojaPassaFiltroTipoCarga } from '../../utils/tipoCarga';
-import { usePeriodoRelatorio } from '../../hooks/usePeriodoRelatorio';
-import FiltroPeriodo from './FiltroPeriodo.jsx';
 
 // Formata contagem de paletes no padrão pt-BR, com até 1 casa decimal —
 // necessário porque, ao dividir os paletes de uma loja entre os
@@ -18,12 +16,15 @@ function formatarMoeda(valor) {
   return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
-export default function ProductivityReport() {
+// `periodoRelatorio` vem de ReportsPage (hook usePeriodoRelatorio
+// compartilhado pelos três relatórios com filtro de período) — assim o
+// mesmo período selecionado vale tanto pra tela quanto pra Exportar
+// Excel/Imprimir (ver ReportsPage.jsx e exportExcel.js).
+export default function ProductivityReport({ periodoRelatorio }) {
   // O filtro Seca/Resfriada é global agora (seletor no cabeçalho — ver
-  // Header.jsx), válido em todas as abas; este relatório só mantém seu
-  // próprio filtro de período (hoje / este mês / um mês escolhido).
+  // Header.jsx), válido em todas as abas.
   const { state, filtroTipoCarga } = useApp();
-  const { periodo, setPeriodo, mesEscolhido, setMesEscolhido, passaPeriodo } = usePeriodoRelatorio();
+  const { periodo, mesEscolhido, passaPeriodo } = periodoRelatorio;
   // Valor pago por palete agrupado, cadastrado na aba Cadastros (ver
   // ValoresConfigCard.jsx) — com um padrão de segurança caso o estado ainda
   // não tenha esse campo (estado salvo antes dele existir).
@@ -63,17 +64,9 @@ export default function ProductivityReport() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <BarChart3 size={18} className="text-brand-600 dark:text-brand-400" />
-          <h2 className="text-sm font-bold text-slate-700 dark:text-slate-200">Produtividade por Colaborador</h2>
-        </div>
-        <FiltroPeriodo
-          periodo={periodo}
-          setPeriodo={setPeriodo}
-          mesEscolhido={mesEscolhido}
-          setMesEscolhido={setMesEscolhido}
-        />
+      <div className="flex items-center gap-2">
+        <BarChart3 size={18} className="text-brand-600 dark:text-brand-400" />
+        <h2 className="text-sm font-bold text-slate-700 dark:text-slate-200">Produtividade por Colaborador</h2>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -122,14 +115,12 @@ export default function ProductivityReport() {
       </div>
 
       <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div className="mb-3 flex items-center gap-2">
           <h3 className="text-sm font-bold text-slate-700 dark:text-slate-200">Detalhamento</h3>
-          {/* Valor por palete cadastrado na aba Cadastros (ver
-              ValoresConfigCard.jsx) — mostrado aqui pra deixar claro de onde
-              vem o cálculo da coluna "Valor" logo abaixo. */}
-          <span className="text-[11px] text-slate-400 dark:text-slate-500">
-            Valor por palete agrupado: <strong>{formatarMoeda(valorPorPalete)}</strong>
-          </span>
+          {/* Observação "Valor por palete agrupado: R$ 0,58" ocultada a
+              pedido — o valor (cadastrado na aba Cadastros, ver
+              ValoresConfigCard.jsx) continua sendo usado no cálculo da
+              coluna "Valor" da tabela abaixo, só não aparece mais aqui. */}
         </div>
         {estatisticasPorColaborador.length === 0 ? (
           <p className="text-sm text-slate-400 dark:text-slate-500">Sem dados para exibir.</p>

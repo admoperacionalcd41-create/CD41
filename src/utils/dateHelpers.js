@@ -90,6 +90,19 @@ export function eNoMes(isoCompleto, mesAno) {
   return isoCompleto.slice(0, 7) === mesAno;
 }
 
+const MESES_PT = [
+  'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
+  'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro',
+];
+
+/** Formata um mês no formato "YYYY-MM" por extenso, ex.: "outubro de 2026". */
+export function formatarMesAno(mesAno) {
+  if (!mesAno) return '—';
+  const [ano, mes] = mesAno.split('-').map(Number);
+  if (!ano || !mes || !MESES_PT[mes - 1]) return mesAno;
+  return `${MESES_PT[mes - 1]} de ${ano}`;
+}
+
 const DIAS_SEMANA_ABREV = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
 /** Nome curto do dia da semana (Seg, Ter, ...) a partir de uma data YYYY-MM-DD. */

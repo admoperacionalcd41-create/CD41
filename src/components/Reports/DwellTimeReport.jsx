@@ -3,9 +3,7 @@ import { Clock, AlertTriangle, MessageSquareWarning } from 'lucide-react';
 import { useApp } from '../../context/AppContext.jsx';
 import { getPermanenciasRegistradas } from '../../utils/selectors';
 import { formatarHora, formatarData, formatarDuracao } from '../../utils/dateHelpers';
-import { usePeriodoRelatorio } from '../../hooks/usePeriodoRelatorio';
 import TipoCargaBadge from '../Shared/TipoCargaBadge.jsx';
-import FiltroPeriodo from './FiltroPeriodo.jsx';
 
 // Tempo de permanência = intervalo entre o motorista registrar chegada e
 // saída na loja (aba Motoristas). Ajuda a enxergar lojas/motoristas com
@@ -17,9 +15,14 @@ function formatarPermanenciaMedia(msArray) {
   return formatarDuracao(media);
 }
 
-export default function DwellTimeReport() {
+// `periodoRelatorio` vem de ReportsPage (hook usePeriodoRelatorio
+// compartilhado pelos três relatórios com filtro de período) — assim o
+// mesmo período selecionado (Hoje/Este mês/Escolher mês) vale tanto para o
+// que aparece na tela quanto para o botão Exportar Excel/Imprimir, que
+// ficam no nível de ReportsPage (ver ReportsPage.jsx e exportExcel.js).
+export default function DwellTimeReport({ periodoRelatorio }) {
   const { state, filtroTipoCarga } = useApp();
-  const { periodo, setPeriodo, mesEscolhido, setMesEscolhido, passaPeriodo } = usePeriodoRelatorio();
+  const { periodo, mesEscolhido, passaPeriodo } = periodoRelatorio;
   const tipo = filtroTipoCarga && filtroTipoCarga !== 'todos' ? filtroTipoCarga : undefined;
 
   const permanencias = useMemo(() => {
@@ -52,22 +55,14 @@ export default function DwellTimeReport() {
 
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <Clock size={18} className="text-brand-600 dark:text-brand-400" />
-          <div>
-            <h2 className="text-sm font-bold text-slate-700 dark:text-slate-200">Tempo de Permanência do Motorista na Loja</h2>
-            <p className="text-xs text-slate-400 dark:text-slate-500">
-              Do registro de chegada até o registro de saída, feitos na aba Motoristas
-            </p>
-          </div>
+      <div className="mb-4 flex items-center gap-2">
+        <Clock size={18} className="text-brand-600 dark:text-brand-400" />
+        <div>
+          <h2 className="text-sm font-bold text-slate-700 dark:text-slate-200">Tempo de Permanência do Motorista na Loja</h2>
+          <p className="text-xs text-slate-400 dark:text-slate-500">
+            Do registro de chegada até o registro de saída, feitos na aba Motoristas
+          </p>
         </div>
-        <FiltroPeriodo
-          periodo={periodo}
-          setPeriodo={setPeriodo}
-          mesEscolhido={mesEscolhido}
-          setMesEscolhido={setMesEscolhido}
-        />
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">

@@ -2,16 +2,19 @@ import React, { useMemo } from 'react';
 import { Truck } from 'lucide-react';
 import { useApp } from '../../context/AppContext.jsx';
 import { getEntregasPorMotorista } from '../../utils/selectors';
-import { usePeriodoRelatorio } from '../../hooks/usePeriodoRelatorio';
-import FiltroPeriodo from './FiltroPeriodo.jsx';
 
 // Quantas lojas cada motorista entregou — conta protocolos completos e
 // parciais/saldo (se ele levou parte da carga pra loja, ela conta como
 // entregue por ele), sem contar a mesma loja duas vezes pro mesmo
 // motorista.
-export default function DriverDeliveriesReport() {
+//
+// `periodoRelatorio` vem de ReportsPage (hook usePeriodoRelatorio
+// compartilhado pelos três relatórios com filtro de período) — assim o
+// mesmo período selecionado vale tanto pra tela quanto pra Exportar
+// Excel/Imprimir (ver ReportsPage.jsx e exportExcel.js).
+export default function DriverDeliveriesReport({ periodoRelatorio }) {
   const { state, filtroTipoCarga } = useApp();
-  const { periodo, setPeriodo, mesEscolhido, setMesEscolhido, passaPeriodo } = usePeriodoRelatorio();
+  const { periodo, mesEscolhido, passaPeriodo } = periodoRelatorio;
   const tipo = filtroTipoCarga && filtroTipoCarga !== 'todos' ? filtroTipoCarga : undefined;
 
   const entregasPorMotorista = useMemo(() => {
@@ -24,23 +27,15 @@ export default function DriverDeliveriesReport() {
 
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <Truck size={18} className="text-brand-600 dark:text-brand-400" />
-          <div>
-            <h2 className="text-sm font-bold text-slate-700 dark:text-slate-200">Lojas Entregues por Motorista</h2>
-            <p className="text-xs text-slate-400 dark:text-slate-500">
-              Total de {totalLojas} loja{totalLojas !== 1 ? 's' : ''} entregue{totalLojas !== 1 ? 's' : ''} por{' '}
-              {entregasPorMotorista.length} motorista{entregasPorMotorista.length !== 1 ? 's' : ''}
-            </p>
-          </div>
+      <div className="mb-4 flex items-center gap-2">
+        <Truck size={18} className="text-brand-600 dark:text-brand-400" />
+        <div>
+          <h2 className="text-sm font-bold text-slate-700 dark:text-slate-200">Lojas Entregues por Motorista</h2>
+          <p className="text-xs text-slate-400 dark:text-slate-500">
+            Total de {totalLojas} loja{totalLojas !== 1 ? 's' : ''} entregue{totalLojas !== 1 ? 's' : ''} por{' '}
+            {entregasPorMotorista.length} motorista{entregasPorMotorista.length !== 1 ? 's' : ''}
+          </p>
         </div>
-        <FiltroPeriodo
-          periodo={periodo}
-          setPeriodo={setPeriodo}
-          mesEscolhido={mesEscolhido}
-          setMesEscolhido={setMesEscolhido}
-        />
       </div>
 
       {entregasPorMotorista.length === 0 ? (

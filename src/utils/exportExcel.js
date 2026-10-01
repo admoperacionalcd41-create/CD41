@@ -77,8 +77,10 @@ function construirPlanilhaMetaPorLoja(state, tipo) {
   return planilha;
 }
 
-function construirPlanilhaTempoPermanencia(state, tipo) {
-  const permanencias = getPermanenciasRegistradas(state, tipo).sort((a, b) => b.permanenciaMs - a.permanenciaMs);
+function construirPlanilhaTempoPermanencia(state, tipo, passaPeriodo) {
+  const permanencias = getPermanenciasRegistradas(state, tipo)
+    .filter((p) => !passaPeriodo || passaPeriodo(p.saidaLoja))
+    .sort((a, b) => b.permanenciaMs - a.permanenciaMs);
   const linhas = permanencias.map((p) => ({
     Código: p.loja.loja,
     Loja: p.loja.nomeLoja,
@@ -93,8 +95,8 @@ function construirPlanilhaTempoPermanencia(state, tipo) {
   return planilha;
 }
 
-function construirPlanilhaLojasPorMotorista(state, tipo) {
-  const dados = getEntregasPorMotorista(state, tipo);
+function construirPlanilhaLojasPorMotorista(state, tipo, passaPeriodo) {
+  const dados = getEntregasPorMotorista(state, tipo, passaPeriodo);
   const linhas = dados.map((m) => ({
     Motorista: m.motorista,
     'Lojas Entregues': m.lojasEntregues,
@@ -104,8 +106,10 @@ function construirPlanilhaLojasPorMotorista(state, tipo) {
   return planilha;
 }
 
-function construirPlanilhaProdutividade(state, filtroTipoCarga) {
-  const lojasConsideradas = getLojasAgrupadasOuAlem(state).filter((l) => lojaPassaFiltroTipoCarga(l, filtroTipoCarga));
+function construirPlanilhaProdutividade(state, filtroTipoCarga, passaPeriodo) {
+  const lojasConsideradas = getLojasAgrupadasOuAlem(state)
+    .filter((l) => lojaPassaFiltroTipoCarga(l, filtroTipoCarga))
+    .filter((l) => !passaPeriodo || passaPeriodo(l.dataAgrupamento || l.dataInicioAgrupamento));
   // Valor pago por palete agrupado, cadastrado na aba Cadastros (ver
   // ValoresConfigCard.jsx) — mesmo valor usado na coluna "Valor" da tela de
   // Produtividade (ver ProductivityReport.jsx).
@@ -140,12 +144,31 @@ function construirPlanilhaProdutividade(state, filtroTipoCarga) {
   return planilha;
 }
 
+// Sufixo do nome do arquivo descrevendo o período usado nas planilhas de
+// Permanência/Motoristas/Produtividade — deixa claro, já no nome do
+// arquivo baixado, qual período foi exportado (ex.: "-mes-2026-09" para um
+// mês escolhido anterior). Meta Diária/Meta por Loja não entram nessa
+// descrição por não terem período próprio (são sempre a semana atual).
+function sufixoArquivoPeriodo(periodoRelatorio) {
+  if (!periodoRelatorio) return '';
+  if (periodoRelatorio.periodo === 'hoje') return '-hoje';
+  if (periodoRelatorio.periodo === 'escolher') return `-mes-${periodoRelatorio.mesEscolhido}`;
+  return '-mes-atual';
+}
+
 /**
  * Gera um único arquivo .xlsx com uma aba para cada relatório exibido na
  * aba Relatórios (Meta de Entrega — geral e por loja, Tempo de
  * Permanência, Lojas por Motorista e Produtividade), respeitando o mesmo
  * filtro Seca/Resfriada selecionado no cabeçalho no momento da exportação,
  * e entrega o arquivo ao usuário.
+ *
+ * `periodoRelatorio` (ver usePeriodoRelatorio.js, compartilhado com a tela
+ * via ReportsPage.jsx) filtra as planilhas de Tempo de Permanência, Lojas
+ * por Motorista e Produtividade pelo mesmo período (Hoje/Este mês/Escolher
+ * mês) que está selecionado na tela no momento da exportação — Meta Diária
+ * e Meta por Loja continuam sempre pela semana atual, que é o período
+ * delas (sem seletor próprio).
  *
  * O app roda em dois lugares diferentes: publicado como Artifact (onde o
  * navegador não deixa a página disparar um download sozinha — é preciso
@@ -154,19 +177,20 @@ function construirPlanilhaProdutividade(state, filtroTipoCarga) {
  * blob funciona normalmente). Por isso tenta a capability primeiro e cai
  * pro download direto quando ela não existir nesse ambiente.
  */
-export async function exportarRelatoriosParaExcel(state, filtroTipoCarga) {
+export async function exportarRelatoriosParaExcel(state, filtroTipoCarga, periodoRelatorio) {
   const tipo = filtroTipoCarga && filtroTipoCarga !== 'todos' ? filtroTipoCarga : undefined;
   const rotuloTipo = ROTULO_TIPO[filtroTipoCarga] || ROTULO_TIPO.todos;
+  const passaPeriodo = periodoRelatorio?.passaPeriodo;
 
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, construirPlanilhaMetaDiaria(state, tipo, rotuloTipo), 'Meta Diaria');
   XLSX.utils.book_append_sheet(workbook, construirPlanilhaMetaPorLoja(state, tipo), 'Meta por Loja');
-  XLSX.utils.book_append_sheet(workbook, construirPlanilhaTempoPermanencia(state, tipo), 'Tempo de Permanencia');
-  XLSX.utils.book_append_sheet(workbook, construirPlanilhaLojasPorMotorista(state, tipo), 'Lojas por Motorista');
-  XLSX.utils.book_append_sheet(workbook, construirPlanilhaProdutividade(state, filtroTipoCarga), 'Produtividade');
+  XLSX.utils.book_append_sheet(workbook, construirPlanilhaTempoPermanencia(state, tipo, passaPeriodo), 'Tempo de Permanencia');
+  XLSX.utils.book_append_sheet(workbook, construirPlanilhaLojasPorMotorista(state, tipo, passaPeriodo), 'Lojas por Motorista');
+  XLSX.utils.book_append_sheet(workbook, construirPlanilhaProdutividade(state, filtroTipoCarga, passaPeriodo), 'Produtividade');
 
   const dataArquivo = hojeISO();
-  const nomeArquivo = `relatorios-doca-manager-${dataArquivo}.xlsx`;
+  const nomeArquivo = `relatorios-doca-manager-${dataArquivo}${sufixoArquivoPeriodo(periodoRelatorio)}.xlsx`;
 
   // Ambiente Artifact (claude.ai): pede a capability de downloads e entrega
   // o arquivo por ela, se disponível nessa visualização.
