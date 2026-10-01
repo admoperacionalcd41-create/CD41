@@ -3,6 +3,18 @@ import { ClipboardList, Scale } from 'lucide-react';
 import { useApp } from '../../context/AppContext.jsx';
 import { getLinhasProcessoDoDia, getLojasSemApontamentoHoje, calcularPesoVolume } from '../../utils/selectors';
 import { lojaPassaFiltroTipoCarga } from '../../utils/tipoCarga';
+import { STATUS_LOJA } from '../../utils/statusStyles';
+
+// Legenda das cores usadas nos números das vagas dentro de cada box (ver
+// BoxCard.jsx, que colore a vaga pelo status da loja que a ocupa — mesmo
+// `corPonto` de statusStyles.js). Só os status que de fato podem estar
+// segurando uma vaga nesse momento: "Pendente" ainda não tem box/vaga
+// alocada, e "Finalizada" já liberou a vaga (carga 100% enviada — ver
+// liberarTodasVagas em boxLogic.js), então os dois ficam de fora da
+// legenda.
+const LEGENDA_STATUS_VAGA = ['apontada', 'conferencia_finalizada', 'em_agrupamento', 'agrupada', 'carregando'].map(
+  (chave) => ({ chave, ...STATUS_LOJA[chave] })
+);
 
 // Formata peso/volume no padrão pt-BR (vírgula decimal, sem casas
 // desnecessárias) — mesma regra usada nos cards do Dashboard.
@@ -33,42 +45,56 @@ export default function ResumoProcessoCard({ irPara }) {
   const completo = total > 0 && comApontamento === total;
 
   return (
-    <button
-      type="button"
-      // "Processo do Dia" é a primeira sub-aba de Relatórios (ver
-      // ReportsPage.jsx) — já abre nela por padrão.
-      onClick={() => irPara && irPara('relatorios')}
-      title="Ver relatório completo em Relatórios — Processo do Dia"
-      className="flex flex-shrink-0 flex-wrap items-center gap-x-5 gap-y-1.5 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-left shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:hover:border-slate-600 dark:hover:bg-slate-700/40"
-    >
-      <span className="flex items-center gap-2">
-        <ClipboardList size={16} className="flex-shrink-0 text-brand-600 dark:text-brand-400" />
-        <span className="text-xs text-slate-500 dark:text-slate-400">Apontamento feito</span>
-        <span
-          className={`text-sm font-bold ${
-            completo ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-700 dark:text-slate-200'
-          }`}
-        >
-          {comApontamento}
-          <span className="text-xs font-medium text-slate-400 dark:text-slate-500">/{total}</span>
-        </span>
-      </span>
-
-      <span className="hidden h-4 w-px flex-shrink-0 bg-slate-200 dark:bg-slate-600 sm:block" />
-
-      <span className="flex min-w-0 flex-wrap items-center gap-2">
-        <Scale size={16} className="flex-shrink-0 text-amber-600 dark:text-amber-400" />
-        <span className="text-xs text-slate-500 dark:text-slate-400">Peso/volume pendente de apontamento</span>
-        {pesoVolumePendente.tem ? (
-          <span className="text-sm font-bold text-slate-700 dark:text-slate-200">
-            {formatarNumeroBR(pesoVolumePendente.peso)} kg{' '}
-            <span className="text-slate-300 dark:text-slate-600">•</span>{' '}
-            {formatarNumeroBR(pesoVolumePendente.volume)} m³
+    <div className="flex flex-shrink-0 flex-col gap-1.5 rounded-lg border border-slate-200 bg-white px-4 py-2.5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+      <button
+        type="button"
+        // "Processo do Dia" é a primeira sub-aba de Relatórios (ver
+        // ReportsPage.jsx) — já abre nela por padrão.
+        onClick={() => irPara && irPara('relatorios')}
+        title="Ver relatório completo em Relatórios — Processo do Dia"
+        className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-left transition-colors hover:opacity-80"
+      >
+        <span className="flex items-center gap-2">
+          <ClipboardList size={16} className="flex-shrink-0 text-brand-600 dark:text-brand-400" />
+          <span className="text-xs text-slate-500 dark:text-slate-400">Apontamento feito</span>
+          <span
+            className={`text-sm font-bold ${
+              completo ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-700 dark:text-slate-200'
+            }`}
+          >
+            {comApontamento}
+            <span className="text-xs font-medium text-slate-400 dark:text-slate-500">/{total}</span>
           </span>
-        ) : (
-          <span className="text-sm text-slate-400 dark:text-slate-500">—</span>
-        )}
-      </span>
-    </button>
+        </span>
+
+        <span className="hidden h-4 w-px flex-shrink-0 bg-slate-200 dark:bg-slate-600 sm:block" />
+
+        <span className="flex min-w-0 flex-wrap items-center gap-2">
+          <Scale size={16} className="flex-shrink-0 text-amber-600 dark:text-amber-400" />
+          <span className="text-xs text-slate-500 dark:text-slate-400">Peso/volume pendente de apontamento</span>
+          {pesoVolumePendente.tem ? (
+            <span className="text-sm font-bold text-slate-700 dark:text-slate-200">
+              {formatarNumeroBR(pesoVolumePendente.peso)} kg{' '}
+              <span className="text-slate-300 dark:text-slate-600">•</span>{' '}
+              {formatarNumeroBR(pesoVolumePendente.volume)} m³
+            </span>
+          ) : (
+            <span className="text-sm text-slate-400 dark:text-slate-500">—</span>
+          )}
+        </span>
+      </button>
+
+      {/* Legenda de cores das vagas, lado a lado numa linha só (pedido do
+          usuário) — mesmas cores usadas nos números das vagas dentro de
+          cada box logo abaixo (ver BoxCard.jsx / statusStyles.js). */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-slate-100 pt-1.5 dark:border-slate-700">
+        {LEGENDA_STATUS_VAGA.map(({ chave, texto, corPonto }) => (
+          <span key={chave} className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+            <span className={`h-2.5 w-2.5 flex-shrink-0 rounded-full ${corPonto}`} />
+            {texto}
+          </span>
+        ))}
+      </div>
+    </div>
   );
 }
