@@ -45,9 +45,32 @@ function garantirEstiloGlobalDeImpressao() {
   document.head.appendChild(estilo);
 }
 
+// O documento impresso é injetado dentro do próprio <html> da página — se o
+// modo escuro estiver ativo, a regra global `.dark body { color: ... }` (ver
+// index.css) tem mais especificidade que o `body { color: ... }` definido
+// dentro de cada documento impresso (montarHtmlProtocolo, LabelGenerator
+// etc.), e vence: o texto sai claro demais pra ler no papel (a maioria das
+// impressoras não imprime o fundo escuro por padrão, só o texto). Por isso
+// desativa o modo escuro só durante a impressão e restaura assim que ela
+// termina — mesma técnica já usada em imprimirRelatorioAtivo
+// (imprimirRelatorio.js), agora centralizada aqui pra valer pra todo mundo
+// que usa imprimirHtml (protocolo, etiquetas).
+function comModoEscuroDesativadoDuranteImpressao() {
+  const raiz = document.documentElement;
+  if (!raiz.classList.contains('dark')) return;
+  raiz.classList.remove('dark');
+  const restaurar = () => {
+    raiz.classList.add('dark');
+    window.removeEventListener('afterprint', restaurar);
+  };
+  window.addEventListener('afterprint', restaurar);
+  setTimeout(restaurar, 60000);
+}
+
 export function imprimirHtml(html) {
   try {
     garantirEstiloGlobalDeImpressao();
+    comModoEscuroDesativadoDuranteImpressao();
 
     // O `html` recebido é um documento autônomo completo (com <html>,
     // <head>, <style>, <body>...), montado pelas funções montarHtml* em

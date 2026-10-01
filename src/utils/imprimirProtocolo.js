@@ -34,6 +34,40 @@ function montarHtmlProtocolo(protocolo, loja, outrasLojas) {
     .assinaturas { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 48px; }
     .linha-assinatura { border-top: 1px solid #1e293b; padding-top: 6px; font-size: 11px; color: #64748b; text-align: center; }
     @media print { body { padding: 12px; } }
+    /* Aviso em estilo de marca d'água, pedido pelo usuário: ocupa a metade
+       de baixo da folha impressa (position: fixed + top: 50% relativo à
+       página, não ao conteúdo — assim cobre a metade de baixo mesmo se o
+       protocolo tiver pouco conteúdo), fonte grande e bem apagada, atrás
+       do conteúdo real. O conteúdo (.conteudo) fica por cima dele via
+       position/z-index, senão um elemento position:fixed pintaria sobre o
+       texto normal mesmo vindo antes no HTML. */
+    .conteudo { position: relative; z-index: 1; }
+    .aviso-motorista {
+      position: fixed;
+      top: 50%;
+      left: 0;
+      z-index: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      height: 50%;
+      overflow: hidden;
+      pointer-events: none;
+    }
+    .aviso-motorista span {
+      display: block;
+      width: 90%;
+      font-size: 44px;
+      font-weight: 800;
+      line-height: 1.25;
+      text-align: center;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #0f172a;
+      opacity: 0.14;
+      transform: rotate(-18deg);
+    }
   `;
 
   const todasLojas = [
@@ -85,6 +119,10 @@ function montarHtmlProtocolo(protocolo, loja, outrasLojas) {
 <style>${estilo}</style>
 </head>
 <body>
+  <div class="aviso-motorista" aria-hidden="true">
+    <span>Atenção motorista<br>Lembrar de registrar<br>entrada e saída da loja</span>
+  </div>
+  <div class="conteudo">
   <h1>Protocolo de Carregamento</h1>
   <p class="subtitulo">Emitido em ${formatarDataHora(new Date().toISOString())}</p>
 
@@ -116,6 +154,7 @@ function montarHtmlProtocolo(protocolo, loja, outrasLojas) {
   <div class="assinaturas">
     <div class="linha-assinatura">Assinatura do Motorista</div>
     <div class="linha-assinatura">Assinatura do Conferente</div>
+  </div>
   </div>
 </body>
 </html>`;
