@@ -17,7 +17,8 @@ export default function GroupingHistory({ aoGerarEtiquetas, aoMoverBox }) {
     () =>
       state.lojas
         .filter((l) => STATUS_HISTORICO.includes(l.status) && lojaPassaFiltroTipoCarga(l, filtroTipoCarga))
-        .sort((a, b) => new Date(b.dataAgrupamento || 0) - new Date(a.dataAgrupamento || 0)),
+        // Mais antiga primeiro, mesma ordem usada no quadro acima.
+        .sort((a, b) => new Date(a.dataAgrupamento || 0) - new Date(b.dataAgrupamento || 0)),
     [state.lojas, filtroTipoCarga]
   );
 

@@ -25,8 +25,11 @@ export default function GroupingBoard({ aoGerarEtiquetas, aoIniciarAgrupamento, 
     state.lojas.forEach((l) => {
       if (mapa[l.status] && lojaPassaFiltroTipoCarga(l, filtroTipoCarga)) mapa[l.status].push(l);
     });
+    // Mais antiga primeiro (ordem de chegada no estágio) — quem está
+    // esperando há mais tempo aparece no topo de cada coluna, pra não ficar
+    // esquecida atrás das lojas mais recentes.
     Object.keys(mapa).forEach((chave) => {
-      mapa[chave].sort((a, b) => new Date(dataMaisRecente(b)) - new Date(dataMaisRecente(a)));
+      mapa[chave].sort((a, b) => new Date(dataMaisRecente(a)) - new Date(dataMaisRecente(b)));
     });
     return mapa;
   }, [state.lojas, filtroTipoCarga]);
