@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useLocalStorage } from './useLocalStorage';
 import { sincronizarBoxes, criarBoxesIniciais } from '../utils/boxLogic';
 import { hojeISO } from '../utils/dateHelpers';
+import { mesclarEstadoSincronizado } from '../utils/mesclarEstadoSincronizado';
 
 // Id fixo da única linha compartilhada da tabela `app_state` — o estado
 // inteiro do sistema (lojas, boxes, motoristas, carregamentos etc.) vive
@@ -15,7 +16,13 @@ const ID_ESTADO_COMPARTILHADO = 'estado-v1';
 // Supabase — evita uma gravação por clique quando várias ações acontecem
 // em sequência rápida (ex.: apontar várias lojas seguidas). A tela sempre
 // atualiza na hora (gravação é só em segundo plano).
-const ATRASO_GRAVACAO_MS = 600;
+//
+// Reduzido de 600ms pra 200ms (mitigação do problema relatado pelo usuário
+// — ver mesclarEstadoSincronizado.js): quanto menor essa janela, menor a
+// chance de a atualização de OUTRO usuário chegar via Realtime bem no meio
+// dela, que é a situação que a mesclagem abaixo existe pra tratar quando
+// acontece mesmo assim.
+const ATRASO_GRAVACAO_MS = 200;
 
 // Garante que qualquer estado vindo de fora (do Supabase — outra pessoa
 // pode estar numa versão ligeiramente diferente do app, ou a linha
@@ -84,6 +91,13 @@ function useEstadoSincronizado(estadoLocal, setEstadoLocal) {
   const ultimoTimestampAplicadoRef = useRef(null);
   const timeoutGravacaoRef = useRef(null);
   const idUsuarioRef = useRef(idUsuario);
+  // Último estado que sabemos que o SERVIDOR tinha — atualizado sempre que
+  // aplicamos algo vindo do Supabase (carga inicial, Realtime) ou depois de
+  // uma gravação nossa dar certo. É a "base" usada por
+  // mesclarEstadoSincronizado pra saber o que mudou de cada lado desde a
+  // última vez que os dois bateram (ver comentário ali e no
+  // ATRASO_GRAVACAO_MS acima).
+  const baseServidorRef = useRef(null);
 
   useEffect(() => {
     estadoRef.current = estadoLocal;
@@ -96,12 +110,13 @@ function useEstadoSincronizado(estadoLocal, setEstadoLocal) {
   const gravarNoSupabase = useCallback((dados) => {
     const agora = new Date().toISOString();
     ultimoTimestampAplicadoRef.current = agora;
+    const dadosNormalizados = normalizarEstadoRecebido(dados);
     supabase
       .from('app_state')
       .upsert(
         {
           id: ID_ESTADO_COMPARTILHADO,
-          dados: normalizarEstadoRecebido(dados),
+          dados: dadosNormalizados,
           atualizado_em: agora,
           atualizado_por: idUsuarioRef.current,
         },
@@ -111,7 +126,12 @@ function useEstadoSincronizado(estadoLocal, setEstadoLocal) {
         if (error) {
           // eslint-disable-next-line no-console
           console.warn('Não foi possível sincronizar o estado com o Supabase:', error.message);
+          return;
         }
+        // Gravação confirmada: isso é, a partir de agora, o que o servidor
+        // tem — vira a nova base pra próxima mesclagem (ver
+        // mesclarEstadoSincronizado.js).
+        baseServidorRef.current = dadosNormalizados;
       });
   }, []);
 
@@ -136,7 +156,9 @@ function useEstadoSincronizado(estadoLocal, setEstadoLocal) {
         }
         if (data) {
           ultimoTimestampAplicadoRef.current = data.atualizado_em;
-          setEstadoLocal(normalizarEstadoRecebido(data.dados));
+          const dadosNormalizados = normalizarEstadoRecebido(data.dados);
+          baseServidorRef.current = dadosNormalizados;
+          setEstadoLocal(dadosNormalizados);
         } else {
           // Primeira vez que o sistema roda com Supabase: publica o estado
           // atual (o que já estava salvo localmente) como ponto de partida
@@ -162,7 +184,22 @@ function useEstadoSincronizado(estadoLocal, setEstadoLocal) {
             return;
           }
           ultimoTimestampAplicadoRef.current = novo.atualizado_em;
-          setEstadoLocal(normalizarEstadoRecebido(novo.dados));
+          const dadosRemotos = normalizarEstadoRecebido(novo.dados);
+
+          // Se há uma gravação local pendente (usuário acabou de fazer algo
+          // aqui e ainda não terminou de salvar — ver ATRASO_GRAVACAO_MS),
+          // NÃO substitui o estado local direto pelo que chegou: isso jogaria
+          // fora a ação local antes mesmo dela ser salva (era exatamente o
+          // problema relatado). Em vez disso, mescla os dois lados usando a
+          // última base conhecida do servidor (ver mesclarEstadoSincronizado.js)
+          // e deixa a gravação pendente seguir seu curso — ela vai salvar o
+          // resultado já mesclado, com a ação local preservada.
+          const dadosParaAplicar = timeoutGravacaoRef.current
+            ? mesclarEstadoSincronizado(baseServidorRef.current, estadoRef.current, dadosRemotos)
+            : dadosRemotos;
+
+          baseServidorRef.current = dadosRemotos;
+          setEstadoLocal(dadosParaAplicar);
         }
       )
       .subscribe();
@@ -184,6 +221,11 @@ function useEstadoSincronizado(estadoLocal, setEstadoLocal) {
         if (idUsuarioRef.current) {
           if (timeoutGravacaoRef.current) clearTimeout(timeoutGravacaoRef.current);
           timeoutGravacaoRef.current = setTimeout(() => {
+            // Zera ANTES de gravar — é o sinal (ver handler do Realtime
+            // acima) de que não há mais edição local pendente a partir
+            // daqui, então uma atualização remota que chegue depois disso
+            // pode ser aplicada direto, sem precisar mesclar.
+            timeoutGravacaoRef.current = null;
             gravarNoSupabase(estadoRef.current);
           }, ATRASO_GRAVACAO_MS);
         }
