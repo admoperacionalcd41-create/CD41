@@ -29,7 +29,7 @@ const pwaPlugin = VitePWA({
   manifest: {
     name: 'Gestão de Docas — Doca Manager',
     short_name: 'Doca Manager',
-    description: 'Separação e carregamento — gestão de boxes, agrupamento, carregamento e entregas.',
+    description: 'CD 41',
     start_url: '/',
     scope: '/',
     display: 'standalone',
