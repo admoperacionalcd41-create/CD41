@@ -2,8 +2,22 @@
 <html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Gestão de Docas | Separação e Carregamento</title>
+
+    <!-- Instalável como app (ver vite.config.js — plugin de PWA, só no
+         build normal, não entra na prévia de Artifact). O
+         <link rel="manifest"> e o registro do service worker são
+         injetados automaticamente aqui pelo plugin durante o build; as
+         tags abaixo são só o que ele não injeta sozinho (ícone do iOS e a
+         cor da barra do navegador/status bar). -->
+    <meta name="theme-color" content="#0b1220" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Doca Manager" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png" />
     <script>
       // Aplica o tema salvo (ou o padrão escuro do app) antes da primeira
       // pintura, evitando o "flash" de tema claro ao carregar.
