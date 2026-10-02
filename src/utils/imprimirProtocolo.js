@@ -31,8 +31,8 @@ function montarHtmlProtocolo(protocolo, loja, outrasLojas) {
        impressão, então não dá pra vir preenchida (ver comentário acima de
        montarHtmlProtocolo). */
     .lacre-manual { display: inline-block; min-width: 70px; border-bottom: 1px solid #1e293b; }
-    .assinaturas { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 48px; }
-    .linha-assinatura { border-top: 1px solid #1e293b; padding-top: 6px; font-size: 11px; color: #64748b; text-align: center; }
+    .obs-celula { max-width: 160px; }
+    .saldo-detalhe { display: block; font-weight: 400; color: #64748b; font-size: 10px; margin-top: 1px; }
     @media print { body { padding: 12px; } }
     /* Aviso em estilo de marca d'água, pedido pelo usuário: ocupa a metade
        de baixo da folha impressa (position: fixed + top: 50% relativo à
@@ -78,6 +78,10 @@ function montarHtmlProtocolo(protocolo, loja, outrasLojas) {
       paletesEnviados: protocolo.paletesEnviados,
       posicaoCarregamento: protocolo.posicaoCarregamento,
       posicaoEntrega: protocolo.posicaoEntrega,
+      boxNumero: loja.boxNumero,
+      observacaoLoja: loja.observacaoLoja,
+      statusEnvio: protocolo.statusEnvio,
+      lotesRestantesDescricao: protocolo.lotesRestantesDescricao,
       // A primeira loja do protocolo é a única cujo(s) lacre(s) já vêm
       // digitados (campo "Lacres" no formulário, impresso na grade acima) —
       // as demais lojas do mesmo veículo são lacradas à parte, então ganham
@@ -98,8 +102,13 @@ function montarHtmlProtocolo(protocolo, loja, outrasLojas) {
     : todasLojas;
 
   const linhasLojas = lojasParaImprimir
-    .map(
-      (l) => `
+    .map((l) => {
+      const statusTexto = l.statusEnvio === 'completo' ? 'Completo' : 'Saldo';
+      const saldoDetalhe =
+        l.statusEnvio === 'saldo' && l.lotesRestantesDescricao?.length
+          ? `<span class="saldo-detalhe">Ficam: ${l.lotesRestantesDescricao.join(', ')}</span>`
+          : '';
+      return `
     <tr>
       ${temSequencia ? `<td>${l.posicaoEntrega}ª</td>` : ''}
       <td>${l.carga}</td>
@@ -107,8 +116,11 @@ function montarHtmlProtocolo(protocolo, loja, outrasLojas) {
       <td>${l.nomeLoja}</td>
       <td>${l.paletesEnviados}</td>
       ${todasLojas.length > 1 ? `<td>${l.principal ? '(ver acima)' : '<span class="lacre-manual">&nbsp;</span>'}</td>` : ''}
-    </tr>`
-    )
+      <td>${getNomeBox(l.boxNumero)}</td>
+      <td>${statusTexto}${saldoDetalhe}</td>
+      <td class="obs-celula">${l.observacaoLoja || '—'}</td>
+    </tr>`;
+    })
     .join('');
 
   return `<!DOCTYPE html>
@@ -131,8 +143,6 @@ function montarHtmlProtocolo(protocolo, loja, outrasLojas) {
     <div><p class="rotulo">Motorista</p><p class="valor">${protocolo.motorista}</p></div>
     <div><p class="rotulo">Data/Hora do carregamento</p><p class="valor">${formatarDataHora(protocolo.dataHora)}</p></div>
     <div><p class="rotulo">Lacres</p><p class="valor">${protocolo.lacres.filter(Boolean).join(', ') || '—'}</p></div>
-    <div><p class="rotulo">Status de envio</p><p class="valor">${protocolo.statusEnvio === 'completo' ? 'Completo' : 'Saldo (envio parcial)'}</p></div>
-    <div><p class="rotulo">Box de origem</p><p class="valor">${getNomeBox(loja.boxNumero)}</p></div>
   </div>
 
   <div class="secao">
@@ -144,16 +154,16 @@ function montarHtmlProtocolo(protocolo, loja, outrasLojas) {
           ${temSequencia ? '<th>Entrega</th>' : ''}
           <th>Carga</th><th>Loja</th><th>Nome da Loja</th><th>Paletes</th>
           ${todasLojas.length > 1 ? '<th>Lacre</th>' : ''}
+          <th>Box de Origem</th><th>Status de Envio</th><th>Observação</th>
         </tr>
       </thead>
       <tbody>${linhasLojas}</tbody>
-      ${todasLojas.length > 1 ? `<tfoot><tr><td colspan="${temSequencia ? 4 : 3}">Total</td><td>${totalPaletes}</td><td></td></tr></tfoot>` : ''}
+      ${
+        todasLojas.length > 1
+          ? `<tfoot><tr><td colspan="${temSequencia ? 4 : 3}">Total</td><td>${totalPaletes}</td><td></td><td></td><td></td><td></td></tr></tfoot>`
+          : ''
+      }
     </table>
-  </div>
-
-  <div class="assinaturas">
-    <div class="linha-assinatura">Assinatura do Motorista</div>
-    <div class="linha-assinatura">Assinatura do Conferente</div>
   </div>
   </div>
 </body>

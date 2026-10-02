@@ -101,6 +101,10 @@ export default function LoadingList({ aoAbrirProtocolo }) {
                   paletesEnviados: p.paletesEnviados,
                   posicaoCarregamento: p.posicaoCarregamento,
                   posicaoEntrega: p.posicaoEntrega,
+                  boxNumero: l.boxNumero,
+                  observacaoLoja: l.observacaoLoja,
+                  statusEnvio: p.statusEnvio,
+                  lotesRestantesDescricao: p.lotesRestantesDescricao,
                 }
               : null;
           })
