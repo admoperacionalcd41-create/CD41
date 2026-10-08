@@ -4,6 +4,7 @@ import { useApp } from '../../context/AppContext.jsx';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
 import { eHoje, formatarHora, formatarData, formatarDuracao } from '../../utils/dateHelpers';
 import { lojaPassaFiltroTipoCarga } from '../../utils/tipoCarga';
+import { ordenarEntregasDaViagem, calcularDeslocamento } from '../../utils/deslocamento';
 
 // Chave usada para lembrar o tempo-limite configurado (fica salvo no
 // navegador, como o restante do estado do app) — compartilhada entre o
@@ -148,7 +149,10 @@ export default function AndamentoEntregasCard({ irPara, compacto = false }) {
     return Object.values(grupos)
       .map((g) => ({
         ...g,
-        entregas: g.entregas.sort((a, b) => new Date(a.dataHora) - new Date(b.dataHora)),
+        // Ordem real da viagem (posição de entrega combinada quando é lote,
+        // senão horário do carregamento) — é essa ordem que define qual é a
+        // "entrega anterior" de cada uma pro cálculo de deslocamento abaixo.
+        entregas: ordenarEntregasDaViagem(g.entregas),
       }))
       .sort((a, b) => {
         // Veículos com alguma entrega ainda não concluída aparecem primeiro.
@@ -391,13 +395,20 @@ export default function AndamentoEntregasCard({ irPara, compacto = false }) {
               </div>
 
               <div className="mt-2.5 space-y-1.5 border-t border-slate-100 pt-2.5 dark:border-slate-700">
-                {veiculo.entregas.map((entrega) => {
+                {veiculo.entregas.map((entrega, indice) => {
                   const statusChave = getStatusEntrega(entrega, agoraMs, limiteMs);
                   const status = STATUS_ENTREGA[statusChave];
                   const emAndamento = entrega.chegadaLoja && !entrega.saidaLoja;
                   const permanenciaMs = entrega.chegadaLoja
                     ? (entrega.saidaLoja ? new Date(entrega.saidaLoja) : agoraMs) - new Date(entrega.chegadaLoja)
                     : null;
+                  // Tempo de deslocamento até esta entrega (do CD ou da loja
+                  // anterior na mesma viagem — ver deslocamento.js). `veiculo.entregas`
+                  // já vem na ordem real da viagem (ver ordenarEntregasDaViagem
+                  // acima), por isso o índice anterior é sempre a parada
+                  // anterior de verdade.
+                  const entregaAnterior = indice > 0 ? veiculo.entregas[indice - 1] : null;
+                  const deslocamento = calcularDeslocamento(entrega, entregaAnterior, agoraMs);
                   // Pendência arrastada de um dia anterior (ver useMemo
                   // acima) — mostra a data do carregamento pra deixar claro
                   // que não é de hoje, já que sem isso ficaria parecendo uma
@@ -417,15 +428,16 @@ export default function AndamentoEntregasCard({ irPara, compacto = false }) {
                               carregado {formatarData(entrega.dataHora.slice(0, 10))}
                             </span>
                           )}
-                          {/* NF entregue ainda é relevante só até a chegada na
-                              loja (depois disso, a permanência abaixo já diz
-                              mais) — mostra quando o motorista de fato saiu do
-                              CD, útil pra quem ficou com status "A caminho" por
-                              causa da demora no faturamento (ver REGISTRAR_ENTREGA_NF
-                              em AppContext.jsx). */}
-                          {!entrega.chegadaLoja && entrega.entregaNotasFiscais && (
+                          {/* Deslocamento ainda é relevante só até a chegada
+                              na loja (depois disso, a permanência abaixo já
+                              diz mais) — mostra há quanto tempo o motorista
+                              está rodando desde que saiu do CD (NF entregue)
+                              ou da parada anterior, útil pra quem ficou com
+                              status "A caminho" por um bom tempo (ver
+                              deslocamento.js). */}
+                          {!entrega.chegadaLoja && deslocamento && (
                             <span className="ml-1.5 text-[10px] text-slate-400 dark:text-slate-500">
-                              NF {formatarHora(entrega.entregaNotasFiscais)}
+                              deslocamento {formatarDuracao(deslocamento.ms)}
                             </span>
                           )}
                           {permanenciaMs != null && (

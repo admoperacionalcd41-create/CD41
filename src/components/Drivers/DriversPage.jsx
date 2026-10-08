@@ -5,6 +5,7 @@ import { formatarHora, formatarData, formatarDuracao, paraDataHoraLocalInput, de
 import TipoCargaBadge from '../Shared/TipoCargaBadge.jsx';
 import { lojaPassaFiltroTipoCarga } from '../../utils/tipoCarga';
 import { calcularDistanciaMetros, formatarDistancia, RAIO_GEOFENCE_METROS, buscarEnderecoPorCoordenada } from '../../utils/geo';
+import { mapaDeslocamentoPorVeiculo } from '../../utils/deslocamento';
 
 // Tela simples para uso dos motoristas: digitam o próprio nome e veem as
 // lojas de entrega dos carregamentos feitos por eles, com um botão grande
@@ -111,6 +112,26 @@ export default function DriversPage() {
     () => entregas.filter((e) => e.saidaLoja && !eHoje(e.saidaLoja)),
     [entregas]
   );
+
+  // Tempo de deslocamento de cada entrega (do CD até a 1ª loja, ou de uma
+  // loja até a próxima na mesma viagem — ver deslocamento.js). Agrupa por
+  // placa antes de calcular porque a sequência da viagem é por veículo, não
+  // por motorista (um motorista raramente troca de veículo no mesmo dia,
+  // mas agrupar certo não custa nada). Não depende de um relógio "ao vivo"
+  // (como o card Andamento das Entregas) — recalcula no próximo render,
+  // igual à permanência na loja já mostrada aqui.
+  const deslocamentoPorProtocolo = useMemo(() => {
+    const agoraMs = Date.now();
+    const porPlaca = {};
+    entregas.forEach((e) => {
+      (porPlaca[e.placa] ||= []).push(e);
+    });
+    const mapaFinal = new Map();
+    Object.values(porPlaca).forEach((grupo) => {
+      mapaDeslocamentoPorVeiculo(grupo, agoraMs).forEach((valor, chave) => mapaFinal.set(chave, valor));
+    });
+    return mapaFinal;
+  }, [entregas]);
 
   // Liga o GPS sempre que houver alguma entrega em aberto (chegada ou saída
   // ainda pendente) — tanto pra destacar o botão quando a loja tem
@@ -261,6 +282,7 @@ export default function DriversPage() {
             <CartaoEntrega
               key={entrega.id}
               entrega={entrega}
+              deslocamento={deslocamentoPorProtocolo.get(entrega.id) || null}
               localizacaoPorCodigo={localizacaoPorCodigo}
               posicaoAtual={posicaoAtual}
               actions={actions}
@@ -303,6 +325,7 @@ export default function DriversPage() {
                     <CartaoEntrega
                       key={entrega.id}
                       entrega={entrega}
+                      deslocamento={deslocamentoPorProtocolo.get(entrega.id) || null}
                       localizacaoPorCodigo={localizacaoPorCodigo}
                       posicaoAtual={posicaoAtual}
                       actions={actions}
@@ -373,6 +396,7 @@ function BotaoDesfazer({ chave, rotulo, confirmandoDesfazer, setConfirmandoDesfa
 // do botão "Ver histórico").
 function CartaoEntrega({
   entrega,
+  deslocamento,
   localizacaoPorCodigo,
   posicaoAtual,
   actions,
@@ -421,12 +445,21 @@ function CartaoEntrega({
         )}
       </div>
 
-      {(entrega.entregaNotasFiscais || entrega.chegadaLoja || entrega.saidaLoja) && (
+      {(entrega.entregaNotasFiscais || entrega.chegadaLoja || entrega.saidaLoja || deslocamento) && (
         <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 border-t border-slate-100 pt-3 text-xs text-slate-500 dark:border-slate-700 dark:text-slate-400">
           {entrega.entregaNotasFiscais && (
             <span className="inline-flex items-center">
               NF entregue:{' '}
               <strong className="ml-1 text-slate-700 dark:text-slate-200">{formatarHora(entrega.entregaNotasFiscais)}</strong>
+            </span>
+          )}
+          {deslocamento && (
+            <span className="inline-flex items-center">
+              Deslocamento:{' '}
+              <strong className="ml-1 text-slate-700 dark:text-slate-200">
+                {formatarDuracao(deslocamento.ms)}
+                {deslocamento.emAndamento ? ' (em andamento)' : ''}
+              </strong>
             </span>
           )}
           {entrega.chegadaLoja && (
