@@ -727,7 +727,13 @@ function aplicarAcaoInterna(state, acao) {
 
       const loja = state.lojas.find((l) => l.id === protocolo.lojaId);
       const agora = dataHora || new Date().toISOString();
-      if (dataHora && new Date(agora) < new Date(protocolo.dataHora)) {
+      // Quando a entrega das notas fiscais já foi registrada, ela é o
+      // horário real de saída do CD (o motorista não sai de fato sem os
+      // documentos) — mais preciso que `dataHora` (que só marca quando o
+      // carregamento em si foi registrado, antes do faturamento terminar).
+      // Sem entrega de NF registrada, cai de volta no comportamento antigo.
+      const baseSaidaCD = protocolo.entregaNotasFiscais || protocolo.dataHora;
+      if (dataHora && new Date(agora) < new Date(baseSaidaCD)) {
         return { ...state, ultimoErro: 'O horário de chegada não pode ser antes da saída do CD.' };
       }
 
@@ -849,6 +855,73 @@ function aplicarAcaoInterna(state, acao) {
         ),
         ultimoErro: null,
         ultimoAviso: `Saída desfeita na loja ${loja?.loja ?? ''}.`,
+      };
+    }
+
+    // Registra o momento em que as notas fiscais (e o manifesto) são
+    // entregues ao motorista — o carregamento físico já foi registrado em
+    // `dataHora`, mas o motorista só sai de verdade do CD depois que o
+    // faturista termina a nota, o que às vezes demora. Esse horário vira a
+    // referência real de "saída do CD" (ver uso em REGISTRAR_CHEGADA_LOJA
+    // acima). Fica no próprio protocolo, igual chegada/saída na loja.
+    case 'REGISTRAR_ENTREGA_NF': {
+      // `dataHora` opcional cobre quem esquece de registrar na hora (mesmo
+      // padrão de chegada/saída na loja).
+      const { protocoloId, dataHora } = acao.payload;
+      const protocolo = state.protocolos.find((p) => p.id === protocoloId);
+      if (!protocolo) {
+        return { ...state, ultimoErro: 'Protocolo não encontrado.' };
+      }
+      if (protocolo.entregaNotasFiscais) {
+        return { ...state, ultimoErro: 'A entrega das notas fiscais já foi registrada para este protocolo.' };
+      }
+
+      const loja = state.lojas.find((l) => l.id === protocolo.lojaId);
+      const agora = dataHora || new Date().toISOString();
+      if (dataHora && new Date(agora) < new Date(protocolo.dataHora)) {
+        return { ...state, ultimoErro: 'O horário de entrega das NFs não pode ser antes do carregamento.' };
+      }
+      if (protocolo.chegadaLoja && new Date(agora) > new Date(protocolo.chegadaLoja)) {
+        return { ...state, ultimoErro: 'O horário de entrega das NFs não pode ser depois da chegada na loja.' };
+      }
+
+      const atualizarProtocolo = (p) =>
+        p.id === protocoloId ? { ...p, entregaNotasFiscais: agora } : p;
+
+      return {
+        ...state,
+        protocolos: state.protocolos.map(atualizarProtocolo),
+        lojas: state.lojas.map((l) =>
+          l.id === protocolo.lojaId ? { ...l, protocolos: l.protocolos.map(atualizarProtocolo) } : l
+        ),
+        ultimoErro: null,
+        ultimoAviso: `Entrega das NFs${dataHora ? ' registrada manualmente' : ' registrada'} — placa ${protocolo.placa} às ${new Date(agora).toLocaleTimeString('pt-BR', {
+          hour: '2-digit',
+          minute: '2-digit',
+        })}.`,
+      };
+    }
+
+    case 'DESFAZER_ENTREGA_NF': {
+      const { protocoloId } = acao.payload;
+      const protocolo = state.protocolos.find((p) => p.id === protocoloId);
+      if (!protocolo) {
+        return { ...state, ultimoErro: 'Protocolo não encontrado.' };
+      }
+      if (!protocolo.entregaNotasFiscais) {
+        return { ...state, ultimoErro: 'Este protocolo ainda não tem entrega de NFs registrada.' };
+      }
+
+      const atualizarProtocolo = (p) => (p.id === protocoloId ? { ...p, entregaNotasFiscais: null } : p);
+
+      return {
+        ...state,
+        protocolos: state.protocolos.map(atualizarProtocolo),
+        lojas: state.lojas.map((l) =>
+          l.id === protocolo.lojaId ? { ...l, protocolos: l.protocolos.map(atualizarProtocolo) } : l
+        ),
+        ultimoErro: null,
+        ultimoAviso: `Entrega das NFs desfeita — placa ${protocolo.placa}.`,
       };
     }
 
@@ -1300,6 +1373,9 @@ export function AppProvider({ children }) {
         dispatch({ tipo: 'REGISTRAR_SAIDA_LOJA', payload: { protocoloId, dataHora, localizacao, observacao } }),
       desfazerChegadaLoja: (protocoloId) => dispatch({ tipo: 'DESFAZER_CHEGADA_LOJA', payload: { protocoloId } }),
       desfazerSaidaLoja: (protocoloId) => dispatch({ tipo: 'DESFAZER_SAIDA_LOJA', payload: { protocoloId } }),
+      registrarEntregaNF: (protocoloId, dataHora) =>
+        dispatch({ tipo: 'REGISTRAR_ENTREGA_NF', payload: { protocoloId, dataHora } }),
+      desfazerEntregaNF: (protocoloId) => dispatch({ tipo: 'DESFAZER_ENTREGA_NF', payload: { protocoloId } }),
       encerrarDia: () => dispatch({ tipo: 'ENCERRAR_DIA' }),
       restaurarDadosExemplo: () => dispatch({ tipo: 'RESTAURAR_DADOS_EXEMPLO' }),
       limparTudo: () => dispatch({ tipo: 'LIMPAR_TUDO' }),

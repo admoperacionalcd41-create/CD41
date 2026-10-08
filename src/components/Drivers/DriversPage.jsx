@@ -421,8 +421,14 @@ function CartaoEntrega({
         )}
       </div>
 
-      {(entrega.chegadaLoja || entrega.saidaLoja) && (
+      {(entrega.entregaNotasFiscais || entrega.chegadaLoja || entrega.saidaLoja) && (
         <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 border-t border-slate-100 pt-3 text-xs text-slate-500 dark:border-slate-700 dark:text-slate-400">
+          {entrega.entregaNotasFiscais && (
+            <span className="inline-flex items-center">
+              NF entregue:{' '}
+              <strong className="ml-1 text-slate-700 dark:text-slate-200">{formatarHora(entrega.entregaNotasFiscais)}</strong>
+            </span>
+          )}
           {entrega.chegadaLoja && (
             <span className="inline-flex items-center">
               Chegada:{' '}

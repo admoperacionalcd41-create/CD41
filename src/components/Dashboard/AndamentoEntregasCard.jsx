@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowRight, AlertTriangle, Package, Truck, MapPinned, CheckCircle2 } from 'lucide-react';
+import { ArrowRight, AlertTriangle, Package, Truck, MapPinned, CheckCircle2, Clock } from 'lucide-react';
 import { useApp } from '../../context/AppContext.jsx';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
 import { eHoje, formatarHora, formatarData, formatarDuracao } from '../../utils/dateHelpers';
@@ -168,7 +168,7 @@ export default function AndamentoEntregasCard({ irPara, compacto = false }) {
   // permanência dela tenha passado do tempo-limite — isso já é só histórico,
   // não algo que precise da atenção de quem está olhando agora.
   const resumoEntregas = useMemo(() => {
-    const contagem = { aguardando: 0, naLoja: 0, concluida: 0, atrasadas: 0, total: 0 };
+    const contagem = { aguardando: 0, naLoja: 0, concluida: 0, atrasadas: 0, aguardandoNF: 0, total: 0 };
     entregasPorVeiculo.forEach((veiculo) => {
       veiculo.entregas.forEach((entrega) => {
         const statusChave = getStatusEntrega(entrega, agoraMs, limiteMs);
@@ -177,6 +177,13 @@ export default function AndamentoEntregasCard({ irPara, compacto = false }) {
         else if (statusChave === 'na_loja' || statusChave === 'na_loja_atrasada') contagem.naLoja += 1;
         else contagem.concluida += 1;
         if (statusChave === 'na_loja_atrasada') contagem.atrasadas += 1;
+        // Fatia mais fina de "A caminho": carregamento já registrado, mas o
+        // motorista ainda nem saiu de fato do CD — a nota fiscal ainda não
+        // foi entregue a ele (ver REGISTRAR_ENTREGA_NF em AppContext.jsx).
+        // Não muda nenhuma das contagens acima (continua contando como "A
+        // caminho" pros fins já existentes); é só uma visão a mais, pro
+        // faturista enxergar a fila de carregamentos esperando NF.
+        if (!entrega.entregaNotasFiscais && !entrega.chegadaLoja) contagem.aguardandoNF += 1;
       });
     });
     return contagem;
@@ -228,7 +235,7 @@ export default function AndamentoEntregasCard({ irPara, compacto = false }) {
               "na loja" x "entregue" pela cor/ícone à distância, sem precisar
               ler o rótulo pequeno, o que ajuda numa tela cheia de números
               como essa. */}
-          <div className={`grid grid-cols-2 ${gapStats} sm:grid-cols-3 lg:grid-cols-5`}>
+          <div className={`grid grid-cols-2 ${gapStats} sm:grid-cols-3 lg:grid-cols-6`}>
             <div className={`flex items-center gap-2 rounded-lg border border-slate-100 ${padStat} dark:border-slate-700`}>
               <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-300">
                 <Package size={14} />
@@ -248,6 +255,20 @@ export default function AndamentoEntregasCard({ irPara, compacto = false }) {
               <span>
                 <p className="text-[11px] font-medium text-slate-400 dark:text-slate-500">A caminho</p>
                 <p className={`${textStat} font-bold leading-tight text-slate-600 dark:text-slate-300`}>{resumoEntregas.aguardando}</p>
+              </span>
+            </div>
+            {/* Pedido do usuário (ver REGISTRAR_ENTREGA_NF em AppContext.jsx):
+                visibilidade de quantos carregamentos já feitos ainda estão
+                parados no CD esperando o faturista terminar a nota fiscal —
+                hoje esse tempo ficava invisível, escondido dentro de "A
+                caminho". Mostra 0 quando não há nenhum, igual às outras. */}
+            <div className={`flex items-center gap-2 rounded-lg border ${padStat} ${resumoEntregas.aguardandoNF > 0 ? 'border-blue-200 dark:border-blue-900/60' : 'border-slate-100 dark:border-slate-700'}`}>
+              <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-500 dark:bg-blue-500/10 dark:text-blue-400">
+                <Clock size={14} />
+              </span>
+              <span>
+                <p className="text-[11px] font-medium text-slate-400 dark:text-slate-500">Aguardando NF</p>
+                <p className={`${textStat} font-bold leading-tight text-blue-600 dark:text-blue-400`}>{resumoEntregas.aguardandoNF}</p>
               </span>
             </div>
             <div className={`flex items-center gap-2 rounded-lg border border-slate-100 ${padStat} dark:border-slate-700`}>
@@ -394,6 +415,17 @@ export default function AndamentoEntregasCard({ irPara, compacto = false }) {
                           {deOutroDia && (
                             <span className="ml-1.5 text-[10px] font-semibold text-amber-600 dark:text-amber-400">
                               carregado {formatarData(entrega.dataHora.slice(0, 10))}
+                            </span>
+                          )}
+                          {/* NF entregue ainda é relevante só até a chegada na
+                              loja (depois disso, a permanência abaixo já diz
+                              mais) — mostra quando o motorista de fato saiu do
+                              CD, útil pra quem ficou com status "A caminho" por
+                              causa da demora no faturamento (ver REGISTRAR_ENTREGA_NF
+                              em AppContext.jsx). */}
+                          {!entrega.chegadaLoja && entrega.entregaNotasFiscais && (
+                            <span className="ml-1.5 text-[10px] text-slate-400 dark:text-slate-500">
+                              NF {formatarHora(entrega.entregaNotasFiscais)}
                             </span>
                           )}
                           {permanenciaMs != null && (

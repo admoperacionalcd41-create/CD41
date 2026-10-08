@@ -1,8 +1,14 @@
 import React, { useMemo, useState } from 'react';
-import { PlayCircle, FileSignature, Truck, Printer, Ban, AlertTriangle, Info, MapPin } from 'lucide-react';
+import { PlayCircle, FileSignature, FileCheck, Truck, Printer, Ban, AlertTriangle, Info, MapPin, Clock } from 'lucide-react';
 import { useApp } from '../../context/AppContext.jsx';
 import { getLojasProntasParaCarregar, getLojasEmCarregamento } from '../../utils/selectors';
-import { formatarDataHora } from '../../utils/dateHelpers';
+import {
+  formatarDataHora,
+  formatarHora,
+  formatarDuracao,
+  paraDataHoraLocalInput,
+  deDataHoraLocalInput,
+} from '../../utils/dateHelpers';
 import { getStatusLoja } from '../../utils/statusStyles';
 import { getNomeBox } from '../../utils/boxLogic';
 import { imprimirProtocolo } from '../../utils/imprimirProtocolo';
@@ -22,6 +28,14 @@ export default function LoadingList({ aoAbrirProtocolo }) {
   // null = nada a mostrar; 'ok' = impressão preparada (mostra dica de Ctrl+P);
   // 'erro' = falha real ao preparar o conteúdo para impressão.
   const [statusImpressao, setStatusImpressao] = useState(null);
+  // Entrega das notas fiscais ao motorista (ver coluna "Entrega NFs" na
+  // tabela abaixo) — mesmo padrão de horário manual usado em Motoristas
+  // para chegada/saída na loja, só que local a este arquivo (o registro
+  // aqui é feito por quem entrega a NF, não pelo motorista).
+  const [manualNFAberto, setManualNFAberto] = useState({});
+  const [valorManualNF, setValorManualNF] = useState({});
+  // id do protocolo com "Desfazer entrega de NF?" em confirmação na tabela.
+  const [confirmandoDesfazerNF, setConfirmandoDesfazerNF] = useState(null);
 
   const prontas = useMemo(
     () => getLojasProntasParaCarregar(state).filter((l) => lojaPassaFiltroTipoCarga(l, filtroTipoCarga)),
@@ -123,6 +137,25 @@ export default function LoadingList({ aoAbrirProtocolo }) {
     actions.cancelarInicioCarregamento(lojaId);
     setConfirmandoCancelamentoInicio(null);
     setSelecionadas((prev) => prev.filter((id) => id !== lojaId));
+  }
+
+  function aoRegistrarEntregaNF(protocoloId) {
+    actions.registrarEntregaNF(protocoloId);
+  }
+
+  function alternarManualNF(protocoloId) {
+    setManualNFAberto((atual) => ({ ...atual, [protocoloId]: !atual[protocoloId] }));
+    setValorManualNF((atual) => (atual[protocoloId] ? atual : { ...atual, [protocoloId]: paraDataHoraLocalInput() }));
+  }
+
+  function confirmarEntregaNFManual(protocoloId) {
+    actions.registrarEntregaNF(protocoloId, deDataHoraLocalInput(valorManualNF[protocoloId]));
+    setManualNFAberto((atual) => ({ ...atual, [protocoloId]: false }));
+  }
+
+  function aoDesfazerEntregaNF(protocoloId) {
+    actions.desfazerEntregaNF(protocoloId);
+    setConfirmandoDesfazerNF(null);
   }
 
   return (
@@ -293,6 +326,7 @@ export default function LoadingList({ aoAbrirProtocolo }) {
                   <th className="py-2 pr-3 font-semibold">Paletes</th>
                   <th className="py-2 pr-3 font-semibold">Status</th>
                   <th className="py-2 pr-3 font-semibold">Data/Hora</th>
+                  <th className="py-2 pr-3 font-semibold">Entrega NFs</th>
                   <th className="py-2 pr-3 font-semibold">Ações</th>
                 </tr>
               </thead>
@@ -343,6 +377,88 @@ export default function LoadingList({ aoAbrirProtocolo }) {
                         </span>
                       </td>
                       <td className="py-2 pr-3 text-slate-400 dark:text-slate-500">{formatarDataHora(p.dataHora)}</td>
+                      <td className="py-2 pr-3">
+                        {p.entregaNotasFiscais ? (
+                          <div>
+                            <span className="font-semibold text-slate-700 dark:text-slate-200">
+                              {formatarHora(p.entregaNotasFiscais)}
+                            </span>
+                            <span
+                              className="ml-1 text-slate-400 dark:text-slate-500"
+                              title="Tempo entre o carregamento e a entrega das notas fiscais ao motorista"
+                            >
+                              (+{formatarDuracao(new Date(p.entregaNotasFiscais) - new Date(p.dataHora))})
+                            </span>
+                            <div>
+                              {confirmandoDesfazerNF === p.id ? (
+                                <span className="inline-flex items-center gap-1.5">
+                                  <span className="text-slate-400 dark:text-slate-500">Desfazer?</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => aoDesfazerEntregaNF(p.id)}
+                                    className="font-semibold text-red-600 hover:underline dark:text-red-400"
+                                  >
+                                    Sim
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setConfirmandoDesfazerNF(null)}
+                                    className="text-slate-400 hover:underline dark:text-slate-500"
+                                  >
+                                    Não
+                                  </button>
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => setConfirmandoDesfazerNF(p.id)}
+                                  className="text-[10px] text-slate-400 underline decoration-dotted underline-offset-2 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
+                                >
+                                  desfazer
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="space-y-1">
+                            <button
+                              type="button"
+                              onClick={() => aoRegistrarEntregaNF(p.id)}
+                              title="Registrar que as notas fiscais foram entregues ao motorista agora"
+                              className="flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
+                            >
+                              <FileCheck size={12} /> Registrar NF
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => alternarManualNF(p.id)}
+                              className="flex items-center gap-1 text-[10px] text-slate-400 underline decoration-dotted underline-offset-2 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
+                            >
+                              <Clock size={10} /> {manualNFAberto[p.id] ? 'cancelar' : 'horário manual'}
+                            </button>
+                            {manualNFAberto[p.id] && (
+                              <div className="flex items-center gap-1">
+                                <input
+                                  type="datetime-local"
+                                  value={valorManualNF[p.id] || ''}
+                                  onChange={(e) =>
+                                    setValorManualNF((atual) => ({ ...atual, [p.id]: e.target.value }))
+                                  }
+                                  className="rounded-md border border-slate-300 bg-white px-1.5 py-1 text-[11px] text-slate-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+                                />
+                                <button
+                                  type="button"
+                                  disabled={!valorManualNF[p.id]}
+                                  onClick={() => confirmarEntregaNFManual(p.id)}
+                                  className="flex-shrink-0 rounded-md bg-slate-700 px-2 py-1 text-[11px] font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-slate-600 dark:hover:bg-slate-500"
+                                >
+                                  OK
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </td>
                       <td className="py-2 pr-3">
                         {confirmandoCancelamento === p.id ? (
                           <div className="flex items-center gap-1.5 rounded-md border border-amber-300 bg-amber-50 px-2 py-1 dark:border-amber-700 dark:bg-amber-900/40">
