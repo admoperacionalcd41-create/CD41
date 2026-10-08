@@ -414,43 +414,39 @@ export default function AndamentoEntregasCard({ irPara, compacto = false }) {
                   // que não é de hoje, já que sem isso ficaria parecendo uma
                   // entrega de hoje igual às outras.
                   const deOutroDia = !eHoje(entrega.dataHora);
+                  // Pedido do usuário: desloc + parado (+ "desde", quando em
+                  // andamento) agora podem aparecer juntos na mesma entrega
+                  // (ex.: "Na loja" mostra os três). Tudo isso dentro do
+                  // mesmo `truncate` de uma linha só cortava a informação
+                  // com "..." nos cards mais estreitos da grade — por isso
+                  // os tempos foram pra uma segunda linha própria, que pode
+                  // quebrar em mais de uma linha (`flex-wrap`) em vez de
+                  // truncar e esconder dado.
+                  const temTempos = Boolean(deslocamento) || permanenciaMs != null || emAndamento;
                   return (
-                    <div key={entrega.id} className="flex items-center justify-between gap-2 text-xs">
-                      <span
-                        className="flex min-w-0 items-center gap-1.5 truncate text-slate-600 dark:text-slate-300"
-                        title={`${entrega.loja.loja} — ${entrega.loja.nomeLoja}`}
-                      >
-                        <status.Icone size={12} className={`flex-shrink-0 ${status.corIcone}`} />
-                        <span className="truncate">
-                          {entrega.loja.loja}
-                          {deOutroDia && (
-                            <span className="ml-1.5 text-[10px] font-semibold text-amber-600 dark:text-amber-400">
-                              carregado {formatarData(entrega.dataHora.slice(0, 10))}
-                            </span>
-                          )}
-                          {/* Deslocamento ainda é relevante só até a chegada
-                              na loja (depois disso, a permanência abaixo já
-                              diz mais) — mostra há quanto tempo o motorista
-                              está rodando desde que saiu do CD (NF entregue)
-                              ou da parada anterior, útil pra quem ficou com
-                              status "A caminho" por um bom tempo (ver
-                              deslocamento.js). */}
-                          {!entrega.chegadaLoja && deslocamento && (
-                            <span className="ml-1.5 text-[10px] text-slate-400 dark:text-slate-500">
-                              deslocamento {formatarDuracao(deslocamento.ms)}
-                            </span>
-                          )}
-                          {permanenciaMs != null && (
-                            <span className="ml-1.5 text-[10px] text-slate-400 dark:text-slate-500">
-                              ({formatarDuracao(permanenciaMs)})
-                            </span>
-                          )}
-                          {emAndamento && (
-                            <span className="ml-1.5 text-[10px] text-slate-400 dark:text-slate-500">
-                              desde {formatarHora(entrega.chegadaLoja)}
-                            </span>
-                          )}
+                    <div key={entrega.id} className="flex items-start justify-between gap-2 text-xs">
+                      <span className="min-w-0 flex-1">
+                        <span
+                          className="flex items-center gap-1.5 truncate text-slate-600 dark:text-slate-300"
+                          title={`${entrega.loja.loja} — ${entrega.loja.nomeLoja}`}
+                        >
+                          <status.Icone size={12} className={`flex-shrink-0 ${status.corIcone}`} />
+                          <span className="truncate">
+                            {entrega.loja.loja}
+                            {deOutroDia && (
+                              <span className="ml-1.5 text-[10px] font-semibold text-amber-600 dark:text-amber-400">
+                                carregado {formatarData(entrega.dataHora.slice(0, 10))}
+                              </span>
+                            )}
+                          </span>
                         </span>
+                        {temTempos && (
+                          <span className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 pl-[18px] text-[10px] text-slate-400 dark:text-slate-500">
+                            {deslocamento && <span>desloc {formatarDuracao(deslocamento.ms)}</span>}
+                            {permanenciaMs != null && <span>parado {formatarDuracao(permanenciaMs)}</span>}
+                            {emAndamento && <span>desde {formatarHora(entrega.chegadaLoja)}</span>}
+                          </span>
+                        )}
                       </span>
                       <span
                         className={`flex-shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${status.corBadge}`}

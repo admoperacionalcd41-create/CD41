@@ -67,10 +67,24 @@ export default function BoxGrid({ irPara, aoAbrirAgrupamento }) {
 
       {/* Mesmo card "Andamento das Entregas" do Dashboard, em versão
           compacta (menos respiro). Ocupa toda a altura que sobrar abaixo da
-          grade de boxes (min-h-0 + flex-1) e só a lista de veículos dentro
-          dele rola, se precisar — pensado pra caber junto com a grade de
-          boxes sem que a tela precise rolar, mesmo em monitores baixos. */}
-      <div className="min-h-0 flex-1">
+          grade de boxes (flex-1) e só a lista de veículos dentro dele rola,
+          se precisar — pensado pra caber junto com a grade de boxes sem que
+          a tela precise rolar, mesmo em monitores baixos.
+
+          `min-h-0` sozinho deixava esse card espremer até sumir (altura 0)
+          quando a grade de boxes acima já ocupava quase toda a tela — sem
+          altura nenhuma, a rolagem interna da lista de veículos (só
+          funciona com uma altura de verdade pra `overflow-y-auto` comparar)
+          nunca tinha chance de aparecer, e o conteúdo só "vazava" pra fora,
+          forçando a PÁGINA inteira a rolar em vez da lista. Um piso mínimo
+          (reserva espaço pro cabeçalho + estatísticas + ~2-3 linhas de
+          veículos, o bastante pra rolagem interna valer a pena em vez de só
+          mostrar meia linha) garante que o card sempre tenha altura o
+          bastante pra rolagem própria funcionar; se mesmo assim não couber
+          tudo na tela (grade de boxes muito alta), a página rola um pouco
+          também pra revelar o card — melhor que o card sumir ou espremer a
+          lista a quase nada. */}
+      <div className="min-h-[420px] flex-1">
         <AndamentoEntregasCard irPara={irPara} compacto />
       </div>
     </div>
