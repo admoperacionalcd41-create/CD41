@@ -100,8 +100,13 @@ export default function LoadingList({ aoAbrirProtocolo }) {
   }
 
   function aoImprimir(protocolo) {
-    const loja = state.lojas.find((l) => l.id === protocolo.lojaId);
-    if (!loja) return;
+    const lojaBase = state.lojas.find((l) => l.id === protocolo.lojaId);
+    if (!lojaBase) return;
+    // A observação é da loja (state.observacoesLoja, por código — ver
+    // AppContext.jsx), não um campo gravado no registro da carga, então é
+    // buscada aqui na hora de montar o protocolo impresso, tanto pra loja
+    // principal quanto pras demais lojas de uma viagem em lote.
+    const loja = { ...lojaBase, observacaoLoja: state.observacoesLoja?.[lojaBase.loja] || null };
     const outrasLojas = protocolo.viagemId
       ? state.protocolos
           .filter((p) => p.viagemId === protocolo.viagemId && p.id !== protocolo.id)
@@ -116,7 +121,7 @@ export default function LoadingList({ aoAbrirProtocolo }) {
                   posicaoCarregamento: p.posicaoCarregamento,
                   posicaoEntrega: p.posicaoEntrega,
                   boxNumero: l.boxNumero,
-                  observacaoLoja: l.observacaoLoja,
+                  observacaoLoja: state.observacoesLoja?.[l.loja] || null,
                   statusEnvio: p.statusEnvio,
                   lotesRestantesDescricao: p.lotesRestantesDescricao,
                 }

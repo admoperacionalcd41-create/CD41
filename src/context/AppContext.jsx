@@ -104,24 +104,36 @@ function aplicarAcaoInterna(state, acao) {
 
     // Define (ou limpa, se o texto vier vazio) a observação manual de uma
     // loja — pedidos do dia a dia feitos pela loja (ex.: "colocar bag",
-    // "material extra por fora"), registrados a qualquer momento, com a
-    // loja em QUALQUER status (inclusive "pendente", ainda sem box/vaga —
-    // ver botão "Observações das Lojas" no cabeçalho). Mostrada depois como
-    // lembrete ao abrir o protocolo de carregamento dessa loja.
+    // "material extra por fora"), registrados a qualquer momento (ver botão
+    // "Observações das Lojas" no cabeçalho). Mostrada depois como lembrete
+    // ao abrir o protocolo de carregamento dessa loja.
+    //
+    // Pedido do usuário: "a observação seja atribuída à loja, não à carga"
+    // — guardada em `state.observacoesLoja`, um mapa { código da loja:
+    // texto } independente de qualquer carga/importação específica (antes
+    // ficava num campo dentro do registro de UMA importação só, então uma
+    // loja com 2 cargas no mesmo dia, ou uma nova carga em outro dia,
+    // "perdia" a observação por não ser mais aquele registro exato). Por
+    // ser identificada só pelo código da loja, também passa a valer pra
+    // lojas sem nenhuma carga importada ainda (ver getLojasConhecidas em
+    // selectors.js, usada pelo modal pra listar todas as lojas já
+    // conhecidas, não só as de hoje).
     case 'DEFINIR_OBSERVACAO_LOJA': {
-      const { lojaId, texto } = acao.payload;
-      const loja = state.lojas.find((l) => l.id === lojaId);
-      if (!loja) {
-        return { ...state, ultimoErro: 'Loja não encontrada.' };
-      }
+      const { codigoLoja, texto } = acao.payload;
       const textoLimpo = (texto || '').trim();
+      const observacoesLoja = { ...state.observacoesLoja };
+      if (textoLimpo) {
+        observacoesLoja[codigoLoja] = textoLimpo;
+      } else {
+        delete observacoesLoja[codigoLoja];
+      }
       return {
         ...state,
-        lojas: state.lojas.map((l) => (l.id === lojaId ? { ...l, observacaoLoja: textoLimpo || null } : l)),
+        observacoesLoja,
         ultimoErro: null,
         ultimoAviso: textoLimpo
-          ? `Observação salva para a loja ${loja.loja}.`
-          : `Observação removida da loja ${loja.loja}.`,
+          ? `Observação salva para a loja ${codigoLoja}.`
+          : `Observação removida da loja ${codigoLoja}.`,
       };
     }
 
@@ -946,12 +958,15 @@ function aplicarAcaoInterna(state, acao) {
         diaAtual: hojeISO(),
         // Cadastros auxiliares (colaboradores/motoristas/placas/localização
         // das lojas) não são dados operacionais do dia — são preservados ao
-        // zerar lojas/boxes.
+        // zerar lojas/boxes. observacoesLoja entra no mesmo grupo: é uma
+        // observação da LOJA (pelo código), não de uma carga/importação do
+        // dia — zerar as lojas não tem por que apagá-la.
         colaboradoresCadastrados: state.colaboradoresCadastrados,
         motoristasCadastrados: state.motoristasCadastrados,
         placasCadastradas: state.placasCadastradas,
         contatosNotificacao: state.contatosNotificacao,
         localizacaoLojas: state.localizacaoLojas,
+        observacoesLoja: state.observacoesLoja,
         ultimoErro: null,
         ultimoAviso: 'Banco de dados zerado — todas as lojas, boxes e protocolos foram removidos.',
       };
@@ -1355,7 +1370,8 @@ export function AppProvider({ children }) {
     () => ({
       importarLojas: (registros) => dispatch({ tipo: 'IMPORTAR_LOJAS', payload: registros }),
       excluirLoja: (lojaId) => dispatch({ tipo: 'EXCLUIR_LOJA', payload: { lojaId } }),
-      definirObservacaoLoja: (lojaId, texto) => dispatch({ tipo: 'DEFINIR_OBSERVACAO_LOJA', payload: { lojaId, texto } }),
+      definirObservacaoLoja: (codigoLoja, texto) =>
+        dispatch({ tipo: 'DEFINIR_OBSERVACAO_LOJA', payload: { codigoLoja, texto } }),
       apontarBox: (payload) => dispatch({ tipo: 'APONTAR_BOX', payload }),
       concluirConferencia: (lojaId) => dispatch({ tipo: 'CONCLUIR_CONFERENCIA', payload: { lojaId } }),
       iniciarAgrupamento: (payload) => dispatch({ tipo: 'INICIAR_AGRUPAMENTO', payload }),

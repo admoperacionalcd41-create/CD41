@@ -2,13 +2,19 @@ import React, { useMemo, useState } from 'react';
 import { X, Search, MessageSquareText, Check } from 'lucide-react';
 import { useApp } from '../../context/AppContext.jsx';
 import { eHoje } from '../../utils/dateHelpers';
+import { getLojasConhecidas } from '../../utils/selectors';
 
-// Descreve rapidamente a situação atual da loja na lista de busca — só pra
-// dar contexto (não é uma tela de acompanhamento), já que essa busca
-// propositalmente lista as lojas de HOJE independente do status: o pedido
-// da loja (ex.: "colocar bag") costuma chegar antes mesmo dela ser apontada
-// num box, e é exatamente por isso que essa tela não depende de box/vaga.
-function descreverSituacao(loja) {
+// Descreve rapidamente a situação da loja HOJE, pra dar contexto na lista de
+// busca (não é uma tela de acompanhamento) — mas a busca em si já não se
+// limita mais a lojas com carga hoje (ver comentário no componente abaixo),
+// então aqui é só mais uma informação, não o critério de quem aparece.
+// `cargasHoje` é a lista de registros de hoje pra esse código (pode ter mais
+// de um — ver DailyProcessReport.jsx sobre lojas com mais de uma carga no
+// dia) ou vazia quando a loja não tem nenhuma carga hoje.
+function descreverSituacao(cargasHoje) {
+  if (!cargasHoje || cargasHoje.length === 0) return 'Sem carga hoje';
+  if (cargasHoje.length > 1) return `${cargasHoje.length} cargas hoje`;
+  const loja = cargasHoje[0];
   if (loja.status === 'pendente') return 'Ainda não apontada';
   if (loja.status === 'finalizada') return 'Carregamento finalizado';
   if (loja.boxNumero) return `Box ${loja.boxNumero}`;
@@ -19,48 +25,67 @@ function descreverSituacao(loja) {
  * Modal acessível pelo botão "Observações das Lojas" no cabeçalho (ver
  * Header.jsx) — de propósito FORA das telas de Boxes/Agrupamento, pra
  * funcionar com a loja em qualquer status do dia, inclusive antes dela ser
- * apontada num box. Busca entre as lojas importadas hoje (mesma regra de
- * "hoje" usada no resto do app — ver eHoje/dataImportacao) por código ou
- * nome, e permite escrever/editar a observação de qualquer uma delas.
+ * apontada num box. Busca por código ou nome entre TODAS as lojas já
+ * conhecidas pelo sistema (ver getLojasConhecidas em selectors.js) — pedido
+ * do usuário: antes listava só as importadas hoje, o que impedia anotar uma
+ * loja que ainda não teve carga importada no dia; agora a observação é da
+ * loja (identificada só pelo código), não de uma carga/importação
+ * específica, então faz sentido já poder anotar qualquer loja conhecida.
  *
  * A observação salva aqui aparece depois como lembrete ao abrir o
- * protocolo de carregamento dessa loja (ver LoadingProtocolForm.jsx).
+ * protocolo de carregamento dessa loja (ver LoadingProtocolForm.jsx), pra
+ * qualquer carga dessa loja, não só a de hoje.
  */
 export default function ObservacoesLojaModal({ aoFechar }) {
   const { state, actions } = useApp();
   const [busca, setBusca] = useState('');
-  const [lojaSelecionadaId, setLojaSelecionadaId] = useState(null);
+  const [codigoSelecionado, setCodigoSelecionado] = useState(null);
   const [texto, setTexto] = useState('');
   const [salvo, setSalvo] = useState(false);
 
-  const lojasHoje = useMemo(() => state.lojas.filter((l) => eHoje(l.dataImportacao)), [state.lojas]);
+  const lojasConhecidas = useMemo(() => getLojasConhecidas(state), [state.lojas]);
+
+  // Cargas de HOJE por código de loja — só pra enriquecer a lista com a
+  // situação atual (ver descreverSituacao acima); não filtra quem aparece.
+  const cargasHojePorCodigo = useMemo(() => {
+    const mapa = new Map();
+    state.lojas
+      .filter((l) => eHoje(l.dataImportacao))
+      .forEach((l) => {
+        if (!mapa.has(l.loja)) mapa.set(l.loja, []);
+        mapa.get(l.loja).push(l);
+      });
+    return mapa;
+  }, [state.lojas]);
+
+  const observacoesLoja = state.observacoesLoja || {};
 
   const buscaNormalizada = busca.trim().toLowerCase();
   const resultados = useMemo(() => {
     const filtradas = buscaNormalizada
-      ? lojasHoje.filter(
-          (l) => l.loja.toLowerCase().includes(buscaNormalizada) || l.nomeLoja.toLowerCase().includes(buscaNormalizada)
+      ? lojasConhecidas.filter(
+          (l) => l.codigo.toLowerCase().includes(buscaNormalizada) || l.nomeLoja.toLowerCase().includes(buscaNormalizada)
         )
-      : lojasHoje;
+      : lojasConhecidas;
     // Lojas com observação já registrada aparecem primeiro — ajuda a
-    // revisar rapidamente o que já foi anotado no dia, sem precisar buscar
-    // uma por uma.
+    // revisar rapidamente o que já foi anotado, sem precisar buscar uma por
+    // uma.
     return [...filtradas].sort((a, b) => {
-      const temA = a.observacaoLoja ? 0 : 1;
-      const temB = b.observacaoLoja ? 0 : 1;
+      const temA = observacoesLoja[a.codigo] ? 0 : 1;
+      const temB = observacoesLoja[b.codigo] ? 0 : 1;
       if (temA !== temB) return temA - temB;
-      return a.loja.localeCompare(b.loja);
+      return a.codigo.localeCompare(b.codigo, 'pt-BR', { numeric: true, sensitivity: 'base' });
     });
-  }, [lojasHoje, buscaNormalizada]);
+  }, [lojasConhecidas, buscaNormalizada, observacoesLoja]);
 
   function selecionar(loja) {
-    setLojaSelecionadaId((atual) => (atual === loja.id ? null : loja.id));
-    setTexto(loja.observacaoLoja || '');
+    setCodigoSelecionado((atual) => (atual === loja.codigo ? null : loja.codigo));
+    setTexto(observacoesLoja[loja.codigo] || '');
     setSalvo(false);
   }
 
   function salvar() {
-    actions.definirObservacaoLoja(lojaSelecionadaId, texto);
+    actions.definirObservacaoLoja(codigoSelecionado, texto);
     setSalvo(true);
     setTimeout(() => setSalvo(false), 1500);
   }
@@ -85,8 +110,9 @@ export default function ObservacoesLojaModal({ aoFechar }) {
         <div className="border-b border-slate-200 p-3 dark:border-slate-700">
           <p className="mb-2 text-xs text-slate-500 dark:text-slate-400">
             Registre aqui um pedido da loja (ex.: colocar bag, material extra por fora) a qualquer
-            momento do dia — não precisa a loja já estar apontada num box. A observação aparece como
-            lembrete na hora de fazer o protocolo de carregamento dessa loja.
+            momento — não precisa a loja já estar apontada num box, nem ter carga importada hoje. A
+            observação fica salva na loja (vale pra qualquer carga dela) e aparece como lembrete na
+            hora de fazer o protocolo de carregamento.
           </p>
           <div className="relative">
             <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -104,33 +130,35 @@ export default function ObservacoesLojaModal({ aoFechar }) {
         <div className="flex-1 overflow-y-auto">
           {resultados.length === 0 ? (
             <p className="p-4 text-center text-xs text-slate-400 dark:text-slate-500">
-              {lojasHoje.length === 0
-                ? 'Nenhuma loja importada hoje ainda.'
+              {lojasConhecidas.length === 0
+                ? 'Nenhuma loja registrada ainda.'
                 : 'Nenhuma loja encontrada com esse código ou nome.'}
             </p>
           ) : (
             <ul className="divide-y divide-slate-100 dark:divide-slate-700">
               {resultados.map((l) => (
-                <li key={l.id}>
+                <li key={l.codigo}>
                   <button
                     type="button"
                     onClick={() => selecionar(l)}
                     className={`flex w-full flex-col items-start gap-0.5 px-4 py-2.5 text-left text-xs hover:bg-slate-50 dark:hover:bg-slate-700/50 ${
-                      lojaSelecionadaId === l.id ? 'bg-totvs-50 dark:bg-whatsapp-500/10' : ''
+                      codigoSelecionado === l.codigo ? 'bg-totvs-50 dark:bg-whatsapp-500/10' : ''
                     }`}
                   >
                     <span className="flex min-w-0 items-center gap-1.5 font-medium text-slate-700 dark:text-slate-200">
-                      {l.observacaoLoja && (
+                      {observacoesLoja[l.codigo] && (
                         <MessageSquareText size={12} className="flex-shrink-0 text-amber-500" />
                       )}
                       <span className="truncate">
-                        Loja {l.loja} — {l.nomeLoja}
+                        Loja {l.codigo} — {l.nomeLoja}
                       </span>
                     </span>
-                    <span className="text-slate-400 dark:text-slate-500">{descreverSituacao(l)}</span>
+                    <span className="text-slate-400 dark:text-slate-500">
+                      {descreverSituacao(cargasHojePorCodigo.get(l.codigo))}
+                    </span>
                   </button>
 
-                  {lojaSelecionadaId === l.id && (
+                  {codigoSelecionado === l.codigo && (
                     <div className="space-y-2 bg-slate-50 px-4 py-3 dark:bg-slate-900/40">
                       <textarea
                         value={texto}

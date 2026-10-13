@@ -45,6 +45,12 @@ const CHAVE_COLECAO = {
 // Coleções de strings simples (nomes cadastrados), sem identidade própria.
 const COLECOES_SIMPLES = ['colaboradoresCadastrados', 'motoristasCadastrados'];
 
+// Mapas objeto { chave: valor } sem identidade por item (não são arrays) —
+// hoje só observacoesLoja ({ código da loja: texto }, ver AppContext.jsx).
+// Mesma lógica de 3 pontas de mesclarColecaoPorChave, mas usando as
+// próprias chaves do objeto em vez de um campo `chave` dentro de cada item.
+const MAPAS_OBJETO = ['observacoesLoja'];
+
 // Campos escalares onde uma edição local concorrente deve prevalecer sobre
 // o remoto (mesmo critério das coleções: a ação local mais recente, ainda
 // não salva, não deve sumir sem alguém tentar gravá-la).
@@ -108,6 +114,42 @@ function mesclarColecaoPorChave(chave, base, local, remoto) {
   return resultado;
 }
 
+function mesclarMapaObjeto(base, local, remoto) {
+  const baseObj = base && typeof base === 'object' ? base : {};
+  const localObj = local && typeof local === 'object' ? local : {};
+  const remotoObj = remoto && typeof remoto === 'object' ? remoto : {};
+
+  const todasAsChaves = new Set([...Object.keys(baseObj), ...Object.keys(localObj), ...Object.keys(remotoObj)]);
+  const resultado = {};
+
+  todasAsChaves.forEach((chave) => {
+    const emBase = baseObj[chave];
+    const emLocal = localObj[chave];
+    const emRemoto = remotoObj[chave];
+
+    if (emLocal == null && emRemoto == null) return; // removido/ausente dos dois lados
+
+    const localMudou = !iguais(emLocal, emBase);
+    const remotoMudou = !iguais(emRemoto, emBase);
+
+    if (emLocal == null) {
+      if (emRemoto != null) resultado[chave] = emRemoto;
+      return;
+    }
+    if (emRemoto == null) {
+      if (emBase == null) resultado[chave] = emLocal; // criado só local (nunca existiu na base)
+      return;
+    }
+
+    if (localMudou && !remotoMudou) resultado[chave] = emLocal;
+    else if (!localMudou && remotoMudou) resultado[chave] = emRemoto;
+    else if (localMudou && remotoMudou) resultado[chave] = emLocal; // colisão real — ver comentário acima
+    else resultado[chave] = emRemoto; // nenhum dos dois mudou
+  });
+
+  return resultado;
+}
+
 function mesclarColecaoSimples(base, local, remoto) {
   const baseSet = new Set(Array.isArray(base) ? base : []);
   const localSet = new Set(Array.isArray(local) ? local : []);
@@ -142,6 +184,10 @@ export function mesclarEstadoSincronizado(base, local, remoto) {
 
   COLECOES_SIMPLES.forEach((campo) => {
     resultado[campo] = mesclarColecaoSimples(base[campo], local[campo], remoto[campo]);
+  });
+
+  MAPAS_OBJETO.forEach((campo) => {
+    resultado[campo] = mesclarMapaObjeto(base[campo], local[campo], remoto[campo]);
   });
 
   CAMPOS_ESCALARES.forEach((campo) => {

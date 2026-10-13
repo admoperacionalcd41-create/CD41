@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Truck, MessageSquareText } from 'lucide-react';
+import { X, Truck, MessageSquareText, Check } from 'lucide-react';
 import { useApp } from '../../context/AppContext.jsx';
 import { getNomeBox } from '../../utils/boxLogic';
 import { montarMensagemProtocolo } from '../../utils/notificacoes';
@@ -70,6 +70,26 @@ export default function LoadingProtocolForm({ lojas, aoFechar, aoRegistrar }) {
   // lista — o operador ajusta arrastando no desenho do caminhão, se precisar.
   const [ordemCarregamento, setOrdemCarregamento] = useState(() => (lojas || []).map((l) => l.id));
 
+  // Lembrete de observação da loja (ver ObservacoesLojaModal.jsx) — captura
+  // as lojas com observação UMA VEZ, na abertura do formulário (useState
+  // lazy, não reativo), pra não sumir da tela assim que o operador clica
+  // "Sim" (que já apaga a observação de verdade em state.observacoesLoja —
+  // se esse cálculo fosse refeito a cada render, o item desapareceria antes
+  // de mostrar a confirmação "Atendida").
+  const [lojasComObservacao] = useState(() =>
+    (lojas || [])
+      .map((l) => ({ ...l, observacaoLoja: state.observacoesLoja?.[l.loja] || null }))
+      .filter((l) => l.observacaoLoja)
+  );
+  // Resposta do operador pra cada loja com observação nesta tela —
+  // { código da loja: 'sim' | 'nao' }. Pedido do usuário: um botão Sim/Não
+  // pra informar se o pedido da loja está sendo atendido nesta carga. "Sim"
+  // apaga a observação (não aparece mais — ver marcarObservacaoAtendida
+  // abaixo); "Não" não muda nada no estado — a observação já fica
+  // registrada por padrão (ver AppContext.jsx), então simplesmente
+  // continua lá e aparece de novo na próxima carga dessa loja.
+  const [respostaObservacao, setRespostaObservacao] = useState({});
+
   if (!lojas || lojas.length === 0) return null;
   const emLote = lojas.length > 1;
   const loja = lojas[0]; // usado apenas no fluxo de loja única
@@ -90,6 +110,23 @@ export default function LoadingProtocolForm({ lojas, aoFechar, aoRegistrar }) {
 
   function atualizarLacre(indice, valor) {
     setLacres((prev) => prev.map((l, i) => (i === indice ? valor : l)));
+  }
+
+  // "Sim, atendida" — apaga a observação de verdade (mesma ação usada no
+  // modal de Observações das Lojas pra limpar o texto), então ela some
+  // também do indicador do cabeçalho e não aparece mais em nenhuma carga
+  // futura dessa loja.
+  function marcarObservacaoAtendida(codigoLoja) {
+    actions.definirObservacaoLoja(codigoLoja, '');
+    setRespostaObservacao((prev) => ({ ...prev, [codigoLoja]: 'sim' }));
+  }
+
+  // "Não, não atendida" — só registra a resposta NESTA tela (pra trocar o
+  // botão por uma confirmação); não mexe em state.observacoesLoja, então a
+  // observação continua exatamente como estava e aparece de novo na
+  // próxima carga dessa loja, sem precisar de nenhuma ação extra aqui.
+  function marcarObservacaoNaoAtendida(codigoLoja) {
+    setRespostaObservacao((prev) => ({ ...prev, [codigoLoja]: 'nao' }));
   }
 
   function alterarStatusLoja(lojaId, novoStatus) {
@@ -232,33 +269,68 @@ export default function LoadingProtocolForm({ lojas, aoFechar, aoRegistrar }) {
         </div>
 
         {/* Lembrete de pedidos da loja (ex.: "colocar bag", "material extra
-            por fora") anotados a qualquer momento do dia — ver botão
-            "Observações das Lojas" no cabeçalho (Header.jsx) e
-            ObservacoesLojaModal.jsx. Só aparece quando existe observação
-            (nenhuma loja da viagem com observacaoLoja preenchido = nenhum
-            aviso), pra não virar ruído em toda entrega. */}
-        {(() => {
-          const lojasComObservacao = lojas.filter((l) => l.observacaoLoja);
-          if (lojasComObservacao.length === 0) return null;
-          return (
-            <div className="mb-3 rounded-lg bg-amber-50 p-2.5 text-xs text-amber-700 dark:border dark:border-current dark:bg-amber-500/10 dark:text-amber-300">
-              <p className="mb-1 flex items-center gap-1.5 font-semibold">
-                <MessageSquareText size={13} />
-                {lojasComObservacao.length > 1
-                  ? 'Observações registradas para estas lojas:'
-                  : 'Observação registrada para esta loja:'}
-              </p>
-              <ul className="space-y-0.5">
-                {lojasComObservacao.map((l) => (
+            por fora") anotados a qualquer momento — ver botão "Observações
+            das Lojas" no cabeçalho (Header.jsx) e ObservacoesLojaModal.jsx.
+            A observação é da loja (state.observacoesLoja, por código — ver
+            AppContext.jsx), não de uma carga específica, então vale pra
+            qualquer carga dela, inclusive essa. Só aparece quando existe
+            observação, pra não virar ruído em toda entrega.
+
+            Pedido do usuário: um botão Sim/Não pra informar se o pedido da
+            loja está sendo atendido nesta carga — "Sim" apaga a observação
+            (não aparece mais em nenhuma carga futura); "Não" mantém, pra
+            aparecer de novo na próxima carga dessa loja (ver
+            marcarObservacaoAtendida/marcarObservacaoNaoAtendida acima). */}
+        {lojasComObservacao.length > 0 && (
+          <div className="mb-3 rounded-lg bg-amber-50 p-2.5 text-xs text-amber-700 dark:border dark:border-current dark:bg-amber-500/10 dark:text-amber-300">
+            <p className="mb-1.5 flex items-center gap-1.5 font-semibold">
+              <MessageSquareText size={13} />
+              {lojasComObservacao.length > 1
+                ? 'Observações registradas para estas lojas:'
+                : 'Observação registrada para esta loja:'}
+            </p>
+            <ul className="space-y-2">
+              {lojasComObservacao.map((l) => {
+                const resposta = respostaObservacao[l.loja];
+                return (
                   <li key={l.id}>
-                    {emLote && <span className="font-medium">Loja {l.loja}: </span>}
-                    {l.observacaoLoja}
+                    <div>
+                      {emLote && <span className="font-medium">Loja {l.loja}: </span>}
+                      {l.observacaoLoja}
+                    </div>
+                    {resposta === 'sim' ? (
+                      <p className="mt-0.5 flex items-center gap-1 font-medium text-emerald-600 dark:text-emerald-400">
+                        <Check size={12} /> Atendida nesta carga — removida, não aparece mais.
+                      </p>
+                    ) : resposta === 'nao' ? (
+                      <p className="mt-0.5 text-amber-700/80 dark:text-amber-300/80">
+                        Não atendida agora — continua registrada, aparece de novo na próxima carga desta loja.
+                      </p>
+                    ) : (
+                      <div className="mt-1 flex items-center gap-2">
+                        <span className="text-slate-500 dark:text-slate-400">Atendida nesta carga?</span>
+                        <button
+                          type="button"
+                          onClick={() => marcarObservacaoAtendida(l.loja)}
+                          className="rounded bg-emerald-600 px-2 py-0.5 text-[11px] font-semibold text-white hover:bg-emerald-700"
+                        >
+                          Sim
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => marcarObservacaoNaoAtendida(l.loja)}
+                          className="rounded border border-slate-300 bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+                        >
+                          Não
+                        </button>
+                      </div>
+                    )}
                   </li>
-                ))}
-              </ul>
-            </div>
-          );
-        })()}
+                );
+              })}
+            </ul>
+          </div>
+        )}
 
         <div className="space-y-3">
           {emLote && (

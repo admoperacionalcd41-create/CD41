@@ -73,13 +73,6 @@ function novaLoja({
     vagasOcupadas: [],
     colaboradores: [],
     protocolos: [],
-    // Observação manual de pedido da loja (ex.: "colocar bag", "material
-    // extra por fora"), registrada a qualquer momento do dia — não depende
-    // da loja já estar apontada num box (ver botão "Observações das Lojas"
-    // no cabeçalho). Mostrada como lembrete ao abrir o protocolo de
-    // carregamento dessa loja (ver LoadingProtocolForm.jsx). null = sem
-    // observação (nenhum lembrete aparece).
-    observacaoLoja: null,
     dataImportacao: new Date().toISOString(),
     dataApontamento: null,
     dataConferencia: null,
@@ -297,6 +290,16 @@ export function gerarDadosIniciais() {
     placasCadastradas: PLACAS_CADASTRADAS,
     contatosNotificacao: [],
     localizacaoLojas: [],
+    // Observações manuais de pedido da loja (ex.: "colocar bag", "material
+    // extra por fora"), registradas a qualquer momento pelo botão
+    // "Observações das Lojas" no cabeçalho (ver ObservacoesLojaModal.jsx).
+    // Mapa { código da loja: texto } — pedido do usuário: a observação
+    // pertence à LOJA (código), não a uma carga/importação específica, para
+    // valer pra qualquer carga dessa loja, inclusive futuras, e não exigir
+    // que a loja já tenha sido importada hoje pra poder anotar algo nela
+    // (ver getLojasConhecidas em selectors.js). Mostrada como lembrete ao
+    // abrir o protocolo de carregamento da loja (ver LoadingProtocolForm.jsx).
+    observacoesLoja: {},
     // Valor pago por palete agrupado (ver ValoresConfigCard.jsx, aba
     // Cadastros) — usado no relatório de Produtividade. Editável a
     // qualquer momento, sem precisar mexer em código quando reajustar.

@@ -161,6 +161,35 @@ export function calcularPesoVolume(lojas) {
 }
 
 /**
+ * Lista de todas as lojas já conhecidas pelo sistema — todo código já visto
+ * em alguma importação, em qualquer dia (não existe cadastro à parte com as
+ * lojas fixas, então o histórico de `state.lojas` faz esse papel; mesma
+ * base usada em getLinhasProcessoDoDia logo abaixo). Cada item é só
+ * `{ codigo, nomeLoja }` (o nome mais recente visto pra esse código) — sem
+ * nenhuma informação de apontamento/carregamento/dia.
+ *
+ * Usada no modal de Observações das Lojas (ver ObservacoesLojaModal.jsx)
+ * pra listar TODAS as lojas conhecidas, não só as importadas hoje — pedido
+ * do usuário: permitir anotar uma loja mesmo sem carga hoje, já que a
+ * observação agora é da loja (ver DEFINIR_OBSERVACAO_LOJA em
+ * AppContext.jsx), não de uma carga específica.
+ */
+export function getLojasConhecidas(state) {
+  const lojasConhecidas = new Map();
+  state.lojas.forEach((l) => {
+    const atual = lojasConhecidas.get(l.loja);
+    // Guarda a dataImportacao junto (não só o nome) pra essa comparação
+    // realmente conseguir decidir qual ocorrência é a mais recente.
+    if (!atual || new Date(l.dataImportacao) >= new Date(atual.dataImportacao)) {
+      lojasConhecidas.set(l.loja, { nomeLoja: l.nomeLoja, dataImportacao: l.dataImportacao });
+    }
+  });
+  return Array.from(lojasConhecidas.entries())
+    .map(([codigo, info]) => ({ codigo, nomeLoja: info.nomeLoja }))
+    .sort((a, b) => a.codigo.localeCompare(b.codigo, 'pt-BR', { numeric: true, sensitivity: 'base' }));
+}
+
+/**
  * Uma linha por CÓDIGO de loja (não por carga — ver comentário em
  * DailyProcessReport.jsx) com o apontamento/carregamento feitos hoje. Base
  * do relatório "Processo do Dia" — extraído pra selectors.js pra poder ser

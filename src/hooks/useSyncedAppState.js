@@ -45,6 +45,14 @@ function normalizarEstadoRecebido(dados) {
     placasCadastradas: placasBrutas.map((p) => (typeof p === 'string' ? { placa: p, possuiPlataforma: false } : p)),
     contatosNotificacao: Array.isArray(dados.contatosNotificacao) ? dados.contatosNotificacao : [],
     localizacaoLojas: Array.isArray(dados.localizacaoLojas) ? dados.localizacaoLojas : [],
+    // Observações das lojas (ver AppContext.jsx, DEFINIR_OBSERVACAO_LOJA) —
+    // mapa { código da loja: texto }, não um array; mesmo cuidado de
+    // normalização dos campos acima, pro caso de chegar aqui uma linha
+    // compartilhada salva antes desse campo existir.
+    observacoesLoja:
+      dados.observacoesLoja && typeof dados.observacoesLoja === 'object' && !Array.isArray(dados.observacoesLoja)
+        ? dados.observacoesLoja
+        : {},
     // Valor pago por palete agrupado (ver ValoresConfigCard.jsx) — mesmo
     // padrão de 0,58 usado em SINCRONIZAR_CADASTROS/mockData.js, pro caso de
     // chegar aqui um estado compartilhado salvo antes desse campo existir.

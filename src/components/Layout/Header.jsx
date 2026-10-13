@@ -3,7 +3,6 @@ import { Menu, RotateCcw, Trash2, CalendarClock, X, CheckCircle2, AlertTriangle,
 import { useApp } from '../../context/AppContext.jsx';
 import { useDarkMode } from '../../hooks/useDarkMode.js';
 import { useFullscreen } from '../../hooks/useFullscreen.js';
-import { eHoje } from '../../utils/dateHelpers';
 import { TIPOS_CARGA } from '../../utils/tipoCarga';
 import ObservacoesLojaModal from '../Shared/ObservacoesLojaModal.jsx';
 
@@ -36,10 +35,13 @@ export default function Header({ tituloAba, abaAtiva, onAbrirMenu }) {
   const inputSenhaRef = useRef(null);
   const [mostrarObservacoes, setMostrarObservacoes] = useState(false);
 
-  // Quantas lojas de hoje já têm observação registrada — só para o
-  // indicadorzinho no botão do cabeçalho, avisando que há pedidos anotados
-  // mesmo sem abrir a busca.
-  const quantidadeComObservacao = state.lojas.filter((l) => eHoje(l.dataImportacao) && l.observacaoLoja).length;
+  // Quantas lojas têm observação registrada — só para o indicadorzinho no
+  // botão do cabeçalho, avisando que há pedidos anotados mesmo sem abrir a
+  // busca. A observação é da loja (state.observacoesLoja, por código — ver
+  // AppContext.jsx), não mais de uma carga/importação do dia, então conta
+  // todas, não só as de hoje (ver ObservacoesLojaModal.jsx, que agora lista
+  // todas as lojas conhecidas).
+  const quantidadeComObservacao = Object.keys(state.observacoesLoja || {}).length;
 
   function cancelarConfirmacao() {
     setConfirmando(null);
