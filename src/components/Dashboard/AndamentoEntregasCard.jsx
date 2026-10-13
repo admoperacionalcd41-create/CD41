@@ -224,7 +224,7 @@ export default function AndamentoEntregasCard({ irPara, compacto = false }) {
           {irPara && (
             <button
               onClick={() => irPara('motoristas')}
-              className="flex items-center gap-1 text-xs font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300"
+              className="flex items-center gap-1 text-xs font-medium text-brand-600 hover:text-brand-700 dark:text-whatsapp-400 dark:hover:text-whatsapp-300"
             >
               Ir para Motoristas <ArrowRight size={14} />
             </button>

@@ -218,7 +218,7 @@ export default function LoadingProtocolForm({ lojas, aoFechar, aoRegistrar }) {
       >
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Truck size={18} className="text-brand-600 dark:text-brand-400" />
+            <Truck size={18} className="text-brand-600 dark:text-whatsapp-400" />
             <h3 className="text-sm font-bold text-slate-700 dark:text-slate-200">
               {emLote
                 ? `Protocolo de Carregamento — ${lojas.length} lojas no mesmo veículo`

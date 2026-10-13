@@ -49,7 +49,7 @@ export default function GroupingForm() {
       className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800 sm:p-5"
     >
       <div className="mb-4 flex items-center gap-2">
-        <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400">
+        <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-600 dark:bg-whatsapp-500/10 dark:text-whatsapp-400">
           <PackagePlus size={16} />
         </span>
         <div>

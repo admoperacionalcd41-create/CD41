@@ -167,7 +167,7 @@ export default function ReportsPage() {
           aqui, fora da área impressa (ver abaixo), porque agora vale tanto
           pra tela quanto pra Exportar Excel/Imprimir — um só lugar pra
           escolher o período do relatório inteiro. */}
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-brand-100 bg-brand-50/60 px-3 py-2 text-xs text-brand-700 dark:border-brand-900/40 dark:bg-brand-950/20 dark:text-brand-300">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-brand-100 bg-brand-50/60 px-3 py-2 text-xs text-brand-700 dark:border-whatsapp-900/40 dark:bg-whatsapp-950/20 dark:text-whatsapp-300">
         <p className="flex items-start gap-2">
           <relatorioAtivo.Icone size={14} className="mt-px flex-shrink-0" />
           <span>

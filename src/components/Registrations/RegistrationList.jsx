@@ -73,7 +73,7 @@ export default function RegistrationList({ titulo, icone: Icone, entidade, place
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
       <div className="mb-3 flex items-center gap-2">
-        <Icone size={16} className="text-brand-600 dark:text-brand-400" />
+        <Icone size={16} className="text-brand-600 dark:text-whatsapp-400" />
         <h2 className="text-sm font-bold text-slate-700 dark:text-slate-200">{titulo}</h2>
         <span className="ml-auto rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-500 dark:bg-slate-700 dark:text-slate-400">
           {lista.length}
@@ -134,7 +134,7 @@ export default function RegistrationList({ titulo, icone: Icone, entidade, place
                         setValorEditado(e.target.value);
                         setErroEdicao('');
                       }}
-                      className="min-w-0 flex-1 rounded border border-brand-300 bg-white px-2 py-1 text-sm text-slate-700 focus:border-brand-500 focus:outline-none dark:border-brand-700 dark:bg-slate-800 dark:text-slate-200"
+                      className="min-w-0 flex-1 rounded border border-brand-300 bg-white px-2 py-1 text-sm text-slate-700 focus:border-brand-500 focus:outline-none dark:border-whatsapp-700 dark:bg-slate-800 dark:text-slate-200"
                     />
                     <button
                       type="submit"
@@ -167,7 +167,7 @@ export default function RegistrationList({ titulo, icone: Icone, entidade, place
                     <button
                       onClick={() => iniciarEdicao(item)}
                       title={`Editar ${item}`}
-                      className="rounded p-1 text-slate-300 hover:text-brand-600 dark:text-slate-600 dark:hover:text-brand-400"
+                      className="rounded p-1 text-slate-300 hover:text-brand-600 dark:text-slate-600 dark:hover:text-whatsapp-400"
                     >
                       <Pencil size={13} />
                     </button>

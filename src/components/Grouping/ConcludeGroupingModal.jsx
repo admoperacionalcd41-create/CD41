@@ -95,7 +95,7 @@ export default function ConcludeGroupingModal({ loja, aoFechar, aoConcluir }) {
             <button
               type="button"
               onClick={() => setMostrarComposicao((v) => !v)}
-              className="text-xs font-medium text-brand-600 underline decoration-dotted underline-offset-2 hover:text-brand-700 dark:text-brand-400"
+              className="text-xs font-medium text-brand-600 underline decoration-dotted underline-offset-2 hover:text-brand-700 dark:text-whatsapp-400"
             >
               {mostrarComposicao
                 ? 'Ocultar composição dos paletes'

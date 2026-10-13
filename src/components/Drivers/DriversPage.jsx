@@ -472,7 +472,7 @@ function CartaoEntrega({
                   target="_blank"
                   rel="noreferrer"
                   title="Abrir no mapa"
-                  className="ml-1.5 inline-flex items-center gap-1 text-brand-600 hover:underline dark:text-brand-400"
+                  className="ml-1.5 inline-flex items-center gap-1 text-brand-600 hover:underline dark:text-whatsapp-400"
                 >
                   <MapPin size={11} className="flex-shrink-0" />
                   {entrega.localizacaoChegada.endereco || 'mapa'}
@@ -502,7 +502,7 @@ function CartaoEntrega({
                   target="_blank"
                   rel="noreferrer"
                   title="Abrir no mapa"
-                  className="ml-1.5 inline-flex items-center gap-1 text-brand-600 hover:underline dark:text-brand-400"
+                  className="ml-1.5 inline-flex items-center gap-1 text-brand-600 hover:underline dark:text-whatsapp-400"
                 >
                   <MapPin size={11} className="flex-shrink-0" />
                   {entrega.localizacaoSaida.endereco || 'mapa'}

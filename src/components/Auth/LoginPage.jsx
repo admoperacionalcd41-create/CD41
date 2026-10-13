@@ -34,7 +34,7 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-slate-100 p-4 dark:bg-slate-900">
       <div className="w-full max-w-sm rounded-lg border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800">
         <div className="mb-6 flex flex-col items-center text-center">
-          <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-md border-2 border-brand-600 text-brand-600 dark:border-brand-400 dark:text-brand-400">
+          <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-md border-2 border-brand-600 text-brand-600 dark:border-whatsapp-400 dark:text-whatsapp-400">
             <Warehouse size={24} />
           </div>
           <h1 className="text-base font-bold text-slate-800 dark:text-slate-100">Gestão de Docas</h1>

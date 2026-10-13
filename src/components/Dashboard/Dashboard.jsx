@@ -137,7 +137,7 @@ export default function Dashboard({ irPara }) {
           </h2>
           <button
             onClick={() => irPara('boxes')}
-            className="flex items-center gap-1 text-xs font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300"
+            className="flex items-center gap-1 text-xs font-medium text-brand-600 hover:text-brand-700 dark:text-whatsapp-400 dark:hover:text-whatsapp-300"
           >
             Ver detalhes <ArrowRight size={14} />
           </button>

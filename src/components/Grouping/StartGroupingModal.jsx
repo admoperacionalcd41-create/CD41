@@ -30,7 +30,7 @@ export default function StartGroupingModal({ loja, aoFechar }) {
       <form onSubmit={enviar} className="w-full max-w-md rounded-lg bg-white p-5 shadow-2xl dark:bg-slate-800">
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Users size={18} className="text-brand-600 dark:text-brand-400" />
+            <Users size={18} className="text-brand-600 dark:text-whatsapp-400" />
             <h3 className="text-sm font-bold text-slate-700 dark:text-slate-200">
               Iniciar Agrupamento — {loja.carga} / Loja {loja.loja}
             </h3>

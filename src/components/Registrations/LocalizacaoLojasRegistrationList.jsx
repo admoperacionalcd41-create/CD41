@@ -73,7 +73,7 @@ export default function LocalizacaoLojasRegistrationList() {
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
       <div className="mb-3 flex items-center gap-2">
-        <MapPin size={16} className="text-brand-600 dark:text-brand-400" />
+        <MapPin size={16} className="text-brand-600 dark:text-whatsapp-400" />
         <h2 className="text-sm font-bold text-slate-700 dark:text-slate-200">Localização das Lojas</h2>
         <span className="ml-auto rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-500 dark:bg-slate-700 dark:text-slate-400">
           {lista.length}

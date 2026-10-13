@@ -59,7 +59,7 @@ export default function DailyProcessReport() {
     <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <ListChecks size={18} className="text-brand-600 dark:text-brand-400" />
+          <ListChecks size={18} className="text-brand-600 dark:text-whatsapp-400" />
           <div>
             <h2 className="text-sm font-bold text-slate-700 dark:text-slate-200">Processo do Dia — {rotuloTipo}</h2>
             <p className="text-xs text-slate-400 dark:text-slate-500">

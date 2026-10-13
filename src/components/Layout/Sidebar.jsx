@@ -17,8 +17,7 @@ import { useAuth } from '../../context/AuthContext.jsx';
 
 const ROTULO_GRUPO = {
   motorista: 'Motorista',
-  operacao: 'Operação',
-  gestao: 'Gestão',
+  administrativo: 'Administrativo',
 };
 
 const ICONES = {
@@ -60,12 +59,12 @@ function ListaAbas({ abas, abaAtiva, aoSelecionar }) {
 function LogoGestaoDocas() {
   return (
     <div className="flex items-center gap-2.5">
-      <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md border-2 border-brand-600 text-brand-600 dark:border-brand-400 dark:text-brand-400">
+      <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md border-2 border-brand-600 text-brand-600 dark:border-whatsapp-400 dark:text-whatsapp-400">
         <Warehouse size={18} />
       </div>
       <div className="min-w-0">
         <p className="truncate text-sm font-bold leading-tight text-slate-800 dark:text-slate-100">Gestão de Docas</p>
-        <p className="truncate text-[10px] font-semibold uppercase leading-tight tracking-widest text-slate-400 dark:text-brand-400/80">
+        <p className="truncate text-[10px] font-semibold uppercase leading-tight tracking-widest text-slate-400 dark:text-whatsapp-400/80">
           Separação &amp; Carregamento
         </p>
       </div>

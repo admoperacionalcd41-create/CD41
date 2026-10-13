@@ -65,7 +65,7 @@ export default function ProductivityReport({ periodoRelatorio }) {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-2">
-        <BarChart3 size={18} className="text-brand-600 dark:text-brand-400" />
+        <BarChart3 size={18} className="text-brand-600 dark:text-whatsapp-400" />
         <h2 className="text-sm font-bold text-slate-700 dark:text-slate-200">Produtividade por Colaborador</h2>
       </div>
 

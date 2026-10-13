@@ -278,7 +278,7 @@ export default function LoadingList({ aoAbrirProtocolo }) {
             ))}
 
             {selecionadas.length >= 2 && (
-              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-brand-500 bg-brand-50 p-3 text-xs dark:border-brand-400 dark:bg-brand-500/10">
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-brand-500 bg-brand-50 p-3 text-xs dark:border-whatsapp-400 dark:bg-whatsapp-500/10">
                 <span className="font-medium text-slate-700 dark:text-slate-200">
                   {selecionadas.length} lojas selecionadas para o mesmo veículo
                 </span>
@@ -341,7 +341,7 @@ export default function LoadingList({ aoAbrirProtocolo }) {
                         {p.viagemId && contagemPorViagem[p.viagemId] > 1 && (
                           <span
                             title="Carregado junto com outras lojas no mesmo veículo"
-                            className="ml-1.5 inline-flex items-center gap-0.5 rounded-full bg-brand-50 px-1.5 py-0.5 text-[10px] font-medium text-brand-600 dark:bg-brand-500/10 dark:text-brand-400"
+                            className="ml-1.5 inline-flex items-center gap-0.5 rounded-full bg-brand-50 px-1.5 py-0.5 text-[10px] font-medium text-brand-600 dark:bg-whatsapp-500/10 dark:text-whatsapp-400"
                           >
                             <Truck size={10} /> +{contagemPorViagem[p.viagemId] - 1}
                           </span>
