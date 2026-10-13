@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ListChecks, CheckCircle2, XCircle, ArrowUpDown, GripVertical, ChevronUp, ChevronDown } from 'lucide-react';
+import { ListChecks, CheckCircle2, XCircle, ArrowUpDown } from 'lucide-react';
 import { useApp } from '../../context/AppContext.jsx';
 import { getLinhasProcessoDoDia } from '../../utils/selectors';
 import TipoCargaBadge from '../Shared/TipoCargaBadge.jsx';
@@ -77,8 +77,6 @@ export default function DailyProcessReport() {
     return [...sequenciadas, ...restantes];
   }, [modoSequencia, linhas, state.sequenciaLojas]);
 
-  const [arrastandoCodigo, setArrastandoCodigo] = useState(null);
-
   function moverSequencia(indiceAtual, indiceNovo) {
     if (indiceNovo < 0 || indiceNovo >= linhasSequenciadas.length || indiceNovo === indiceAtual) return;
     const novaOrdem = linhasSequenciadas.map((l) => l.codigo);
@@ -87,12 +85,16 @@ export default function DailyProcessReport() {
     actions.definirSequenciaLojas(novaOrdem);
   }
 
-  function aoSoltarSequenciaSobre(indiceDestino) {
-    if (arrastandoCodigo == null) return;
-    const indiceOrigem = linhasSequenciadas.findIndex((l) => l.codigo === arrastandoCodigo);
-    if (indiceOrigem === -1) return;
-    moverSequencia(indiceOrigem, indiceDestino);
-    setArrastandoCodigo(null);
+  // Pedido do usuário: trocar o arrastar-e-soltar por um campo de número —
+  // com muitas lojas (31+), arrastar de uma ponta à outra da lista ficou
+  // lento; digitar a posição desejada resolve isso num passo só. `indice`
+  // é a posição atual (base 0) da linha sendo editada; `valorDigitado` é o
+  // texto bruto do campo (1-based, como mostrado pro usuário).
+  function aplicarPosicaoDigitada(indice, valorDigitado) {
+    const numero = parseInt(valorDigitado, 10);
+    if (!Number.isFinite(numero)) return;
+    const indiceNovo = Math.min(Math.max(numero, 1), linhasSequenciadas.length) - 1;
+    moverSequencia(indice, indiceNovo);
   }
 
   return (
@@ -114,16 +116,18 @@ export default function DailyProcessReport() {
           </div>
         </div>
 
-        {/* Pedido do usuário: opção pra sequenciar as lojas (arrastar e
-            soltar) — modo à parte, opcional; não substitui a separação
-            padrão pendente/completo, que continua sendo a visão default. */}
+        {/* Pedido do usuário: opção pra sequenciar as lojas — modo à parte,
+            opcional; não substitui a separação padrão pendente/completo,
+            que continua sendo a visão default. Era por arrastar e soltar,
+            trocado por campo de número a pedido do usuário (arrastar ficou
+            lento com a lista grande). */}
         <button
           type="button"
           onClick={() => setModoSequencia((v) => !v)}
           title={
             modoSequencia
               ? 'Voltar pra visão padrão (pendente / completo)'
-              : 'Organizar a ordem das lojas por arrastar e soltar'
+              : 'Organizar a ordem das lojas digitando a posição de cada uma'
           }
           className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-semibold transition-colors ${
             modoSequencia
@@ -170,95 +174,78 @@ export default function DailyProcessReport() {
           </p>
         ) : modoSequencia ? (
           // Modo sequência (opcional, à parte): lista única (sem separar
-          // pendente/completo) em que cada linha pode ser arrastada — mesmo
-          // padrão de drag-and-drop nativo (sem biblioteca) já usado em
-          // SequenciaCarregamentoCaminhao.jsx (sequência de carregamento
-          // dentro de um protocolo), aqui reaproveitado pra uma ordem geral
-          // das lojas, salva em state.sequenciaLojas e reaplicada todo dia.
+          // pendente/completo) em que cada linha tem um campo de posição
+          // (número). Pedido do usuário: era por arrastar-e-soltar, mas com
+          // 31+ lojas arrastar de uma ponta à outra da lista ficou lento —
+          // trocado por digitar a posição desejada, que resolve isso num
+          // passo só (ver aplicarPosicaoDigitada acima). A ordem fica salva
+          // em state.sequenciaLojas e é reaplicada nos próximos dias.
           <div>
             <p className="mb-3 text-[11px] leading-snug text-slate-400 dark:text-slate-500">
-              Arraste pelo ícone (ou use as setas) para organizar a ordem das lojas. A ordem é salva automaticamente e
-              vale pros próximos dias também — lojas novas entram no fim da lista até serem organizadas.
+              Digite a posição desejada (1 a {linhasSequenciadas.length}) e pressione Enter ou clique fora do campo. A
+              ordem é salva automaticamente e vale pros próximos dias também — lojas novas entram no fim da lista até
+              serem organizadas.
             </p>
             <div className="max-h-[70vh] overflow-auto rounded-lg border border-slate-100 dark:border-slate-700">
               <table className="w-full text-left text-sm">
                 <thead className="sticky top-0 z-10 bg-white text-xs text-slate-500 shadow-sm dark:bg-slate-800 dark:text-slate-400">
                   <tr className="border-b border-slate-200 dark:border-slate-700">
-                    <th className="w-10 py-2.5 pl-3 pr-1"></th>
+                    <th className="w-16 py-2.5 pl-3 pr-1 font-semibold">Posição</th>
                     <th className="py-2.5 pr-3 font-semibold">Loja</th>
                     <th className="px-2 py-2.5 text-center font-semibold">Apontamento</th>
                     <th className="px-2 py-2.5 text-center font-semibold">Carregamento</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {linhasSequenciadas.map((loja, indice) => {
-                    const primeira = indice === 0;
-                    const ultima = indice === linhasSequenciadas.length - 1;
-                    return (
-                      <tr
-                        key={loja.codigo}
-                        draggable
-                        onDragStart={() => setArrastandoCodigo(loja.codigo)}
-                        onDragOver={(e) => e.preventDefault()}
-                        onDrop={() => aoSoltarSequenciaSobre(indice)}
-                        onDragEnd={() => setArrastandoCodigo(null)}
-                        className={`border-b border-slate-50 last:border-0 dark:border-slate-700/60 ${
-                          arrastandoCodigo === loja.codigo
-                            ? 'bg-totvs-50 opacity-60 dark:bg-whatsapp-500/10'
-                            : indice % 2 === 1
-                            ? 'bg-slate-50/60 hover:bg-slate-50 dark:bg-slate-900/20 dark:hover:bg-slate-700/30'
-                            : 'hover:bg-slate-50 dark:hover:bg-slate-700/30'
-                        }`}
-                      >
-                        <td className="cursor-grab py-2.5 pl-3 pr-1 text-slate-300 dark:text-slate-600">
-                          <GripVertical size={14} />
-                        </td>
-                        <td className="py-2.5 pr-3">
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-slate-100 text-[10px] font-bold text-slate-500 dark:bg-slate-700 dark:text-slate-300">
-                              {indice + 1}
+                  {linhasSequenciadas.map((loja, indice) => (
+                    <tr
+                      key={loja.codigo}
+                      className={`border-b border-slate-50 last:border-0 dark:border-slate-700/60 ${
+                        indice % 2 === 1
+                          ? 'bg-slate-50/60 hover:bg-slate-50 dark:bg-slate-900/20 dark:hover:bg-slate-700/30'
+                          : 'hover:bg-slate-50 dark:hover:bg-slate-700/30'
+                      }`}
+                    >
+                      <td className="py-2 pl-3 pr-1">
+                        {/* key com o índice força o campo a remontar (e
+                            mostrar o valor atualizado) depois de qualquer
+                            reordenação — sem isso, um input não-controlado
+                            ficaria com o número antigo na tela. */}
+                        <input
+                          key={`${loja.codigo}-${indice}`}
+                          type="number"
+                          min={1}
+                          max={linhasSequenciadas.length}
+                          defaultValue={indice + 1}
+                          onBlur={(e) => aplicarPosicaoDigitada(indice, e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') e.currentTarget.blur();
+                          }}
+                          className="w-14 rounded-md border border-slate-200 bg-white px-1.5 py-1 text-center text-xs font-bold text-slate-700 focus:border-totvs-400 focus:outline-none focus:ring-1 focus:ring-totvs-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:focus:border-whatsapp-500 dark:focus:ring-whatsapp-500"
+                        />
+                      </td>
+                      <td className="py-2.5 pr-3">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="font-mono font-semibold text-slate-700 dark:text-slate-200">{loja.codigo}</span>
+                          <span className="text-slate-500 dark:text-slate-400">{loja.nomeLoja}</span>
+                          {loja.tiposCarga.map((tipo) => (
+                            <TipoCargaBadge key={tipo} tipo={tipo} />
+                          ))}
+                          {loja.cargas.length === 0 && (
+                            <span className="text-xs font-medium text-amber-600 dark:text-amber-400">
+                              Sem carga hoje
                             </span>
-                            <span className="font-mono font-semibold text-slate-700 dark:text-slate-200">{loja.codigo}</span>
-                            <span className="text-slate-500 dark:text-slate-400">{loja.nomeLoja}</span>
-                            {loja.tiposCarga.map((tipo) => (
-                              <TipoCargaBadge key={tipo} tipo={tipo} />
-                            ))}
-                            {loja.cargas.length === 0 && (
-                              <span className="text-xs font-medium text-amber-600 dark:text-amber-400">
-                                Sem carga hoje
-                              </span>
-                            )}
-                            <div className="ml-auto flex flex-shrink-0 flex-col">
-                              <button
-                                type="button"
-                                onClick={() => moverSequencia(indice, indice - 1)}
-                                disabled={primeira}
-                                title="Mover pra cima"
-                                className="text-slate-300 hover:text-slate-600 disabled:cursor-not-allowed disabled:opacity-30 dark:text-slate-600 dark:hover:text-slate-300"
-                              >
-                                <ChevronUp size={13} />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => moverSequencia(indice, indice + 1)}
-                                disabled={ultima}
-                                title="Mover pra baixo"
-                                className="text-slate-300 hover:text-slate-600 disabled:cursor-not-allowed disabled:opacity-30 dark:text-slate-600 dark:hover:text-slate-300"
-                              >
-                                <ChevronDown size={13} />
-                              </button>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-2 py-2.5 text-center">
-                          <Selo feito={loja.apontamentoFeito} />
-                        </td>
-                        <td className="px-2 py-2.5 text-center">
-                          <Selo feito={loja.carregamentoFeito} />
-                        </td>
-                      </tr>
-                    );
-                  })}
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-2 py-2.5 text-center">
+                        <Selo feito={loja.apontamentoFeito} />
+                      </td>
+                      <td className="px-2 py-2.5 text-center">
+                        <Selo feito={loja.carregamentoFeito} />
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
