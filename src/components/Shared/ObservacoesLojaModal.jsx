@@ -70,7 +70,7 @@ export default function ObservacoesLojaModal({ aoFechar }) {
       <div className="flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-lg bg-white shadow-2xl dark:bg-slate-800">
         <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 dark:border-slate-700">
           <div className="flex items-center gap-2">
-            <MessageSquareText size={18} className="text-brand-600 dark:text-whatsapp-400" />
+            <MessageSquareText size={18} className="text-totvs-600 dark:text-whatsapp-400" />
             <h3 className="text-sm font-bold text-slate-700 dark:text-slate-200">Observações das Lojas</h3>
           </div>
           <button
@@ -96,7 +96,7 @@ export default function ObservacoesLojaModal({ aoFechar }) {
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
               placeholder="Buscar por código ou nome da loja..."
-              className="w-full rounded-md border border-slate-300 bg-white py-1.5 pl-8 pr-2 text-xs text-slate-800 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+              className="w-full rounded-md border border-slate-300 bg-white py-1.5 pl-8 pr-2 text-xs text-slate-800 focus:border-totvs-500 dark:focus:border-whatsapp-500 focus:outline-none focus:ring-1 focus:ring-totvs-500 dark:focus:ring-whatsapp-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
             />
           </div>
         </div>
@@ -116,7 +116,7 @@ export default function ObservacoesLojaModal({ aoFechar }) {
                     type="button"
                     onClick={() => selecionar(l)}
                     className={`flex w-full flex-col items-start gap-0.5 px-4 py-2.5 text-left text-xs hover:bg-slate-50 dark:hover:bg-slate-700/50 ${
-                      lojaSelecionadaId === l.id ? 'bg-brand-50 dark:bg-whatsapp-500/10' : ''
+                      lojaSelecionadaId === l.id ? 'bg-totvs-50 dark:bg-whatsapp-500/10' : ''
                     }`}
                   >
                     <span className="flex min-w-0 items-center gap-1.5 font-medium text-slate-700 dark:text-slate-200">
@@ -137,13 +137,13 @@ export default function ObservacoesLojaModal({ aoFechar }) {
                         onChange={(e) => setTexto(e.target.value)}
                         rows={3}
                         placeholder="Ex.: Colocar bag para a loja / material extra por fora do palete..."
-                        className="w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-800 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                        className="w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-800 focus:border-totvs-500 dark:focus:border-whatsapp-500 focus:outline-none focus:ring-1 focus:ring-totvs-500 dark:focus:ring-whatsapp-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
                       />
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
                           onClick={salvar}
-                          className="flex items-center gap-1.5 rounded-md bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-700"
+                          className="flex items-center gap-1.5 rounded-md bg-totvs-600 dark:bg-whatsapp-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-totvs-700 dark:hover:bg-whatsapp-700"
                         >
                           <Check size={13} />
                           Salvar observação

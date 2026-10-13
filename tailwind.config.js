@@ -5,21 +5,28 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Ciano/petróleo técnico — substitui o azul genérico de antes.
-        // Funciona como cor sólida de ação (botões, foco, links) tanto no
-        // claro (tons 600/700, com bom contraste em fundo branco) quanto no
-        // escuro (tons 400/500, que "acendem" sobre o fundo grafite).
-        brand: {
-          50: '#ecfeff',
-          100: '#cffafe',
-          200: '#a5f3fc',
-          300: '#67e8f9',
-          400: '#22d3ee',
-          500: '#06b6d4',
-          600: '#0891b2',
-          700: '#0e7490',
-          800: '#155e75',
-          900: '#164e63',
+        // Pedido do usuário: "no tema claro use essa paleta", com um print
+        // do TOTVS Varejo (tela de Agendamento) — o azul usado lá no botão
+        // principal e no cabeçalho do calendário (#3498db) virou a cor de
+        // ação do tema claro no lugar do ciano/petróleo de antes. Essa cor
+        // vivia num token só ("brand") compartilhado pelos dois temas; para
+        // trocar só o claro sem mexer no escuro (que tinha acabado de virar
+        // verde-WhatsApp, ver "whatsapp" abaixo), cada uso sem prefixo
+        // `dark:` foi migrado de `brand-N` pra `totvs-N`, e onde não havia
+        // ainda uma variante `dark:` própria, foi adicionada apontando pro
+        // "whatsapp" (mesmo tom), pra o escuro continuar exatamente como
+        // estava. O token "brand" ficou sem nenhum uso no app — removido.
+        totvs: {
+          50: '#eaf4fc',
+          100: '#d4e9f8',
+          200: '#a9d3f1',
+          300: '#7ebce9',
+          400: '#53a6e2',
+          500: '#3498db',
+          600: '#2f89c7',
+          700: '#2980b9',
+          800: '#20658f',
+          900: '#1a5275',
         },
         // Pedido do usuário: "o tema escuro, deixe a paleta igual o
         // WhatsApp" — os tons 700/800/900/950 (os únicos que este projeto
@@ -49,12 +56,11 @@ export default {
           950: '#060b0e',
         },
         // Verde-petróleo do WhatsApp (cor de destaque do tema escuro dele —
-        // ícones ativos, links, foco) — usado só nas classes `dark:` que já
-        // destacavam ações/links com a cor "brand" (ciano) em vez de um
-        // cinza neutro. O "brand" ciano em si não foi tocado (ele ainda
-        // aparece sem o prefixo `dark:` em botões e outros elementos
-        // visíveis nos dois temas), então o tema claro continua ciano —
-        // só o destaque do tema escuro virou verde, como pedido.
+        // ícones ativos, links, foco, botões) — é o par exclusivo do modo
+        // escuro pra cada uso de "totvs" (azul, tema claro) acima. Toda
+        // classe de ação/destaque no app tem as duas variantes lado a lado
+        // (ex.: `bg-totvs-600 dark:bg-whatsapp-600`), então trocar a paleta
+        // de um tema nunca muda o outro.
         whatsapp: {
           50: '#e6f7f1',
           100: '#c0ecdc',

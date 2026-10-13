@@ -233,7 +233,7 @@ export default function DriversPage() {
             onChange={(evento) => setMotoristaDigitado(evento.target.value)}
             placeholder="Nome do motorista"
             autoFocus
-            className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-lg font-semibold text-slate-800 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+            className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-lg font-semibold text-slate-800 focus:border-totvs-500 dark:focus:border-whatsapp-500 focus:outline-none focus:ring-2 focus:ring-totvs-500 dark:focus:ring-whatsapp-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
           />
           <datalist id="lista-motoristas-motoristas">
             {(state.motoristasCadastrados || []).map((m) => (
@@ -242,7 +242,7 @@ export default function DriversPage() {
           </datalist>
           <button
             type="submit"
-            className="flex-shrink-0 rounded-lg bg-brand-600 px-6 py-3 text-base font-semibold text-white transition-colors hover:bg-brand-700"
+            className="flex-shrink-0 rounded-lg bg-totvs-600 dark:bg-whatsapp-600 px-6 py-3 text-base font-semibold text-white transition-colors hover:bg-totvs-700 dark:hover:bg-whatsapp-700"
           >
             Buscar
           </button>
@@ -472,7 +472,7 @@ function CartaoEntrega({
                   target="_blank"
                   rel="noreferrer"
                   title="Abrir no mapa"
-                  className="ml-1.5 inline-flex items-center gap-1 text-brand-600 hover:underline dark:text-whatsapp-400"
+                  className="ml-1.5 inline-flex items-center gap-1 text-totvs-600 hover:underline dark:text-whatsapp-400"
                 >
                   <MapPin size={11} className="flex-shrink-0" />
                   {entrega.localizacaoChegada.endereco || 'mapa'}
@@ -502,7 +502,7 @@ function CartaoEntrega({
                   target="_blank"
                   rel="noreferrer"
                   title="Abrir no mapa"
-                  className="ml-1.5 inline-flex items-center gap-1 text-brand-600 hover:underline dark:text-whatsapp-400"
+                  className="ml-1.5 inline-flex items-center gap-1 text-totvs-600 hover:underline dark:text-whatsapp-400"
                 >
                   <MapPin size={11} className="flex-shrink-0" />
                   {entrega.localizacaoSaida.endereco || 'mapa'}
@@ -580,7 +580,7 @@ function CartaoEntrega({
                 }
                 placeholder="Alguma observação? (opcional — fila, atraso, recusa de carga...)"
                 rows={2}
-                className="mb-2 w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 placeholder:text-slate-400 focus:border-brand-400 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:placeholder:text-slate-500"
+                className="mb-2 w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 placeholder:text-slate-400 focus:border-totvs-400 dark:focus:border-whatsapp-400 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:placeholder:text-slate-500"
               />
               <button
                 onClick={() => aoRegistrarSaida(entrega.id)}
@@ -625,7 +625,7 @@ function RegistroManual({ chave, aberto, valor, aoAlternar, aoMudarValor, aoConf
             type="datetime-local"
             value={valor || ''}
             onChange={(evento) => aoMudarValor(chave, evento.target.value)}
-            className="flex-1 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+            className="flex-1 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-700 focus:border-totvs-500 dark:focus:border-whatsapp-500 focus:outline-none focus:ring-1 focus:ring-totvs-500 dark:focus:ring-whatsapp-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
           />
           <button
             type="button"

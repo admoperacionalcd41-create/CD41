@@ -49,7 +49,7 @@ export default function GroupingForm() {
       className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800 sm:p-5"
     >
       <div className="mb-4 flex items-center gap-2">
-        <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-600 dark:bg-whatsapp-500/10 dark:text-whatsapp-400">
+        <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-totvs-50 text-totvs-600 dark:bg-whatsapp-500/10 dark:text-whatsapp-400">
           <PackagePlus size={16} />
         </span>
         <div>
@@ -65,7 +65,7 @@ export default function GroupingForm() {
             value={lojaId}
             onChange={(e) => selecionarLoja(e.target.value)}
             required
-            className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+            className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-totvs-500 dark:focus:border-whatsapp-500 focus:outline-none focus:ring-1 focus:ring-totvs-500 dark:focus:ring-whatsapp-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
           >
             <option value="">Selecione...</option>
             {lojasPendentes.map((l) => (
@@ -89,7 +89,7 @@ export default function GroupingForm() {
             value={quantidade}
             onChange={(e) => setQuantidade(e.target.value)}
             required
-            className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+            className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-totvs-500 dark:focus:border-whatsapp-500 focus:outline-none focus:ring-1 focus:ring-totvs-500 dark:focus:ring-whatsapp-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
           />
         </div>
 
@@ -99,7 +99,7 @@ export default function GroupingForm() {
             value={boxNumero}
             onChange={(e) => setBoxNumero(e.target.value)}
             required
-            className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+            className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-totvs-500 dark:focus:border-whatsapp-500 focus:outline-none focus:ring-1 focus:ring-totvs-500 dark:focus:ring-whatsapp-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
           >
             <option value="">Selecione...</option>
             {BOX_NUMBERS.map((n) => {
@@ -118,7 +118,7 @@ export default function GroupingForm() {
         <button
           type="submit"
           disabled={!lojaId || !boxNumero || !quantidade}
-          className="flex items-center justify-center gap-1.5 rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-40 lg:w-auto"
+          className="flex items-center justify-center gap-1.5 rounded-md bg-totvs-600 dark:bg-whatsapp-600 px-4 py-2 text-sm font-semibold text-white hover:bg-totvs-700 dark:hover:bg-whatsapp-700 disabled:cursor-not-allowed disabled:opacity-40 lg:w-auto"
         >
           <PackagePlus size={15} />
           Apontar Box

@@ -65,7 +65,7 @@ export default function ProductivityReport({ periodoRelatorio }) {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-2">
-        <BarChart3 size={18} className="text-brand-600 dark:text-whatsapp-400" />
+        <BarChart3 size={18} className="text-totvs-600 dark:text-whatsapp-400" />
         <h2 className="text-sm font-bold text-slate-700 dark:text-slate-200">Produtividade por Colaborador</h2>
       </div>
 
@@ -101,7 +101,7 @@ export default function ProductivityReport({ periodoRelatorio }) {
                 </span>
                 <div className="h-3 flex-1 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-700">
                   <div
-                    className="h-full rounded-full bg-brand-500"
+                    className="h-full rounded-full bg-totvs-500 dark:bg-whatsapp-500"
                     style={{ width: `${(c.paletes / maiorValor) * 100}%` }}
                   />
                 </div>

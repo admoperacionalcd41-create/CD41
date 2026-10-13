@@ -97,7 +97,7 @@ export default function SequenciaCarregamentoCaminhao({ lojas, ordem, aoAlterarO
                   }`}
                   className={`flex min-h-[34px] flex-shrink-0 items-center gap-1 rounded-md border bg-white/95 px-1.5 py-1 text-[10px] font-semibold text-slate-700 shadow-sm dark:bg-slate-800/95 dark:text-slate-200 ${
                     arrastandoId === lojaId
-                      ? 'cursor-grabbing border-brand-400 opacity-60 dark:border-whatsapp-500'
+                      ? 'cursor-grabbing border-totvs-400 opacity-60 dark:border-whatsapp-500'
                       : 'cursor-grab border-slate-200 dark:border-slate-600'
                   }`}
                 >

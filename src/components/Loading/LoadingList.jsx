@@ -224,7 +224,7 @@ export default function LoadingList({ aoAbrirProtocolo }) {
                       checked={selecionadas.includes(loja.id)}
                       onChange={() => alternarSelecao(loja.id)}
                       aria-label={`Selecionar loja ${loja.loja} para carregamento em lote`}
-                      className="h-4 w-4 flex-shrink-0 rounded border-slate-300 text-brand-600 focus:ring-brand-500 dark:border-slate-600"
+                      className="h-4 w-4 flex-shrink-0 rounded border-slate-300 text-totvs-600 dark:text-whatsapp-600 focus:ring-totvs-500 dark:focus:ring-whatsapp-500 dark:border-slate-600"
                     />
                   )}
                   <div>
@@ -278,13 +278,13 @@ export default function LoadingList({ aoAbrirProtocolo }) {
             ))}
 
             {selecionadas.length >= 2 && (
-              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-brand-500 bg-brand-50 p-3 text-xs dark:border-whatsapp-400 dark:bg-whatsapp-500/10">
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-totvs-500 bg-totvs-50 p-3 text-xs dark:border-whatsapp-400 dark:bg-whatsapp-500/10">
                 <span className="font-medium text-slate-700 dark:text-slate-200">
                   {selecionadas.length} lojas selecionadas para o mesmo veículo
                 </span>
                 <button
                   onClick={abrirProtocoloEmLote}
-                  className="flex items-center gap-1.5 rounded-md bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700"
+                  className="flex items-center gap-1.5 rounded-md bg-totvs-600 dark:bg-whatsapp-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-totvs-700 dark:hover:bg-whatsapp-700"
                 >
                   <Truck size={14} /> Registrar Protocolo em Lote
                 </button>
@@ -341,7 +341,7 @@ export default function LoadingList({ aoAbrirProtocolo }) {
                         {p.viagemId && contagemPorViagem[p.viagemId] > 1 && (
                           <span
                             title="Carregado junto com outras lojas no mesmo veículo"
-                            className="ml-1.5 inline-flex items-center gap-0.5 rounded-full bg-brand-50 px-1.5 py-0.5 text-[10px] font-medium text-brand-600 dark:bg-whatsapp-500/10 dark:text-whatsapp-400"
+                            className="ml-1.5 inline-flex items-center gap-0.5 rounded-full bg-totvs-50 px-1.5 py-0.5 text-[10px] font-medium text-totvs-600 dark:bg-whatsapp-500/10 dark:text-whatsapp-400"
                           >
                             <Truck size={10} /> +{contagemPorViagem[p.viagemId] - 1}
                           </span>
@@ -444,7 +444,7 @@ export default function LoadingList({ aoAbrirProtocolo }) {
                                   onChange={(e) =>
                                     setValorManualNF((atual) => ({ ...atual, [p.id]: e.target.value }))
                                   }
-                                  className="rounded-md border border-slate-300 bg-white px-1.5 py-1 text-[11px] text-slate-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+                                  className="rounded-md border border-slate-300 bg-white px-1.5 py-1 text-[11px] text-slate-700 focus:border-totvs-500 dark:focus:border-whatsapp-500 focus:outline-none focus:ring-1 focus:ring-totvs-500 dark:focus:ring-whatsapp-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
                                 />
                                 <button
                                   type="button"

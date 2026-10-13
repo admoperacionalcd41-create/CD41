@@ -119,7 +119,7 @@ export default function ReportsPage() {
               title={descricao}
               className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
                 abaAtiva === chave
-                  ? 'bg-brand-600 text-white'
+                  ? 'bg-totvs-600 dark:bg-whatsapp-600 text-white'
                   : 'bg-slate-100 text-slate-500 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-400 dark:hover:bg-slate-600'
               }`}
             >
@@ -167,7 +167,7 @@ export default function ReportsPage() {
           aqui, fora da área impressa (ver abaixo), porque agora vale tanto
           pra tela quanto pra Exportar Excel/Imprimir — um só lugar pra
           escolher o período do relatório inteiro. */}
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-brand-100 bg-brand-50/60 px-3 py-2 text-xs text-brand-700 dark:border-whatsapp-900/40 dark:bg-whatsapp-950/20 dark:text-whatsapp-300">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-totvs-100 bg-totvs-50/60 px-3 py-2 text-xs text-totvs-700 dark:border-whatsapp-900/40 dark:bg-whatsapp-950/20 dark:text-whatsapp-300">
         <p className="flex items-start gap-2">
           <relatorioAtivo.Icone size={14} className="mt-px flex-shrink-0" />
           <span>

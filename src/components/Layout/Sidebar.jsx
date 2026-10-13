@@ -43,7 +43,7 @@ function ListaAbas({ abas, abaAtiva, aoSelecionar }) {
             onClick={() => aoSelecionar(aba.chave)}
             className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
               ativa
-                ? 'bg-brand-600 text-white shadow-sm'
+                ? 'bg-totvs-600 dark:bg-whatsapp-600 text-white shadow-sm'
                 : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-white'
             }`}
           >
@@ -59,7 +59,7 @@ function ListaAbas({ abas, abaAtiva, aoSelecionar }) {
 function LogoGestaoDocas() {
   return (
     <div className="flex items-center gap-2.5">
-      <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md border-2 border-brand-600 text-brand-600 dark:border-whatsapp-400 dark:text-whatsapp-400">
+      <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md border-2 border-totvs-600 text-totvs-600 dark:border-whatsapp-400 dark:text-whatsapp-400">
         <Warehouse size={18} />
       </div>
       <div className="min-w-0">

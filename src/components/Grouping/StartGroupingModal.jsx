@@ -30,7 +30,7 @@ export default function StartGroupingModal({ loja, aoFechar }) {
       <form onSubmit={enviar} className="w-full max-w-md rounded-lg bg-white p-5 shadow-2xl dark:bg-slate-800">
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Users size={18} className="text-brand-600 dark:text-whatsapp-400" />
+            <Users size={18} className="text-totvs-600 dark:text-whatsapp-400" />
             <h3 className="text-sm font-bold text-slate-700 dark:text-slate-200">
               Iniciar Agrupamento — {loja.carga} / Loja {loja.loja}
             </h3>
@@ -59,7 +59,7 @@ export default function StartGroupingModal({ loja, aoFechar }) {
                 value={colaboradores[i]}
                 onChange={(e) => atualizarColaborador(i, e.target.value)}
                 placeholder={`Colaborador ${i + 1}`}
-                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500"
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:border-totvs-500 dark:focus:border-whatsapp-500 focus:outline-none focus:ring-1 focus:ring-totvs-500 dark:focus:ring-whatsapp-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500"
               />
             ))}
           </div>
@@ -72,7 +72,7 @@ export default function StartGroupingModal({ loja, aoFechar }) {
 
         <button
           type="submit"
-          className="mt-5 w-full rounded-md bg-brand-600 py-2.5 text-sm font-semibold text-white hover:bg-brand-700"
+          className="mt-5 w-full rounded-md bg-totvs-600 dark:bg-whatsapp-600 py-2.5 text-sm font-semibold text-white hover:bg-totvs-700 dark:hover:bg-whatsapp-700"
         >
           Iniciar Agrupamento
         </button>

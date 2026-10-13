@@ -74,7 +74,7 @@ export default function PlacasRegistrationList() {
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
       <div className="mb-3 flex items-center gap-2">
-        <Car size={16} className="text-brand-600 dark:text-whatsapp-400" />
+        <Car size={16} className="text-totvs-600 dark:text-whatsapp-400" />
         <h2 className="text-sm font-bold text-slate-700 dark:text-slate-200">Placas de Veículo</h2>
         <span className="ml-auto rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-500 dark:bg-slate-700 dark:text-slate-400">
           {lista.length}
@@ -89,7 +89,7 @@ export default function PlacasRegistrationList() {
             setErroLocal('');
           }}
           placeholder="ABC-1D23"
-          className="w-full rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-sm uppercase text-slate-700 placeholder:text-slate-400 focus:border-brand-400 focus:outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200 dark:placeholder:text-slate-500"
+          className="w-full rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-sm uppercase text-slate-700 placeholder:text-slate-400 focus:border-totvs-400 dark:focus:border-whatsapp-400 focus:outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200 dark:placeholder:text-slate-500"
         />
 
         <div className="flex items-center justify-between gap-2 rounded-md bg-slate-50 px-2.5 py-2 text-xs dark:bg-slate-700/40">
@@ -118,7 +118,7 @@ export default function PlacasRegistrationList() {
 
         <button
           type="submit"
-          className="flex w-full items-center justify-center gap-1 rounded-md bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-700"
+          className="flex w-full items-center justify-center gap-1 rounded-md bg-totvs-600 dark:bg-whatsapp-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-totvs-700 dark:hover:bg-whatsapp-700"
         >
           <Plus size={14} /> Adicionar
         </button>
@@ -132,7 +132,7 @@ export default function PlacasRegistrationList() {
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
             placeholder={`Buscar em ${lista.length} placas...`}
-            className="w-full rounded-md border border-slate-200 bg-white py-1.5 pl-8 pr-2.5 text-xs text-slate-700 placeholder:text-slate-400 focus:border-brand-400 focus:outline-none dark:border-slate-600 dark:bg-slate-900/40 dark:text-slate-200 dark:placeholder:text-slate-500"
+            className="w-full rounded-md border border-slate-200 bg-white py-1.5 pl-8 pr-2.5 text-xs text-slate-700 placeholder:text-slate-400 focus:border-totvs-400 dark:focus:border-whatsapp-400 focus:outline-none dark:border-slate-600 dark:bg-slate-900/40 dark:text-slate-200 dark:placeholder:text-slate-500"
           />
         </div>
       )}
@@ -158,7 +158,7 @@ export default function PlacasRegistrationList() {
                           setPlacaEditada(e.target.value);
                           setErroEdicao('');
                         }}
-                        className="min-w-0 flex-1 rounded border border-brand-300 bg-white px-2 py-1 text-sm uppercase text-slate-700 focus:border-brand-500 focus:outline-none dark:border-whatsapp-700 dark:bg-slate-800 dark:text-slate-200"
+                        className="min-w-0 flex-1 rounded border border-totvs-300 bg-white px-2 py-1 text-sm uppercase text-slate-700 focus:border-totvs-500 focus:outline-none dark:border-whatsapp-700 dark:focus:border-whatsapp-500 dark:bg-slate-800 dark:text-slate-200"
                       />
                       <button
                         type="submit"
@@ -221,7 +221,7 @@ export default function PlacasRegistrationList() {
                     <button
                       onClick={() => iniciarEdicao(item)}
                       title={`Editar ${item.placa}`}
-                      className="rounded p-1 text-slate-300 hover:text-brand-600 dark:text-slate-600 dark:hover:text-whatsapp-400"
+                      className="rounded p-1 text-slate-300 hover:text-totvs-600 dark:text-slate-600 dark:hover:text-whatsapp-400"
                     >
                       <Pencil size={13} />
                     </button>

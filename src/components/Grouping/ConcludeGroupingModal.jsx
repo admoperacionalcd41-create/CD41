@@ -79,7 +79,7 @@ export default function ConcludeGroupingModal({ loja, aoFechar, aoConcluir }) {
             onChange={(e) => setQuantidade(e.target.value)}
             required
             autoFocus
-            className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+            className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-totvs-500 dark:focus:border-whatsapp-500 focus:outline-none focus:ring-1 focus:ring-totvs-500 dark:focus:ring-whatsapp-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
           />
           {Number(quantidade) > 0 && Number(quantidade) !== loja.paletesAgrupados && (
             <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
@@ -95,7 +95,7 @@ export default function ConcludeGroupingModal({ loja, aoFechar, aoConcluir }) {
             <button
               type="button"
               onClick={() => setMostrarComposicao((v) => !v)}
-              className="text-xs font-medium text-brand-600 underline decoration-dotted underline-offset-2 hover:text-brand-700 dark:text-whatsapp-400"
+              className="text-xs font-medium text-totvs-600 underline decoration-dotted underline-offset-2 hover:text-totvs-700 dark:text-whatsapp-400 dark:hover:text-whatsapp-300"
             >
               {mostrarComposicao
                 ? 'Ocultar composição dos paletes'
@@ -117,7 +117,7 @@ export default function ConcludeGroupingModal({ loja, aoFechar, aoConcluir }) {
                       value={composicoes[n] || ''}
                       onChange={(e) => atualizarComposicao(n, e.target.value)}
                       placeholder="ex.: 2 + 5"
-                      className="w-full rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+                      className="w-full rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700 focus:border-totvs-500 dark:focus:border-whatsapp-500 focus:outline-none focus:ring-1 focus:ring-totvs-500 dark:focus:ring-whatsapp-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
                     />
                   </div>
                 ))}

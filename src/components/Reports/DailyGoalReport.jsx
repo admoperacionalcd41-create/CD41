@@ -117,7 +117,7 @@ export default function DailyGoalReport() {
     <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <Target size={18} className="text-brand-600 dark:text-whatsapp-400" />
+          <Target size={18} className="text-totvs-600 dark:text-whatsapp-400" />
           <div>
             <h2 className="text-sm font-bold text-slate-700 dark:text-slate-200">Meta de Entrega — {rotuloTipo}</h2>
             <p className="text-xs text-slate-400 dark:text-slate-500">
@@ -169,7 +169,7 @@ export default function DailyGoalReport() {
               key={d.dataISO}
               className={`rounded-lg border p-3 text-center ${
                 d.hoje
-                  ? 'border-brand-400 bg-brand-50/60 dark:border-whatsapp-500 dark:bg-whatsapp-500/10'
+                  ? 'border-totvs-400 bg-totvs-50/60 dark:border-whatsapp-500 dark:bg-whatsapp-500/10'
                   : 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800'
               }`}
             >

@@ -190,7 +190,7 @@ export default function LabelGenerator({ loja, aoFechar }) {
           <div className="flex items-center gap-2">
             <button
               onClick={aoImprimir}
-              className="flex items-center gap-1.5 rounded-md bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700"
+              className="flex items-center gap-1.5 rounded-md bg-totvs-600 dark:bg-whatsapp-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-totvs-700 dark:hover:bg-whatsapp-700"
             >
               <Printer size={14} /> Imprimir
             </button>

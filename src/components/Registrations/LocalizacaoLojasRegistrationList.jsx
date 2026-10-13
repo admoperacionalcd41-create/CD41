@@ -73,7 +73,7 @@ export default function LocalizacaoLojasRegistrationList() {
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
       <div className="mb-3 flex items-center gap-2">
-        <MapPin size={16} className="text-brand-600 dark:text-whatsapp-400" />
+        <MapPin size={16} className="text-totvs-600 dark:text-whatsapp-400" />
         <h2 className="text-sm font-bold text-slate-700 dark:text-slate-200">Localização das Lojas</h2>
         <span className="ml-auto rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-500 dark:bg-slate-700 dark:text-slate-400">
           {lista.length}
@@ -92,13 +92,13 @@ export default function LocalizacaoLojasRegistrationList() {
             setErroLocal('');
           }}
           placeholder="Código da loja (ex.: 0407)"
-          className="w-full rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-sm uppercase text-slate-700 placeholder:text-slate-400 focus:border-brand-400 focus:outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200 dark:placeholder:text-slate-500"
+          className="w-full rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-sm uppercase text-slate-700 placeholder:text-slate-400 focus:border-totvs-400 dark:focus:border-whatsapp-400 focus:outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200 dark:placeholder:text-slate-500"
         />
         <input
           value={nomeLoja}
           onChange={(e) => setNomeLoja(e.target.value)}
           placeholder="Nome da loja (opcional)"
-          className="w-full rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-700 placeholder:text-slate-400 focus:border-brand-400 focus:outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200 dark:placeholder:text-slate-500"
+          className="w-full rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-700 placeholder:text-slate-400 focus:border-totvs-400 dark:focus:border-whatsapp-400 focus:outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200 dark:placeholder:text-slate-500"
         />
         <div className="grid grid-cols-2 gap-2">
           <input
@@ -109,7 +109,7 @@ export default function LocalizacaoLojasRegistrationList() {
             }}
             placeholder="Latitude"
             inputMode="decimal"
-            className="w-full rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-700 placeholder:text-slate-400 focus:border-brand-400 focus:outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200 dark:placeholder:text-slate-500"
+            className="w-full rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-700 placeholder:text-slate-400 focus:border-totvs-400 dark:focus:border-whatsapp-400 focus:outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200 dark:placeholder:text-slate-500"
           />
           <input
             value={longitude}
@@ -119,7 +119,7 @@ export default function LocalizacaoLojasRegistrationList() {
             }}
             placeholder="Longitude"
             inputMode="decimal"
-            className="w-full rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-700 placeholder:text-slate-400 focus:border-brand-400 focus:outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200 dark:placeholder:text-slate-500"
+            className="w-full rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-700 placeholder:text-slate-400 focus:border-totvs-400 dark:focus:border-whatsapp-400 focus:outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200 dark:placeholder:text-slate-500"
           />
         </div>
         <button
@@ -133,7 +133,7 @@ export default function LocalizacaoLojasRegistrationList() {
         </button>
         <button
           type="submit"
-          className="flex w-full items-center justify-center gap-1 rounded-md bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-700"
+          className="flex w-full items-center justify-center gap-1 rounded-md bg-totvs-600 dark:bg-whatsapp-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-totvs-700 dark:hover:bg-whatsapp-700"
         >
           <Plus size={14} /> Adicionar
         </button>
@@ -147,7 +147,7 @@ export default function LocalizacaoLojasRegistrationList() {
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
             placeholder={`Buscar em ${lista.length} lojas...`}
-            className="w-full rounded-md border border-slate-200 bg-white py-1.5 pl-8 pr-2.5 text-xs text-slate-700 placeholder:text-slate-400 focus:border-brand-400 focus:outline-none dark:border-slate-600 dark:bg-slate-900/40 dark:text-slate-200 dark:placeholder:text-slate-500"
+            className="w-full rounded-md border border-slate-200 bg-white py-1.5 pl-8 pr-2.5 text-xs text-slate-700 placeholder:text-slate-400 focus:border-totvs-400 dark:focus:border-whatsapp-400 focus:outline-none dark:border-slate-600 dark:bg-slate-900/40 dark:text-slate-200 dark:placeholder:text-slate-500"
           />
         </div>
       )}

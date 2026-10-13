@@ -95,7 +95,7 @@ export default function Header({ tituloAba, abaAtiva, onAbrirMenu }) {
                 title="Mostrar lojas de carga Seca e Resfriada"
                 className={`px-2.5 py-1.5 font-medium ${
                   filtroTipoCarga === 'todos'
-                    ? 'bg-brand-600 text-white'
+                    ? 'bg-totvs-600 dark:bg-whatsapp-600 text-white'
                     : 'bg-white text-slate-500 hover:bg-slate-50 dark:bg-slate-700 dark:text-slate-400 dark:hover:bg-slate-600'
                 }`}
               >
@@ -109,7 +109,7 @@ export default function Header({ tituloAba, abaAtiva, onAbrirMenu }) {
                   title={`Mostrar só lojas de carga ${t.texto}`}
                   className={`px-2.5 py-1.5 font-medium ${
                     filtroTipoCarga === t.chave
-                      ? 'bg-brand-600 text-white'
+                      ? 'bg-totvs-600 dark:bg-whatsapp-600 text-white'
                       : 'bg-white text-slate-500 hover:bg-slate-50 dark:bg-slate-700 dark:text-slate-400 dark:hover:bg-slate-600'
                   }`}
                 >

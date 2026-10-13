@@ -22,7 +22,7 @@ export default function FiltroPeriodo({ periodo, setPeriodo, mesEscolhido, setMe
             onClick={() => setPeriodo(opcao.chave)}
             className={`px-3 py-1.5 font-medium ${
               periodo === opcao.chave
-                ? 'bg-brand-600 text-white'
+                ? 'bg-totvs-600 dark:bg-whatsapp-600 text-white'
                 : 'bg-white text-slate-500 hover:bg-slate-50 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700'
             }`}
           >
@@ -36,7 +36,7 @@ export default function FiltroPeriodo({ periodo, setPeriodo, mesEscolhido, setMe
           value={mesEscolhido}
           max={mesAtualISO()}
           onChange={(e) => setMesEscolhido(e.target.value)}
-          className="rounded-md border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+          className="rounded-md border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-700 focus:border-totvs-500 dark:focus:border-whatsapp-500 focus:outline-none focus:ring-1 focus:ring-totvs-500 dark:focus:ring-whatsapp-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
         />
       )}
     </div>

@@ -55,7 +55,7 @@ export default function ResumoProcessoCard({ irPara }) {
         className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-left transition-colors hover:opacity-80"
       >
         <span className="flex items-center gap-2">
-          <ClipboardList size={16} className="flex-shrink-0 text-brand-600 dark:text-whatsapp-400" />
+          <ClipboardList size={16} className="flex-shrink-0 text-totvs-600 dark:text-whatsapp-400" />
           <span className="text-xs text-slate-500 dark:text-slate-400">Apontamento feito</span>
           <span
             className={`text-sm font-bold ${

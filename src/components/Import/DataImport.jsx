@@ -79,7 +79,7 @@ export default function DataImport() {
     <div className="space-y-6">
       <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
         <div className="mb-3 flex items-center gap-2">
-          <ClipboardPaste size={18} className="text-brand-600" />
+          <ClipboardPaste size={18} className="text-totvs-600 dark:text-whatsapp-600" />
           <h2 className="text-sm font-bold text-slate-700 dark:text-slate-200">Colar dados de cargas e lojas</h2>
         </div>
         <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
@@ -109,7 +109,7 @@ export default function DataImport() {
                 onClick={() => setTipoCarga(t.chave)}
                 className={`px-4 py-1.5 font-medium ${
                   tipoCarga === t.chave
-                    ? 'bg-brand-600 text-white'
+                    ? 'bg-totvs-600 dark:bg-whatsapp-600 text-white'
                     : 'bg-white text-slate-500 hover:bg-slate-50 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700'
                 }`}
               >
@@ -124,14 +124,14 @@ export default function DataImport() {
           onChange={(e) => setTexto(e.target.value)}
           placeholder={`Exemplo:\n${MODELO_EXEMPLO}`}
           rows={10}
-          className="w-full rounded-lg border border-slate-300 bg-white p-3 font-mono text-xs text-slate-800 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+          className="w-full rounded-lg border border-slate-300 bg-white p-3 font-mono text-xs text-slate-800 focus:border-totvs-500 dark:focus:border-whatsapp-500 focus:outline-none focus:ring-1 focus:ring-totvs-500 dark:focus:ring-whatsapp-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
         />
 
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <button
             onClick={processar}
             disabled={!texto.trim()}
-            className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded-md bg-totvs-600 dark:bg-whatsapp-600 px-4 py-2 text-sm font-medium text-white hover:bg-totvs-700 dark:hover:bg-whatsapp-700 disabled:cursor-not-allowed disabled:opacity-40"
           >
             Processar Dados
           </button>
@@ -146,7 +146,7 @@ export default function DataImport() {
           </button>
           <button
             onClick={() => setTexto(MODELO_EXEMPLO)}
-            className="text-xs font-medium text-brand-600 hover:underline"
+            className="text-xs font-medium text-totvs-600 dark:text-whatsapp-600 hover:underline"
           >
             Usar exemplo
           </button>
@@ -177,7 +177,7 @@ export default function DataImport() {
                 value={buscaExcluir}
                 onChange={(e) => setBuscaExcluir(e.target.value)}
                 placeholder="Buscar por carga, loja ou nome..."
-                className="w-full rounded-md border border-slate-300 bg-white py-1.5 pl-8 pr-3 text-xs text-slate-800 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+                className="w-full rounded-md border border-slate-300 bg-white py-1.5 pl-8 pr-3 text-xs text-slate-800 focus:border-totvs-500 dark:focus:border-whatsapp-500 focus:outline-none focus:ring-1 focus:ring-totvs-500 dark:focus:ring-whatsapp-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
               />
             </div>
             {pendentesFiltradas.length === 0 ? (

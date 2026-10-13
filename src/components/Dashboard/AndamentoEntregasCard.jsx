@@ -217,14 +217,14 @@ export default function AndamentoEntregasCard({ irPara, compacto = false }) {
               inputMode="numeric"
               value={tempoLimiteTexto}
               onChange={(evento) => setTempoLimiteTexto(evento.target.value)}
-              className="w-16 rounded-md border border-slate-300 bg-white px-2 py-1 text-center text-xs font-semibold text-slate-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+              className="w-16 rounded-md border border-slate-300 bg-white px-2 py-1 text-center text-xs font-semibold text-slate-700 focus:border-totvs-500 dark:focus:border-whatsapp-500 focus:outline-none focus:ring-1 focus:ring-totvs-500 dark:focus:ring-whatsapp-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
             />
             min
           </label>
           {irPara && (
             <button
               onClick={() => irPara('motoristas')}
-              className="flex items-center gap-1 text-xs font-medium text-brand-600 hover:text-brand-700 dark:text-whatsapp-400 dark:hover:text-whatsapp-300"
+              className="flex items-center gap-1 text-xs font-medium text-totvs-600 hover:text-totvs-700 dark:text-whatsapp-400 dark:hover:text-whatsapp-300"
             >
               Ir para Motoristas <ArrowRight size={14} />
             </button>

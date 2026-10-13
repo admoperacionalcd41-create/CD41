@@ -218,7 +218,7 @@ export default function LoadingProtocolForm({ lojas, aoFechar, aoRegistrar }) {
       >
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Truck size={18} className="text-brand-600 dark:text-whatsapp-400" />
+            <Truck size={18} className="text-totvs-600 dark:text-whatsapp-400" />
             <h3 className="text-sm font-bold text-slate-700 dark:text-slate-200">
               {emLote
                 ? `Protocolo de Carregamento — ${lojas.length} lojas no mesmo veículo`
@@ -281,7 +281,7 @@ export default function LoadingProtocolForm({ lojas, aoFechar, aoRegistrar }) {
                         <select
                           value={statusLoja}
                           onChange={(e) => alterarStatusLoja(l.id, e.target.value)}
-                          className="rounded-md border border-slate-300 bg-white px-2 py-1 text-[11px] text-slate-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+                          className="rounded-md border border-slate-300 bg-white px-2 py-1 text-[11px] text-slate-700 focus:border-totvs-500 dark:focus:border-whatsapp-500 focus:outline-none focus:ring-1 focus:ring-totvs-500 dark:focus:ring-whatsapp-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
                         >
                           <option value="completo">Todos os paletes</option>
                           <option value="saldo">Ficou saldo</option>
@@ -298,7 +298,7 @@ export default function LoadingProtocolForm({ lojas, aoFechar, aoRegistrar }) {
                             onChange={(e) => atualizarQuantidadeLoja(l.id, e.target.value)}
                             required
                             placeholder={`${l.paletesAgrupados}`}
-                            className="w-16 rounded-md border border-slate-300 bg-white px-2 py-1 text-[11px] text-slate-700 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+                            className="w-16 rounded-md border border-slate-300 bg-white px-2 py-1 text-[11px] text-slate-700 focus:border-totvs-500 dark:focus:border-whatsapp-500 focus:outline-none focus:ring-1 focus:ring-totvs-500 dark:focus:ring-whatsapp-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
                           />
                         </label>
                       </div>
@@ -370,7 +370,7 @@ export default function LoadingProtocolForm({ lojas, aoFechar, aoRegistrar }) {
                 onChange={(e) => setPlaca(e.target.value)}
                 required
                 placeholder="ABC-1D23"
-                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm uppercase text-slate-800 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm uppercase text-slate-800 focus:border-totvs-500 dark:focus:border-whatsapp-500 focus:outline-none focus:ring-1 focus:ring-totvs-500 dark:focus:ring-whatsapp-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
               />
               <datalist id="lista-placas-carregamento">
                 {(state.placasCadastradas || []).map((p) => (
@@ -396,7 +396,7 @@ export default function LoadingProtocolForm({ lojas, aoFechar, aoRegistrar }) {
                 value={motorista}
                 onChange={(e) => setMotorista(e.target.value)}
                 required
-                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-totvs-500 dark:focus:border-whatsapp-500 focus:outline-none focus:ring-1 focus:ring-totvs-500 dark:focus:ring-whatsapp-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
               />
               <datalist id="lista-motoristas-carregamento">
                 {(state.motoristasCadastrados || []).map((m) => (
@@ -420,7 +420,7 @@ export default function LoadingProtocolForm({ lojas, aoFechar, aoRegistrar }) {
                   placeholder={i === 0 ? 'Lacre 1' : `Lacre ${i + 1} (opcional)`}
                   inputMode="numeric"
                   pattern="[0-9]*"
-                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-totvs-500 dark:focus:border-whatsapp-500 focus:outline-none focus:ring-1 focus:ring-totvs-500 dark:focus:ring-whatsapp-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
                 />
               ))}
             </div>
@@ -437,7 +437,7 @@ export default function LoadingProtocolForm({ lojas, aoFechar, aoRegistrar }) {
                     setLoteRestante([]);
                     setPaletesEnviadosInput('');
                   }}
-                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-totvs-500 dark:focus:border-whatsapp-500 focus:outline-none focus:ring-1 focus:ring-totvs-500 dark:focus:ring-whatsapp-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
                 >
                   <option value="completo">Todos os paletes enviados</option>
                   <option value="saldo">Ficou saldo (envio parcial)</option>
@@ -456,7 +456,7 @@ export default function LoadingProtocolForm({ lojas, aoFechar, aoRegistrar }) {
                   onChange={(e) => setPaletesEnviadosInput(e.target.value)}
                   required
                   placeholder={`de ${loja.paletesAgrupados}`}
-                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-totvs-500 dark:focus:border-whatsapp-500 focus:outline-none focus:ring-1 focus:ring-totvs-500 dark:focus:ring-whatsapp-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
                 />
                 {Number(paletesEnviadosInput) > loja.paletesAgrupados && (
                   <p className="mt-1 text-[11px] text-amber-600 dark:text-amber-400">
