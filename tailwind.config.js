@@ -28,20 +28,27 @@ export default {
           800: '#20658f',
           900: '#1a5275',
         },
-        // Pedido do usuário: "o tema escuro, deixe a paleta igual o
-        // WhatsApp" — os tons 700/800/900/950 (os únicos que este projeto
-        // sobrescreve; 50–600 continuam o cinza padrão do Tailwind, usado
-        // sobretudo em texto e no modo claro, então o modo claro não muda)
-        // agora usam os cinza-grafite reais do tema escuro do WhatsApp em
-        // vez do grafite azul-marinho de antes:
-        //   900 = #0b141a — fundo principal (a "tela de conversa"), o mais
-        //         escuro, usado em bg-slate-900 (fundo da página toda).
-        //   800 = #111b21 — painel/cabeçalho (um degrau mais claro), usado
-        //         em bg-slate-800 (cards, modais).
-        //   700 = #202c33 — superfície elevada/hover/input (a mais clara
-        //         das três), usado em border-slate-700, bg-slate-700 etc.
-        //   950 = ainda mais escuro que o 900, pra sombra/overlay mais
-        //         profundo, mantendo a mesma proporção de antes.
+        // Pedido do usuário: "como ficaria o tema escuro com preto e
+        // cinza" → testamos um cinza neutro primeiro, mas o pedido final
+        // foi "deixe parecido com o design do Vercel" — ou seja, o preto
+        // bem mais "puro" (quase #000) que o dashboard da Vercel usa, com
+        // painéis um degrau acima e bordas finas e discretas, em vez do
+        // cinza-grafite médio da tentativa anterior. Os tons 700/800/900/950
+        // (os únicos que este projeto sobrescreve; 50–600 continuam o cinza
+        // padrão do Tailwind, usado sobretudo em texto e no modo claro,
+        // então o modo claro não muda) agora são:
+        //   900 = #000000 — fundo principal (a tela toda), preto puro, a
+        //         marca registrada do visual da Vercel. Usado em
+        //         bg-slate-900 (fundo da página).
+        //   800 = #111111 — painel/cabeçalho/cards (um degrau acima do
+        //         preto puro, pra diferenciar do fundo), usado em
+        //         bg-slate-800 (cards, modais).
+        //   700 = #333333 — borda/hover/superfície elevada (bem mais clara
+        //         que o painel, pra servir de linha fina visível sobre o
+        //         preto — como as bordas sutis da Vercel), usado em
+        //         border-slate-700, bg-slate-700 etc.
+        //   950 = #000000 — mesmo preto puro do 900, pra sombra/overlay
+        //         mais profundo (não tem como ficar mais escuro que preto).
         slate: {
           50: '#f8fafc',
           100: '#f1f5f9',
@@ -50,29 +57,36 @@ export default {
           400: '#94a3b8',
           500: '#64748b',
           600: '#475569',
-          700: '#202c33',
-          800: '#111b21',
-          900: '#0b141a',
-          950: '#060b0e',
+          700: '#333333',
+          800: '#111111',
+          900: '#000000',
+          950: '#000000',
         },
-        // Verde-petróleo do WhatsApp (cor de destaque do tema escuro dele —
-        // ícones ativos, links, foco, botões) — é o par exclusivo do modo
-        // escuro pra cada uso de "totvs" (azul, tema claro) acima. Toda
-        // classe de ação/destaque no app tem as duas variantes lado a lado
-        // (ex.: `bg-totvs-600 dark:bg-whatsapp-600`), então trocar a paleta
-        // de um tema nunca muda o outro.
+        // Pedido do usuário: depois de ver o fundo preto puro, "não gostei
+        // do cinza, mantenha o preto e me sugira outra cor que combine e
+        // fique atual" — testamos 4 opções (indigo, azul, verde-esmeralda,
+        // âmbar) lado a lado e o azul elétrico foi o escolhido: tom vivo e
+        // sóbrio que ecoa o azul já usado no tema claro (TOTVS), dando uma
+        // ligação visual entre os dois temas. É a cor de "destaque" do tema
+        // escuro — ícones ativos, links, foco, botões — e o par exclusivo
+        // do modo escuro pra cada uso de "totvs" (azul, tema claro) acima.
+        // Toda classe de ação/destaque no app tem as duas variantes lado a
+        // lado (ex.: `bg-totvs-600 dark:bg-whatsapp-600`), então trocar a
+        // paleta de um tema nunca muda o outro. O nome do token
+        // ("whatsapp") ficou do pedido original que criou essa separação,
+        // mas a cor em si não tem mais nada a ver com o WhatsApp.
         whatsapp: {
-          50: '#e6f7f1',
-          100: '#c0ecdc',
-          200: '#8edcc0',
-          300: '#53c89f',
-          400: '#00a884',
-          500: '#02906f',
-          600: '#057a5e',
-          700: '#0a6350',
-          800: '#0f4d40',
-          900: '#0c3a30',
-          950: '#062420',
+          50: '#eff6ff',
+          100: '#dbeafe',
+          200: '#bfdbfe',
+          300: '#93c5fd',
+          400: '#60a5fa',
+          500: '#3b82f6',
+          600: '#2563eb',
+          700: '#1d4ed8',
+          800: '#1e40af',
+          900: '#1e3a8a',
+          950: '#172554',
         },
         // Pedido do usuário: o tema claro estava "muito claro" — quase todo
         // card/painel/input do app usa `bg-white` (branco puro, #ffffff)
