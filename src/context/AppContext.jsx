@@ -137,6 +137,17 @@ function aplicarAcaoInterna(state, acao) {
       };
     }
 
+    // Pedido do usuário: "opção pra permitir o sequenciamento das lojas" no
+    // relatório Processo do Dia — um modo à parte (opcional, não substitui o
+    // agrupamento padrão pendente/completo) com arrastar-e-soltar. `ordem` é
+    // a lista completa (nova ordem) de códigos de loja; substitui o array
+    // inteiro a cada reordenação (sem botão de salvar separado, mesmo padrão
+    // de "ação imediata" usado em ObservacoesLojaModal.jsx).
+    case 'DEFINIR_SEQUENCIA_LOJAS': {
+      const { ordem } = acao.payload;
+      return { ...state, sequenciaLojas: Array.isArray(ordem) ? ordem : [] };
+    }
+
     // Etapa 1 — Apontamento: aponta manualmente a loja para um box, apenas
     // reservando as vagas físicas em ordem CRESCENTE (estimativa rápida,
     // antes da conferência física). Sinaliza que a loja está "em execução"
@@ -967,6 +978,10 @@ function aplicarAcaoInterna(state, acao) {
         contatosNotificacao: state.contatosNotificacao,
         localizacaoLojas: state.localizacaoLojas,
         observacoesLoja: state.observacoesLoja,
+        // Mesmo motivo: é uma ordem de exibição das lojas (cadastral), não
+        // um dado operacional do dia — zerar lojas/boxes/protocolos não
+        // precisa desfazer a sequência já organizada.
+        sequenciaLojas: state.sequenciaLojas,
         ultimoErro: null,
         ultimoAviso: 'Banco de dados zerado — todas as lojas, boxes e protocolos foram removidos.',
       };
@@ -1372,6 +1387,7 @@ export function AppProvider({ children }) {
       excluirLoja: (lojaId) => dispatch({ tipo: 'EXCLUIR_LOJA', payload: { lojaId } }),
       definirObservacaoLoja: (codigoLoja, texto) =>
         dispatch({ tipo: 'DEFINIR_OBSERVACAO_LOJA', payload: { codigoLoja, texto } }),
+      definirSequenciaLojas: (ordem) => dispatch({ tipo: 'DEFINIR_SEQUENCIA_LOJAS', payload: { ordem } }),
       apontarBox: (payload) => dispatch({ tipo: 'APONTAR_BOX', payload }),
       concluirConferencia: (lojaId) => dispatch({ tipo: 'CONCLUIR_CONFERENCIA', payload: { lojaId } }),
       iniciarAgrupamento: (payload) => dispatch({ tipo: 'INICIAR_AGRUPAMENTO', payload }),

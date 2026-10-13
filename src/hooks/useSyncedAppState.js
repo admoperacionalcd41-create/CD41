@@ -53,6 +53,10 @@ function normalizarEstadoRecebido(dados) {
       dados.observacoesLoja && typeof dados.observacoesLoja === 'object' && !Array.isArray(dados.observacoesLoja)
         ? dados.observacoesLoja
         : {},
+    // Ordem customizada das lojas (Modo sequência, ver DailyProcessReport.jsx)
+    // — mesmo cuidado: estado compartilhado salvo antes desse campo existir
+    // não tem essa chave.
+    sequenciaLojas: Array.isArray(dados.sequenciaLojas) ? dados.sequenciaLojas : [],
     // Valor pago por palete agrupado (ver ValoresConfigCard.jsx) — mesmo
     // padrão de 0,58 usado em SINCRONIZAR_CADASTROS/mockData.js, pro caso de
     // chegar aqui um estado compartilhado salvo antes desse campo existir.

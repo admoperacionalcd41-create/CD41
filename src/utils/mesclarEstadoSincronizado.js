@@ -53,8 +53,11 @@ const MAPAS_OBJETO = ['observacoesLoja'];
 
 // Campos escalares onde uma edição local concorrente deve prevalecer sobre
 // o remoto (mesmo critério das coleções: a ação local mais recente, ainda
-// não salva, não deve sumir sem alguém tentar gravá-la).
-const CAMPOS_ESCALARES = ['diaAtual', 'valorPaletesAgrupamento'];
+// não salva, não deve sumir sem alguém tentar gravá-la). sequenciaLojas
+// entra aqui (não em COLECOES_SIMPLES) porque é um array onde a ORDEM é o
+// próprio conteúdo que importa — uma mesclagem por Set (como as coleções
+// simples fazem) preservaria os itens mas destruiria a ordem arrastada.
+const CAMPOS_ESCALARES = ['diaAtual', 'valorPaletesAgrupamento', 'sequenciaLojas'];
 
 function paraMapa(colecao, chave) {
   const mapa = new Map();

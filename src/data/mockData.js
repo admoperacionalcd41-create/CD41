@@ -300,6 +300,14 @@ export function gerarDadosIniciais() {
     // (ver getLojasConhecidas em selectors.js). Mostrada como lembrete ao
     // abrir o protocolo de carregamento da loja (ver LoadingProtocolForm.jsx).
     observacoesLoja: {},
+    // Ordem customizada das lojas pro "Modo sequência" (opcional) da aba
+    // Relatórios → Processo do Dia — lista de códigos de loja definindo a
+    // ordem de exibição/atendimento, ajustável por arrastar-e-soltar (ver
+    // DailyProcessReport.jsx). Lojas ainda não sequenciadas aparecem depois,
+    // na ordem padrão. Não é a sequência de carregamento de um protocolo
+    // específico (isso é outra coisa, ver SequenciaCarregamentoCaminhao.jsx)
+    // — essa aqui é uma ordem geral de lojas, reaproveitada todo dia.
+    sequenciaLojas: [],
     // Valor pago por palete agrupado (ver ValoresConfigCard.jsx, aba
     // Cadastros) — usado no relatório de Produtividade. Editável a
     // qualquer momento, sem precisar mexer em código quando reajustar.
