@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { ListChecks, CheckCircle2, XCircle, ArrowUpDown } from 'lucide-react';
 import { useApp } from '../../context/AppContext.jsx';
 import { getLinhasProcessoDoDia } from '../../utils/selectors';
@@ -30,13 +30,22 @@ function Selo({ feito }) {
 }
 
 export default function DailyProcessReport() {
-  const { state, actions, filtroTipoCarga } = useApp();
+  const {
+    state,
+    actions,
+    filtroTipoCarga,
+    modoSequenciaProcessoDia: modoSequencia,
+    setModoSequenciaProcessoDia: setModoSequencia,
+  } = useApp();
   const rotuloTipo = ROTULO_TIPO[filtroTipoCarga] || ROTULO_TIPO.todos;
 
   // Pedido do usuário: "opção pra permitir o sequenciamento das lojas" —
   // um modo à parte, opcional (não substitui o agrupamento padrão
   // pendente/completo, que continua sendo a visão default ao abrir a aba).
-  const [modoSequencia, setModoSequencia] = useState(false);
+  // O estado em si (modoSequenciaProcessoDia) mora no AppProvider, não aqui
+  // como useState local — pedido do usuário: precisa continuar ativo ao
+  // trocar de aba e voltar, e esse componente é desmontado nesse momento
+  // (ver AppContext.jsx).
 
   // A lógica de montar essa lista (uma linha por código de loja, sempre com
   // as lojas fixas do histórico, apontamento/carregamento validados só pra

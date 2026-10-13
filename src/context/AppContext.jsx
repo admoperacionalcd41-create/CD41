@@ -1368,6 +1368,15 @@ export function AppProvider({ children }) {
   // então fica fora do reducer/localStorage, como estado de UI simples.
   const [filtroTipoCarga, setFiltroTipoCarga] = useState('todos'); // 'todos' | 'seca' | 'resfriada'
 
+  // Modo sequência do relatório Processo do Dia (ver DailyProcessReport.jsx)
+  // — mesmo motivo do filtroTipoCarga acima: é estado de UI (se a tela está
+  // mostrando o modo de organizar por posição ou a visão padrão), não um
+  // dado a sincronizar. Fica aqui no Provider (que não desmonta ao trocar
+  // de aba) em vez de um useState dentro do próprio componente — pedido do
+  // usuário: o modo ligado estava voltando pra "desligado" toda vez que
+  // trocava de aba e voltava, porque o componente era desmontado.
+  const [modoSequenciaProcessoDia, setModoSequenciaProcessoDia] = useState(false);
+
   // Ao montar, garante que os boxes e os cadastros auxiliares salvos
   // (localStorage) estejam alinhados com o formato atual do app.
   useEffect(() => {
@@ -1423,8 +1432,16 @@ export function AppProvider({ children }) {
   );
 
   const value = useMemo(
-    () => ({ state, dispatch, actions, filtroTipoCarga, setFiltroTipoCarga }),
-    [state, dispatch, actions, filtroTipoCarga]
+    () => ({
+      state,
+      dispatch,
+      actions,
+      filtroTipoCarga,
+      setFiltroTipoCarga,
+      modoSequenciaProcessoDia,
+      setModoSequenciaProcessoDia,
+    }),
+    [state, dispatch, actions, filtroTipoCarga, modoSequenciaProcessoDia]
   );
 
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;
