@@ -3,7 +3,7 @@ import { Menu, RotateCcw, Trash2, CalendarClock, X, CheckCircle2, AlertTriangle,
 import { useApp } from '../../context/AppContext.jsx';
 import { useDarkMode } from '../../hooks/useDarkMode.js';
 import { useFullscreen } from '../../hooks/useFullscreen.js';
-import { formatarData, eHoje } from '../../utils/dateHelpers';
+import { eHoje } from '../../utils/dateHelpers';
 import { TIPOS_CARGA } from '../../utils/tipoCarga';
 import ObservacoesLojaModal from '../Shared/ObservacoesLojaModal.jsx';
 
@@ -78,11 +78,12 @@ export default function Header({ tituloAba, abaAtiva, onAbrirMenu }) {
             <Menu size={18} />
           </button>
           <div>
+            {/* Pedido do usuário: o "Dia operacional: DD/MM/AAAA" que ficava
+                aqui embaixo do título foi ocultado em todas as abas (antes
+                só sumia na Box / Frota). O valor em si (state.diaAtual)
+                continua existindo e sendo usado normalmente no resto do
+                app — só esse texto no cabeçalho que não aparece mais. */}
             <h1 className="text-lg font-bold text-slate-800 dark:text-slate-100">{tituloAba}</h1>
-            <p className="text-xs text-slate-400 dark:text-slate-500">
-              Dia operacional:{' '}
-              <span className="font-semibold text-slate-600 dark:text-slate-300">{formatarData(state.diaAtual)}</span>
-            </p>
           </div>
         </div>
 

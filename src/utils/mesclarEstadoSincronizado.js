@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------------
 // Mitigação do problema de sincronização relatado pelo usuário: dois
-// operadores mexendo na aba Agrupamento & Etiquetas quase ao mesmo tempo —
+// operadores mexendo na aba Expedição / Processos quase ao mesmo tempo —
 // um fazendo apontamento/conferência, o outro fazendo o resto — e a ação de
 // um "voltava" quando o outro salvava, sem precisar dar refresh.
 //

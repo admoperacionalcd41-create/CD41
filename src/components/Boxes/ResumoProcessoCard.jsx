@@ -22,7 +22,7 @@ function formatarNumeroBR(valor) {
   return valor.toLocaleString('pt-BR', { maximumFractionDigits: 1 });
 }
 
-// Card pequeno pedido pelo usuário pra aba Boxes & Vagas, juntando duas
+// Card pequeno pedido pelo usuário pra aba Box / Frota, juntando duas
 // informações que hoje só existem em outras abas: o "Apontamento feito"
 // do relatório Processo do Dia (Relatórios) e o peso/volume no estilo dos
 // cards do Dashboard — mas aqui só o peso/volume do que AINDA FALTA

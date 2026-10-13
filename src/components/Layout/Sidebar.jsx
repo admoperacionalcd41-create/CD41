@@ -41,7 +41,7 @@ function ListaAbas({ abas, abaAtiva, aoSelecionar }) {
           <button
             key={aba.chave}
             onClick={() => aoSelecionar(aba.chave)}
-            className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+            className={`flex w-full items-center gap-3 whitespace-nowrap rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
               ativa
                 ? 'bg-totvs-600 dark:bg-whatsapp-600 text-white shadow-sm'
                 : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-white'

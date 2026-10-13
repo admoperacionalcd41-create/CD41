@@ -151,7 +151,7 @@ export function getEntregaCodigoLojaNaData(state, codigo, dataISO, tipoCarga) {
  * campo fica null e é ignorado na soma; `tem` decide se o dado deve aparecer
  * na tela (para não mostrar "0 kg" quando ninguém informou esse dado).
  * Compartilhado pelo Dashboard e pelo card de resumo operacional da aba
- * Boxes & Vagas, pra não ter duas implementações que podem divergir.
+ * Box / Frota, pra não ter duas implementações que podem divergir.
  */
 export function calcularPesoVolume(lojas) {
   const peso = lojas.reduce((soma, l) => soma + (l.peso ?? 0), 0);
@@ -164,7 +164,7 @@ export function calcularPesoVolume(lojas) {
  * Uma linha por CÓDIGO de loja (não por carga — ver comentário em
  * DailyProcessReport.jsx) com o apontamento/carregamento feitos hoje. Base
  * do relatório "Processo do Dia" — extraído pra selectors.js pra poder ser
- * reaproveitado também no card de resumo operacional da aba Boxes & Vagas,
+ * reaproveitado também no card de resumo operacional da aba Box / Frota,
  * sem duplicar essa lógica (e sem os dois lugares divergindo com o tempo).
  *
  * A COLUNA LOJA sempre traz as lojas fixas (todo código já visto em alguma
@@ -241,7 +241,7 @@ export function getLinhasProcessoDoDia(state, filtroTipoCarga) {
  * aciona "avançar dia" e por isso pode misturar cargas importadas ontem
  * ainda dentro do mesmo ciclo operacional) que AINDA NÃO tiveram apontamento
  * feito hoje. Usada pro peso/volume "pendente de apontamento" no card de
- * resumo operacional da aba Boxes & Vagas — pedido do usuário pra validar
+ * resumo operacional da aba Box / Frota — pedido do usuário pra validar
  * só as cargas realmente importadas hoje, e não o saldo de dias anteriores
  * que porventura ainda esteja no mesmo dia operacional.
  */

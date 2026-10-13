@@ -6,7 +6,7 @@ import ResumoProcessoCard from './ResumoProcessoCard.jsx';
 import AndamentoEntregasCard from '../Dashboard/AndamentoEntregasCard.jsx';
 
 // `aoAbrirAgrupamento` (obrigatório na prática): chamado com a loja
-// clicada — o App navega pra aba Agrupamento & Etiquetas e já abre a tela
+// clicada — o App navega pra aba Expedição / Processos e já abre a tela
 // de etiquetas dessa loja lá (ver App.jsx e GroupingPage.jsx). É lá que
 // ficam as outras ações da loja (mover de box, concluir agrupamento etc.).
 export default function BoxGrid({ irPara, aoAbrirAgrupamento }) {

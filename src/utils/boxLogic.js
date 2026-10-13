@@ -284,7 +284,7 @@ export function vagasIndisponiveisParaReocupar(box, numerosVagas) {
 
 /**
  * Status operacional do box (não confundir com o status da loja): decide o
- * selo/cor exibido nas telas de Boxes e Vagas e no Dashboard, na mesma
+ * selo/cor exibido nas telas de Box / Frota e no Dashboard, na mesma
  * ordem de prioridade em ambas — para que os dois lugares sempre concordem
  * sobre o que é um box "Ocupado".
  *   1) Ocupado — tem alguma loja "em execução" (apontada), mesmo que ainda
@@ -333,7 +333,7 @@ export function getStatusBox(box, lojasPorId) {
   };
 }
 
-// Ordem de exibição das lojas dentro de um box (telas de Boxes & Vagas e
+// Ordem de exibição das lojas dentro de um box (telas de Box / Frota e
 // Dashboard): segue a mesma ordem do fluxo operacional, que também é a
 // ordem física real de ocupação das vagas —
 //   Em Execução, Conferência Finalizada e Agrupando ocupam as PRIMEIRAS

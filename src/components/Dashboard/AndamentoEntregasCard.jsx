@@ -8,7 +8,7 @@ import { ordenarEntregasDaViagem, calcularDeslocamento } from '../../utils/deslo
 
 // Chave usada para lembrar o tempo-limite configurado (fica salvo no
 // navegador, como o restante do estado do app) — compartilhada entre o
-// Dashboard e a aba Boxes & Vagas, já que é o mesmo card nas duas telas.
+// Dashboard e a aba Box / Frota, já que é o mesmo card nas duas telas.
 const CHAVE_TEMPO_LIMITE = 'doca-manager:tempo-limite-loja-min';
 
 // Estágios da entrega de uma loja, a partir do protocolo registrado no
@@ -18,7 +18,7 @@ const CHAVE_TEMPO_LIMITE = 'doca-manager:tempo-limite-loja-min';
 // `Icone` de cada status — usado como um segundo sinal visual além da cor
 // (o badge de texto continua existindo), pra dar pra reconhecer o estágio
 // de uma entrega num piscar de olhos, sem precisar ler a palavra — útil
-// numa grade com vários veículos ao mesmo tempo, como na aba Boxes & Vagas.
+// numa grade com vários veículos ao mesmo tempo, como na aba Box / Frota.
 const STATUS_ENTREGA = {
   aguardando: {
     texto: 'A caminho',
@@ -90,7 +90,7 @@ function getStatusEntrega(protocolo, agoraMs, limiteMs) {
 
 /**
  * Card "Andamento das Entregas" — usado tanto no Dashboard quanto na aba
- * Boxes & Vagas (mesmos dados e mesma lógica, só o visual muda). `irPara`
+ * Box / Frota (mesmos dados e mesma lógica, só o visual muda). `irPara`
  * navega para outra aba (Motoristas). `compacto` deixa o card mais enxuto
  * (menos respiro, tipografia menor e a lista de veículos com altura
  * limitada e rolagem própria) — pensado pra caber ao lado da grade de

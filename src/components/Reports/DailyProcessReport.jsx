@@ -2,7 +2,6 @@ import React, { useMemo } from 'react';
 import { ListChecks, CheckCircle2, XCircle, Loader2, Clock } from 'lucide-react';
 import { useApp } from '../../context/AppContext.jsx';
 import { getLinhasProcessoDoDia } from '../../utils/selectors';
-import { formatarData } from '../../utils/dateHelpers';
 import TipoCargaBadge from '../Shared/TipoCargaBadge.jsx';
 
 const ROTULO_TIPO = {
@@ -33,7 +32,7 @@ export default function DailyProcessReport() {
   // as lojas fixas do histórico, apontamento/carregamento validados só pra
   // hoje de verdade) mora em getLinhasProcessoDoDia (selectors.js) — foi
   // extraída de lá pra poder ser reaproveitada também no card de resumo
-  // operacional da aba Boxes & Vagas, sem duplicar essa regra em dois
+  // operacional da aba Box / Frota, sem duplicar essa regra em dois
   // lugares.
   const linhas = useMemo(
     () => getLinhasProcessoDoDia(state, filtroTipoCarga),
@@ -62,11 +61,14 @@ export default function DailyProcessReport() {
           <ListChecks size={18} className="text-totvs-600 dark:text-whatsapp-400" />
           <div>
             <h2 className="text-sm font-bold text-slate-700 dark:text-slate-200">Processo do Dia — {rotuloTipo}</h2>
+            {/* Pedido do usuário: "Dia operacional: DD/MM/AAAA" ocultado em
+                todas as abas (inclusive aqui, que tinha essa mesma data no
+                início da legenda) — o resto da explicação continua, só
+                reescrita pra começar sozinha com letra maiúscula. */}
             <p className="text-xs text-slate-400 dark:text-slate-500">
-              Dia operacional: <span className="font-semibold">{formatarData(state.diaAtual)}</span> — a coluna Loja
-              traz sempre as lojas fixas (todo código já visto em alguma importação), mesmo sem carga hoje; as
-              colunas Apontamento e Carregamento validam só o que foi feito hoje de verdade (registros de dias
-              anteriores não contam)
+              A coluna Loja traz sempre as lojas fixas (todo código já visto em alguma importação), mesmo sem carga
+              hoje; as colunas Apontamento e Carregamento validam só o que foi feito hoje de verdade (registros de
+              dias anteriores não contam)
             </p>
           </div>
         </div>

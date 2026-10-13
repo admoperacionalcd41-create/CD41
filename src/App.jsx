@@ -15,7 +15,7 @@ import { SUPABASE_CONFIGURADO } from './lib/supabaseClient';
 // tamanho do carregamento inicial do app (o chunk principal vinha passando
 // dos 900kB, o que o próprio Vite avisa no build), já que a maior parte do
 // código de abas como Relatórios ou Agrupamento não é necessária só para
-// abrir o app e ver a tela de Boxes & Vagas, que é a aba inicial.
+// abrir o app e ver a tela de Box / Frota, que é a aba inicial.
 const Dashboard = lazy(() => import('./components/Dashboard/Dashboard.jsx'));
 const DataImport = lazy(() => import('./components/Import/DataImport.jsx'));
 const BoxGrid = lazy(() => import('./components/Boxes/BoxGrid.jsx'));
@@ -45,13 +45,13 @@ function CarregandoAba() {
 //
 // A aba Dashboard fica oculta do menu por escolha do usuário (o
 // componente/rota continuam existindo em renderConteudo, caso precise
-// voltar — basta reinserir a entrada aqui). "Boxes & Vagas" é a primeira
+// voltar — basta reinserir a entrada aqui). "Box / Frota" é a primeira
 // da lista de propósito: é ela que abre por padrão ao entrar no app (ver
 // useEffect logo abaixo, que sempre cai na primeira aba permitida).
 export const ABAS = [
-  { chave: 'boxes', rotulo: 'Boxes & Vagas', grupos: ['administrativo'] },
-  { chave: 'agrupamento', rotulo: 'Agrupamento & Etiquetas', grupos: ['administrativo'] },
-  { chave: 'carregamento', rotulo: 'Carregamento', grupos: ['administrativo'] },
+  { chave: 'boxes', rotulo: 'Box / Frota', grupos: ['administrativo'] },
+  { chave: 'agrupamento', rotulo: 'Expedição / Processos', grupos: ['administrativo'] },
+  { chave: 'carregamento', rotulo: 'Carregamento / Faturamento', grupos: ['administrativo'] },
   { chave: 'motoristas', rotulo: 'Motoristas', grupos: ['motorista', 'administrativo'] },
   { chave: 'relatorios', rotulo: 'Relatórios', grupos: ['administrativo'] },
   { chave: 'cadastros', rotulo: 'Cadastros', grupos: ['administrativo'] },
@@ -120,7 +120,7 @@ function AppLogado({ grupo }) {
           onAbrirMenu={() => setMenuAberto(true)}
         />
         <main className="flex-1 overflow-y-auto p-3 sm:p-4 lg:p-6">
-          {/* Na aba Boxes & Vagas, o conteúdo preenche toda a altura
+          {/* Na aba Box / Frota, o conteúdo preenche toda a altura
               disponível (h-full) e se organiza em flex-col internamente, pra
               a lista de veículos do card "Andamento das Entregas" ganhar
               rolagem própria dentro do espaço que sobra — em vez de a

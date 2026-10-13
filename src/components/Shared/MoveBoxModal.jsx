@@ -5,7 +5,7 @@ import { getNomeBox, getVagasDisponiveisCount } from '../../utils/boxLogic';
 import TipoCargaBadge from './TipoCargaBadge.jsx';
 
 // Modal genérico de movimentação de box, reutilizado nas telas de Boxes e
-// Vagas e de Agrupamento e Etiquetas: lista os demais boxes com a
+// Vagas e de Expedição / Processos: lista os demais boxes com a
 // quantidade de vagas livres, desabilitando os que não comportam a
 // quantidade de paletes atual da loja.
 export default function MoveBoxModal({ loja, aoFechar }) {
