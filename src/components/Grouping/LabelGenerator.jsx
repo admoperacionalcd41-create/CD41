@@ -14,7 +14,11 @@ function Etiqueta({ loja, indice, total }) {
   // nele — ver ConcludeGroupingModal), ex.: "2 + 5".
   const composicao = (loja.composicaoPaletes || [])[indice - 1];
   return (
-    <div className="flex flex-col gap-1.5 rounded-lg border-2 border-slate-800 p-3 text-slate-900">
+    // bg-white fixo: a etiqueta é sempre "papel branco", mesmo com o app no
+    // tema escuro (ver comentário no container que envolve esta grade, mais
+    // abaixo) — sem isso, o card ficava sem fundo próprio e herdava o fundo
+    // escuro da página, deixando o texto escuro ilegível na pré-visualização.
+    <div className="flex flex-col gap-1.5 rounded-lg border-2 border-slate-800 bg-white p-3 text-slate-900">
       <div className="flex items-center justify-between border-b-2 border-slate-800 pb-1.5">
         <span className="text-xs font-black uppercase tracking-wide text-slate-500">PALETE {indice}/{total}</span>
         <div className="flex items-center gap-1.5">
@@ -24,26 +28,29 @@ function Etiqueta({ loja, indice, total }) {
       </div>
       <div className="flex flex-col items-center justify-center py-2">
         <p className="text-[10px] uppercase tracking-widest text-slate-400">Loja</p>
-        <p className="text-5xl font-black leading-none">{loja.loja}</p>
+        {/* Número da Loja = "nome principal" da etiqueta (pedido do
+            usuário pra aumentar ainda mais) — ver mesmo ajuste em
+            .loja-valor, montarHtmlImpressao abaixo. */}
+        <p className="text-6xl font-black leading-none">{loja.loja}</p>
         {composicao && <p className="text-[10px] font-semibold text-slate-500">Lotes: {composicao}</p>}
       </div>
       <div className="flex items-end justify-between gap-2 text-xs">
         <div className="min-w-0">
-          <p className="text-[9px] uppercase text-slate-400">Carga</p>
+          <p className="text-[9px] font-bold uppercase text-slate-700">Carga</p>
           <p className="truncate font-bold">{loja.carga}</p>
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-[9px] uppercase text-slate-400">Nome da Loja</p>
+          <p className="text-[9px] font-bold uppercase text-slate-700">Nome da Loja</p>
           <p className="truncate font-bold">{loja.nomeLoja}</p>
         </div>
         <div className="min-w-0">
-          <p className="text-[9px] uppercase text-slate-400">Paletes</p>
+          <p className="text-[9px] font-bold uppercase text-slate-700">Paletes</p>
           <p className="font-bold">{total}</p>
         </div>
       </div>
-      <div className="flex items-end justify-between gap-2 text-[10px] text-slate-500">
-        <p className="min-w-0 truncate font-semibold">{loja.colaboradores.join(', ') || '—'}</p>
-        <p className="flex-shrink-0 text-slate-400">Agrupado em {formatarDataHora(loja.dataAgrupamento)}</p>
+      <div className="flex items-end justify-between gap-2 text-[10px]">
+        <p className="min-w-0 truncate font-bold">{loja.colaboradores.join(', ') || '—'}</p>
+        <p className="flex-shrink-0 font-bold text-slate-600">Agrupado em {formatarDataHora(loja.dataAgrupamento)}</p>
       </div>
     </div>
   );
@@ -100,21 +107,29 @@ function montarHtmlImpressao(loja, total) {
 
     .loja-destaque { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; }
     .loja-rotulo { font-size: 7pt; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5pt; color: #000; margin: 0; }
-    .loja-valor { font-size: 44pt; font-weight: 900; line-height: 1; color: #000; margin: 0.5mm 0 0; }
+    /* Número da Loja é o "nome principal" da etiqueta — pedido do usuário
+       pra aumentar ainda mais esse valor (era 44pt), já que é o elemento
+       que o operador usa pra separar as cargas no box/caminhão. */
+    .loja-valor { font-size: 58pt; font-weight: 900; line-height: 1; color: #000; margin: 0.5mm 0 0; }
 
     .rodape-campos { display: flex; align-items: flex-end; gap: 3mm; }
     .rodape-campo { min-width: 0; }
     .rodape-campo.destaque { flex: 1; }
-    .rodape-rotulo { font-size: 6pt; text-transform: uppercase; color: #000; margin: 0; }
+    /* Pedido do usuário: impressora ribbon (térmica por transferência) —
+       todo o resto do texto (além do número grande da Loja) em preto e
+       negrito, pra sair bem legível na impressão, inclusive os rótulos
+       pequenos (ex.: "CARGA", "NOME DA LOJA") que antes ficavam em peso
+       normal. */
+    .rodape-rotulo { font-size: 6pt; font-weight: 700; text-transform: uppercase; color: #000; margin: 0; }
     .rodape-valor { font-size: 8.5pt; font-weight: 700; color: #000; margin: 0.3mm 0 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     /* Nome da Loja é o campo de destaque do rodapé (maior espaço, ver
-       .rodape-campo.destaque) — pedido do usuário pra aumentar mais esse
-       valor especificamente, bem além do tamanho de Carga/Paletes. */
+       .rodape-campo.destaque) — já tinha sido aumentado antes, bem além do
+       tamanho de Carga/Paletes. */
     .rodape-valor-loja { font-size: 13pt; font-weight: 800; color: #000; margin: 0.3mm 0 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
     .segunda-linha { display: flex; align-items: flex-end; justify-content: space-between; gap: 3mm; margin-top: 1mm; }
     .colaboradores { font-size: 9.5pt; font-weight: 700; color: #000; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .data-agrupamento { flex-shrink: 0; font-size: 6pt; color: #000; white-space: nowrap; }
+    .data-agrupamento { flex-shrink: 0; font-size: 6pt; font-weight: 700; color: #000; white-space: nowrap; }
   `;
 
   const corpo = etiquetas
