@@ -431,10 +431,23 @@ function CartaoEntrega({
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800">
       <div className="flex items-start justify-between gap-2">
-        <div>
-          <p className="flex flex-wrap items-center gap-1.5 text-base font-bold text-slate-800 dark:text-slate-100">
-            <span className="font-mono">{entrega.loja.loja}</span> — {entrega.loja.nomeLoja}
-            <TipoCargaBadge tipo={entrega.loja.tipoCarga} />
+        {/* `min-w-0 flex-1`: sem isso, este bloco do título disputa espaço
+            com o selo "Concluída" (flex-shrink-0) de forma imprevisível no
+            `justify-between` — no celular (tela estreita), o código da loja
+            ficava isolado numa linha, o selo "Concluída" ao lado dele, e o
+            nome da loja caía sozinho pra linha de baixo, em vez de quebrar
+            de um jeito legível. */}
+        <div className="min-w-0 flex-1">
+          {/* Texto corrido normal (sem `flex`) em vez de flex-wrap: um
+              título "0407 — Loja Praça da Matriz" quebra palavra por
+              palavra como qualquer texto, em vez de "0407" ficar isolado
+              numa linha e o nome inteiro pular pra linha de baixo sozinho
+              (o que acontecia no celular, com o selo "Concluída" disputando
+              espaço do lado). O selo de carga (inline-flex) flui junto no
+              texto e só desce de linha sozinho se não couber mais nada. */}
+          <p className="text-base font-bold leading-snug text-slate-800 dark:text-slate-100">
+            <span className="font-mono">{entrega.loja.loja}</span> — {entrega.loja.nomeLoja}{' '}
+            <TipoCargaBadge tipo={entrega.loja.tipoCarga} className="align-middle" />
           </p>
           <p className="mt-0.5 text-xs text-slate-400 dark:text-slate-500">
             Placa <span className="font-mono font-semibold text-slate-500 dark:text-slate-400">{entrega.placa}</span>
@@ -623,18 +636,24 @@ function RegistroManual({ chave, aberto, valor, aoAlternar, aoMudarValor, aoConf
         <Clock size={11} /> {aberto ? 'Cancelar registro manual' : rotulo}
       </button>
       {aberto && (
-        <div className="mt-1.5 flex items-center gap-2 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-2 dark:border-slate-600 dark:bg-slate-900/40">
+        // Empilha input + botão no celular (tela estreita) em vez de lado a
+        // lado: o controle nativo de data/hora já ocupa bastante espaço
+        // sozinho, e espremido ao lado do botão "Confirmar" numa única linha
+        // ficava difícil de ler e tocar certo. A partir de `sm` (telas
+        // maiores) volta a ficar lado a lado, já que aí sobra espaço de
+        // verdade pros dois.
+        <div className="mt-1.5 flex flex-col gap-2 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-2 dark:border-slate-600 dark:bg-slate-900/40 sm:flex-row sm:items-center">
           <input
             type="datetime-local"
             value={valor || ''}
             onChange={(evento) => aoMudarValor(chave, evento.target.value)}
-            className="flex-1 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-700 focus:border-totvs-500 dark:focus:border-whatsapp-500 focus:outline-none focus:ring-1 focus:ring-totvs-500 dark:focus:ring-whatsapp-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+            className="w-full min-w-0 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-700 focus:border-totvs-500 dark:focus:border-whatsapp-500 focus:outline-none focus:ring-1 focus:ring-totvs-500 dark:focus:ring-whatsapp-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 sm:flex-1"
           />
           <button
             type="button"
             disabled={!valor}
             onClick={() => aoConfirmar(chave)}
-            className="flex-shrink-0 rounded-md bg-slate-700 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-slate-600 dark:hover:bg-slate-500"
+            className="w-full flex-shrink-0 rounded-md bg-slate-700 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-slate-600 dark:hover:bg-slate-500 sm:w-auto sm:py-1.5 sm:text-xs"
           >
             Confirmar
           </button>
