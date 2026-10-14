@@ -1,10 +1,13 @@
 // Tempo de deslocamento do motorista entre dois pontos de uma viagem:
-//   - do CD até a primeira loja: da entrega das notas fiscais (o momento
+//   - do CD até a primeira loja de uma viagem (ou até qualquer carregamento
+//     independente, mesmo não sendo o primeiro do veículo no dia — ver
+//     inicioDeslocamento abaixo): da entrega das notas fiscais (o momento
 //     real da saída do CD — ver REGISTRAR_ENTREGA_NF em AppContext.jsx; cai
 //     para `dataHora` do carregamento se a NF ainda não foi registrada) até
 //     a chegada na loja.
-//   - de uma loja até a próxima, na mesma viagem: da saída registrada numa
-//     loja até a chegada na seguinte.
+//   - de uma loja até a próxima, DENTRO da mesma viagem (mesmo `viagemId`,
+//     carregadas juntas no mesmo caminhão): da saída registrada numa loja
+//     até a chegada na seguinte.
 // Centralizado aqui porque é usado tanto em Motoristas (DriversPage.jsx)
 // quanto no card Andamento das Entregas (AndamentoEntregasCard.jsx), e as
 // duas telas precisam enxergar exatamente a mesma conta.
@@ -28,13 +31,29 @@ export function ordenarEntregasDaViagem(entregas) {
 
 /**
  * Horário em que o motorista saiu rumo a esta entrega: a saída da loja
- * anterior na mesma viagem (`null` se a loja anterior ainda não tem saída
- * registrada — o deslocamento desta ainda nem começou), ou — se for a
- * primeira parada da viagem — a entrega das notas fiscais (cai para
- * `dataHora` do carregamento se ainda não houver NF registrada).
+ * anterior, MAS só quando as duas entregas são de verdade a mesma viagem —
+ * carregadas juntas no mesmo caminhão, numa viagem com várias lojas (mesmo
+ * `viagemId`, ver FINALIZAR_CARREGAMENTO_MULTIPLO em AppContext.jsx).
+ * `null` se a loja anterior ainda não tem saída registrada (o deslocamento
+ * desta ainda nem começou).
+ *
+ * Fora desse caso — cada protocolo é um carregamento independente, feito de
+ * novo no CD, mesmo que o veículo seja o mesmo e tenha sido logo depois do
+ * anterior. Isso inclui o caso de entrega parcial: quando sobra saldo, ele
+ * volta pra fila e é carregado de novo depois, gerando um protocolo novo
+ * pra MESMA loja — mas é uma saída nova do CD, não uma continuação da
+ * viagem anterior. Por isso aqui conta como se fosse a primeira parada de
+ * uma viagem nova: a partir da entrega das notas fiscais deste próprio
+ * protocolo (cai para `dataHora` do carregamento se a NF ainda não foi
+ * registrada). Sem essa checagem, o saldo de uma entrega parcial acabava
+ * herdando o deslocamento (e o tempo) da primeira entrega, em vez de ter o
+ * seu próprio.
  */
 export function inicioDeslocamento(entrega, entregaAnterior) {
-  if (entregaAnterior) return entregaAnterior.saidaLoja || null;
+  const mesmaViagem = Boolean(
+    entregaAnterior && entrega.viagemId && entregaAnterior.viagemId === entrega.viagemId
+  );
+  if (mesmaViagem) return entregaAnterior.saidaLoja || null;
   return entrega.entregaNotasFiscais || entrega.dataHora;
 }
 
