@@ -21,6 +21,9 @@ import { ChevronDown, Search } from 'lucide-react';
 // vazio — a validação em si (bloquear o envio) continua sendo feita pelo
 // formulário que usa este componente, já que um <button> não participa da
 // validação nativa de obrigatoriedade do HTML.
+// `mensagemVazia`: texto mostrado quando a lista de opções está vazia —
+// usado, por exemplo, quando o chamador já filtrou a lista (ex.: só placas
+// disponíveis) e quer explicar o motivo em vez do texto genérico padrão.
 export default function SeletorCadastro({
   opcoes,
   valor,
@@ -30,6 +33,7 @@ export default function SeletorCadastro({
   temErro = false,
   disabled = false,
   className = '',
+  mensagemVazia = 'Nada encontrado. Cadastre em Cadastros.',
 }) {
   const [aberto, setAberto] = useState(false);
   const [busca, setBusca] = useState('');
@@ -130,7 +134,7 @@ export default function SeletorCadastro({
           <ul className="max-h-48 overflow-y-auto py-1">
             {filtradas.length === 0 && (
               <li className="px-3 py-2 text-xs text-slate-400 dark:text-slate-500">
-                Nada encontrado. Cadastre em Cadastros.
+                {normalizadas.length === 0 ? mensagemVazia : 'Nada encontrado para essa busca.'}
               </li>
             )}
             {filtradas.map((o, i) => (

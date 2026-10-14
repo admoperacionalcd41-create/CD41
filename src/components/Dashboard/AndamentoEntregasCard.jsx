@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowRight, AlertTriangle, Package, Truck, MapPinned, CheckCircle2, Clock } from 'lucide-react';
+import { ArrowRight, AlertTriangle, Package, Truck, MapPinned, CheckCircle2, Clock, FileClock } from 'lucide-react';
 import { useApp } from '../../context/AppContext.jsx';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
 import { eHoje, formatarHora, formatarData, formatarDuracao } from '../../utils/dateHelpers';
@@ -21,6 +21,21 @@ const CHAVE_TEMPO_LIMITE = 'doca-manager:tempo-limite-loja-min';
 // de uma entrega num piscar de olhos, sem precisar ler a palavra — útil
 // numa grade com vários veículos ao mesmo tempo, como na aba Box / Frota.
 const STATUS_ENTREGA = {
+  // Pedido do usuário: "o status de A CAMINHO precisa ser iniciado somente
+  // ao registrar a entrega das NFs" — antes, "A caminho" era o estado
+  // padrão assim que o protocolo de carregamento era finalizado, mesmo que
+  // o motorista ainda estivesse parado no CD esperando o faturista terminar
+  // a nota fiscal. Agora isso vira um estágio PRÉVIO próprio ("Aguardando
+  // NF") — "A caminho" só começa quando `entregaNotasFiscais` é registrado
+  // (ver REGISTRAR_ENTREGA_NF em AppContext.jsx), que é o mesmo momento já
+  // usado como "saída real do CD" no cálculo de deslocamento
+  // (ver utils/deslocamento.js).
+  aguardando_nf: {
+    texto: 'Aguardando NF',
+    Icone: FileClock,
+    corBadge: 'bg-blue-50 text-blue-600 dark:border dark:border-current dark:bg-blue-500/10 dark:text-blue-300',
+    corIcone: 'text-blue-500 dark:text-blue-400',
+  },
   aguardando: {
     texto: 'A caminho',
     Icone: Truck,
@@ -63,6 +78,7 @@ function corBordaVeiculo(entregas, agoraMs, limiteMs) {
   if (chaves.includes('na_loja_atrasada')) return 'border-l-red-400 dark:border-l-red-500';
   if (chaves.includes('na_loja')) return 'border-l-amber-400 dark:border-l-amber-500';
   if (chaves.includes('aguardando')) return 'border-l-slate-300 dark:border-l-slate-600';
+  if (chaves.includes('aguardando_nf')) return 'border-l-blue-300 dark:border-l-blue-700';
   return 'border-l-emerald-400 dark:border-l-emerald-500';
 }
 
@@ -86,6 +102,9 @@ function getStatusEntrega(protocolo, agoraMs, limiteMs) {
     }
     return 'na_loja';
   }
+  // "A caminho" só começa quando a NF foi entregue ao motorista — até lá,
+  // o carregamento já está pronto mas o veículo ainda está parado no CD.
+  if (!protocolo.entregaNotasFiscais) return 'aguardando_nf';
   return 'aguardando';
 }
 
@@ -186,17 +205,14 @@ export default function AndamentoEntregasCard({ irPara, compacto = false }) {
       veiculo.entregas.forEach((entrega) => {
         const statusChave = getStatusEntrega(entrega, agoraMs, limiteMs);
         contagem.total += 1;
-        if (statusChave === 'aguardando') contagem.aguardando += 1;
+        // "Aguardando NF" agora é um estágio próprio, antes do "A caminho"
+        // (ver getStatusEntrega acima) — por isso entra numa contagem
+        // separada, e não mais dentro de "aguardando".
+        if (statusChave === 'aguardando_nf') contagem.aguardandoNF += 1;
+        else if (statusChave === 'aguardando') contagem.aguardando += 1;
         else if (statusChave === 'na_loja' || statusChave === 'na_loja_atrasada') contagem.naLoja += 1;
         else contagem.concluida += 1;
         if (statusChave === 'na_loja_atrasada') contagem.atrasadas += 1;
-        // Fatia mais fina de "A caminho": carregamento já registrado, mas o
-        // motorista ainda nem saiu de fato do CD — a nota fiscal ainda não
-        // foi entregue a ele (ver REGISTRAR_ENTREGA_NF em AppContext.jsx).
-        // Não muda nenhuma das contagens acima (continua contando como "A
-        // caminho" pros fins já existentes); é só uma visão a mais, pro
-        // faturista enxergar a fila de carregamentos esperando NF.
-        if (!entrega.entregaNotasFiscais && !entrega.chegadaLoja) contagem.aguardandoNF += 1;
       });
     });
     return contagem;
@@ -261,20 +277,11 @@ export default function AndamentoEntregasCard({ irPara, compacto = false }) {
                 <p className={`${textStat} font-bold leading-tight text-slate-800 dark:text-slate-100`}>{resumoEntregas.total}</p>
               </span>
             </div>
-            <div className={`flex items-center gap-2 rounded-lg border border-slate-100 ${padStat} dark:border-slate-700`}>
-              <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-300">
-                <Truck size={14} />
-              </span>
-              <span>
-                <p className="text-[11px] font-medium text-slate-400 dark:text-slate-500">A caminho</p>
-                <p className={`${textStat} font-bold leading-tight text-slate-600 dark:text-slate-300`}>{resumoEntregas.aguardando}</p>
-              </span>
-            </div>
-            {/* Pedido do usuário (ver REGISTRAR_ENTREGA_NF em AppContext.jsx):
-                visibilidade de quantos carregamentos já feitos ainda estão
-                parados no CD esperando o faturista terminar a nota fiscal —
-                hoje esse tempo ficava invisível, escondido dentro de "A
-                caminho". Mostra 0 quando não há nenhum, igual às outras. */}
+            {/* Estágio anterior ao "A caminho": carregamento já feito, mas o
+                veículo ainda está parado no CD esperando o faturista
+                terminar a nota fiscal (ver REGISTRAR_ENTREGA_NF em
+                AppContext.jsx e getStatusEntrega acima). Mostra 0 quando não
+                há nenhum, igual às outras. */}
             <div className={`flex items-center gap-2 rounded-lg border ${padStat} ${resumoEntregas.aguardandoNF > 0 ? 'border-blue-200 dark:border-blue-900/60' : 'border-slate-100 dark:border-slate-700'}`}>
               <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-500 dark:bg-blue-500/10 dark:text-blue-400">
                 <Clock size={14} />
@@ -282,6 +289,17 @@ export default function AndamentoEntregasCard({ irPara, compacto = false }) {
               <span>
                 <p className="text-[11px] font-medium text-slate-400 dark:text-slate-500">Aguardando NF</p>
                 <p className={`${textStat} font-bold leading-tight text-blue-600 dark:text-blue-400`}>{resumoEntregas.aguardandoNF}</p>
+              </span>
+            </div>
+            <div className={`flex items-center gap-2 rounded-lg border border-slate-100 ${padStat} dark:border-slate-700`}>
+              <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-300">
+                <Truck size={14} />
+              </span>
+              <span>
+                {/* Só começa a contar depois que a NF é entregue — ver
+                    getStatusEntrega acima. */}
+                <p className="text-[11px] font-medium text-slate-400 dark:text-slate-500">A caminho</p>
+                <p className={`${textStat} font-bold leading-tight text-slate-600 dark:text-slate-300`}>{resumoEntregas.aguardando}</p>
               </span>
             </div>
             <div className={`flex items-center gap-2 rounded-lg border border-slate-100 ${padStat} dark:border-slate-700`}>
@@ -324,6 +342,13 @@ export default function AndamentoEntregasCard({ irPara, compacto = false }) {
               tamanho do trecho verde a olho. */}
           <div className={`${compacto ? 'mt-2' : 'mt-3'} flex items-center gap-2`}>
             <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-700">
+              {resumoEntregas.aguardandoNF > 0 && (
+                <div
+                  className="h-full bg-blue-300 dark:bg-blue-600"
+                  style={{ width: `${(resumoEntregas.aguardandoNF / resumoEntregas.total) * 100}%` }}
+                  title={`${resumoEntregas.aguardandoNF} aguardando NF`}
+                />
+              )}
               {resumoEntregas.aguardando > 0 && (
                 <div
                   className="h-full bg-slate-300 dark:bg-slate-500"

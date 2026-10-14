@@ -112,6 +112,18 @@ export default function LoadingProtocolForm({ lojas, aoFechar, aoRegistrar }) {
     (p) => p.placa === placa.trim().toUpperCase()
   );
 
+  // Pedido do usuário: no menu de Placa/Motorista do protocolo, mostrar só
+  // quem está DISPONÍVEL — ou seja, excluir placas/motoristas que ainda
+  // estão em viagem (têm algum protocolo sem a saída da loja registrada,
+  // `saidaLoja`). Um veículo/motorista só volta a aparecer na lista quando
+  // a última entrega pendente dele for fechada. Considera qualquer
+  // protocolo pendente (não só o de hoje), igual ao card "Andamento das
+  // Entregas" do Dashboard — ver AndamentoEntregasCard.jsx.
+  const placasEmUso = new Set((state.protocolos || []).filter((p) => !p.saidaLoja).map((p) => p.placa));
+  const motoristasEmUso = new Set((state.protocolos || []).filter((p) => !p.saidaLoja).map((p) => p.motorista));
+  const placasDisponiveis = (state.placasCadastradas || []).filter((p) => !placasEmUso.has(p.placa));
+  const motoristasDisponiveis = (state.motoristasCadastrados || []).filter((m) => !motoristasEmUso.has(m));
+
   // A quantidade enviada de cada loja (fluxo em lote) vem sempre do que o
   // operador digitou — não é mais calculada a partir de quantos paletes
   // foram marcados como "ficando" no box.
@@ -455,7 +467,7 @@ export default function LoadingProtocolForm({ lojas, aoFechar, aoRegistrar }) {
             <div>
               <label className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Placa do veículo</label>
               <SeletorCadastro
-                opcoes={(state.placasCadastradas || []).map((p) => ({
+                opcoes={placasDisponiveis.map((p) => ({
                   valor: p.placa,
                   rotulo: p.placa,
                   extra: p.possuiPlataforma ? 'c/ plataforma' : null,
@@ -463,6 +475,7 @@ export default function LoadingProtocolForm({ lojas, aoFechar, aoRegistrar }) {
                 valor={placa}
                 onSelecionar={setPlaca}
                 placeholder="Selecione a placa"
+                mensagemVazia="Nenhuma placa disponível — todas em viagem ou nada cadastrado."
               />
               {placaCadastrada && (
                 <p
@@ -479,10 +492,11 @@ export default function LoadingProtocolForm({ lojas, aoFechar, aoRegistrar }) {
             <div>
               <label className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Motorista</label>
               <SeletorCadastro
-                opcoes={state.motoristasCadastrados || []}
+                opcoes={motoristasDisponiveis}
                 valor={motorista}
                 onSelecionar={setMotorista}
                 placeholder="Selecione o motorista"
+                mensagemVazia="Nenhum motorista disponível — todos em viagem ou nada cadastrado."
               />
             </div>
           </div>
