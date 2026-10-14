@@ -33,12 +33,16 @@ function Etiqueta({ loja, indice, total }) {
       <div className="flex items-center justify-between border-b-2 border-slate-800 pb-1.5">
         <span className="text-xs font-black uppercase tracking-wide text-slate-500">PALETE {indice}/{total}</span>
         <div className="flex items-center gap-1.5">
-          {/* Na impressão (ribbon) essas duas caixinhas saem em preto sólido
-              — ver .caixa-tipo/.caixa-box em montarHtmlImpressao — porque o
-              preenchimento colorido saía "apagado". A pré-visualização em
-              tela usa o mesmo preto só na caixinha de Box (a de Tipo mantém
-              a cor do TipoCargaBadge padrão do app, usado em várias outras
-              telas, só aqui na etiqueta impressa que vira preto). */}
+          {/* Na impressão (ribbon) essas duas informações saem como texto
+              preto puro, sem nenhuma caixinha preenchida — ver
+              .caixa-tipo/.caixa-box em montarHtmlImpressao: até o
+              preenchimento preto sólido saía "apagado" nessa impressora
+              (área grande de tinta sólida é o problema, não a cor). A
+              pré-visualização em tela não tem esse problema (é tela, não
+              impressão térmica), então mantém o badge colorido padrão do
+              app (TipoCargaBadge, usado em várias outras telas) só aqui
+              como referência visual rápida — o que importa é o resultado
+              impresso, que é só texto preto. */}
           <TipoCargaBadge tipo={loja.tipoCarga} />
           <span className="rounded bg-black px-2 py-0.5 text-xs font-bold text-white">{getNomeBox(loja.boxNumero).toUpperCase()}</span>
         </div>
@@ -146,13 +150,16 @@ function montarHtmlImpressao(loja, total) {
     .cabecalho { display: flex; align-items: center; justify-content: space-between; border-bottom: 1pt solid #000; padding-bottom: 1mm; }
     .titulo { font-size: 9pt; font-weight: 800; letter-spacing: 0.5pt; color: #000; text-transform: uppercase; }
     /* Pedido do usuário: numa impressora ribbon, as duas caixinhas
-       (Seca/Resfriada e Box) saíam "apagadas" — o preenchimento colorido
-       (laranja/ciano/azul-marinho) depende da impressora converter a cor
-       pra cinza, e isso costuma sair fraco/desigual no ribbon. Trocado por
-       preto sólido puro (#000) nas duas, sem depender de conversão de
-       cor nenhuma — sai sempre com o máximo de contraste possível. */
-    .caixa-box { background: #000; color: #fff; font-size: 8pt; font-weight: 800; padding: 0.8mm 2.5mm; border-radius: 1mm; }
-    .caixa-tipo { background: #000; color: #fff; font-size: 8pt; font-weight: 800; padding: 0.8mm 2.5mm; border-radius: 1mm; margin-right: 1.5mm; }
+       (Seca/Resfriada e Box) saíam "apagadas". Primeiro trocamos o
+       preenchimento colorido por preto sólido (#000) com texto branco —
+       mas até PREENCHIMENTO PRETO saiu fraco/desigual nessa impressora
+       (impressora ribbon tem dificuldade com áreas grandes de tinta
+       sólida, mesmo em preto — texto fino sai sempre melhor que uma área
+       preenchida). Pedido do usuário então foi direto: "toda fonte seja
+       preta" — nada de caixinha preenchida, só texto preto em negrito,
+       igual ao resto da etiqueta (que já imprime bem). */
+    .caixa-box { color: #000; background: transparent; font-size: 9pt; font-weight: 800; text-transform: uppercase; }
+    .caixa-tipo { color: #000; background: transparent; font-size: 9pt; font-weight: 800; text-transform: uppercase; margin-right: 2.5mm; padding-right: 2.5mm; border-right: 1pt solid #000; }
     .grupo-badges { display: flex; align-items: center; }
 
     .loja-destaque { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 0; }

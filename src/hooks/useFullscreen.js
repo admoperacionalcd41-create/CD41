@@ -22,6 +22,42 @@ export function useFullscreen() {
     return () => document.removeEventListener('fullscreenchange', aoMudar);
   }, []);
 
+  // Pedido do usuário: no celular, o app deve "já vir expandido" (em tela
+  // cheia), sem precisar tocar no botão de expandir manualmente toda vez
+  // que abre. Nenhum navegador permite pedir tela cheia sozinho assim que a
+  // página carrega — a Fullscreen API só aceita o pedido como resposta
+  // DIRETA a um gesto do usuário (toque/clique), por segurança, senão
+  // qualquer site poderia forçar tela cheia sem o usuário querer. Por isso,
+  // em telas de celular, assim que o usuário toca em QUALQUER lugar da tela
+  // pela primeira vez, entramos em tela cheia automaticamente — na prática
+  // o app "abre expandido", já que isso acontece no primeiríssimo toque,
+  // antes de qualquer outra ação dele. O botão manual (ver Header.jsx)
+  // continua existindo, tanto pra quem está no desktop (onde este efeito
+  // nem roda) quanto como alternativa caso esse primeiro toque automático
+  // não funcione por algum motivo (ex.: iPhone — o Safari no iOS não
+  // suporta a Fullscreen API nenhuma, então nem o botão manual aparece lá).
+  useEffect(() => {
+    if (!suportado) return;
+    const ehCelular = window.matchMedia('(max-width: 768px)').matches;
+    if (!ehCelular || document.fullscreenElement) return;
+
+    let jaTentou = false;
+    function aoPrimeiroToque() {
+      if (jaTentou) return;
+      jaTentou = true;
+      document.documentElement.requestFullscreen?.().catch(() => {
+        // Pedido negado pelo navegador — sem travar nada, o app continua
+        // funcionando normalmente, só sem entrar em tela cheia sozinho.
+      });
+    }
+    document.addEventListener('pointerdown', aoPrimeiroToque, { once: true });
+    document.addEventListener('click', aoPrimeiroToque, { once: true });
+    return () => {
+      document.removeEventListener('pointerdown', aoPrimeiroToque);
+      document.removeEventListener('click', aoPrimeiroToque);
+    };
+  }, [suportado]);
+
   const alternarTelaCheia = useCallback(() => {
     if (!document.fullscreenElement) {
       document.documentElement.requestFullscreen?.().catch(() => {
