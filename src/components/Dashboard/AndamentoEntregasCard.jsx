@@ -1,16 +1,30 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowRight, AlertTriangle, Package, Truck, MapPinned, CheckCircle2, Clock, FileClock } from 'lucide-react';
+import { ArrowRight, AlertTriangle, Package, Truck, MapPinned, CheckCircle2, Clock, FileClock, Volume2, VolumeX } from 'lucide-react';
 import { useApp } from '../../context/AppContext.jsx';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
 import { eHoje, formatarHora, formatarData, formatarDuracao } from '../../utils/dateHelpers';
 import { lojaPassaFiltroTipoCarga } from '../../utils/tipoCarga';
 import { ordenarEntregasDaViagem, calcularDeslocamento } from '../../utils/deslocamento';
 import { diaReferenciaProtocolo } from '../../utils/selectors';
+import { tocarAlertaAtraso } from '../../utils/alertaSonoro';
 
 // Chave usada para lembrar o tempo-limite configurado (fica salvo no
 // navegador, como o restante do estado do app) — compartilhada entre o
 // Dashboard e a aba Box / Frota, já que é o mesmo card nas duas telas.
 const CHAVE_TEMPO_LIMITE = 'doca-manager:tempo-limite-loja-min';
+// Mesma ideia para o alerta sonoro ligado/desligado.
+const CHAVE_ALERTA_SONORO = 'doca-manager:alerta-sonoro-atraso';
+
+// Protocolos que já dispararam o bip de atraso — em escopo de MÓDULO (não
+// um estado do componente), de propósito: a aba Box / Frota e o Dashboard
+// montam/desmontam esse card toda vez que o usuário troca de aba (ver
+// App.jsx, que só renderiza a aba ativa), e um estado comum do React
+// reiniciaria do zero a cada troca — tocando o bip de novo pra uma entrega
+// que já tinha sido avisada, só porque o usuário foi olhar outra aba e
+// voltou. Guardando aqui fora, o aviso continua valendo "uma vez por
+// entrega atrasada" durante toda a sessão da página (só reinicia se a
+// página for recarregada).
+const protocolosJaAlertados = new Set();
 
 // Estágios da entrega de uma loja, a partir do protocolo registrado no
 // carregamento (placa/motorista) e dos horários de chegada/saída na loja
@@ -218,6 +232,41 @@ export default function AndamentoEntregasCard({ irPara, compacto = false }) {
     return contagem;
   }, [entregasPorVeiculo, agoraMs, limiteMs]);
 
+  // Pedido do usuário: tocar um bip quando uma entrega passa a "Na loja
+  // (atrasada)" — o alerta vermelho na tela já existia, mas numa operação
+  // corrida é fácil não notar visualmente. Dispara só no momento em que uma
+  // entrega ENTRA nesse estado (comparando com `protocolosJaAlertados`,
+  // escopo de módulo — ver comentário lá em cima do arquivo), nunca de novo
+  // a cada atualização dos 30s enquanto ela continuar atrasada, senão viraria
+  // um bipe sem parar. Entregas que saem desse estado (ex.: tempo-limite
+  // aumentado, ou que finalmente tiveram a saída registrada) são removidas
+  // do controle, pra poder alertar de novo caso voltem a ficar atrasadas no
+  // futuro (ex.: tempo-limite reduzido de novo).
+  const [alertaSonoroAtivo, setAlertaSonoroAtivo] = useLocalStorage(CHAVE_ALERTA_SONORO, true);
+  useEffect(() => {
+    const idsAtrasadosAgora = new Set();
+    entregasPorVeiculo.forEach((veiculo) => {
+      veiculo.entregas.forEach((entrega) => {
+        if (getStatusEntrega(entrega, agoraMs, limiteMs) === 'na_loja_atrasada') {
+          idsAtrasadosAgora.add(entrega.id);
+        }
+      });
+    });
+
+    let apareceuNovaAtrasada = false;
+    idsAtrasadosAgora.forEach((id) => {
+      if (!protocolosJaAlertados.has(id)) {
+        protocolosJaAlertados.add(id);
+        apareceuNovaAtrasada = true;
+      }
+    });
+    protocolosJaAlertados.forEach((id) => {
+      if (!idsAtrasadosAgora.has(id)) protocolosJaAlertados.delete(id);
+    });
+
+    if (apareceuNovaAtrasada && alertaSonoroAtivo) tocarAlertaAtraso();
+  }, [entregasPorVeiculo, agoraMs, limiteMs, alertaSonoroAtivo]);
+
   const padCard = compacto ? 'p-3' : 'p-5';
   const mbHeader = compacto ? 'mb-2' : 'mb-4';
   const padStat = compacto ? 'p-1.5' : 'p-3';
@@ -246,6 +295,22 @@ export default function AndamentoEntregasCard({ irPara, compacto = false }) {
             />
             min
           </label>
+          {/* Liga/desliga o bip de atraso (ver useEffect acima) — fica salvo
+              no navegador, igual ao tempo-limite, então a preferência do
+              operador continua valendo nas próximas visitas à tela. */}
+          <button
+            type="button"
+            onClick={() => setAlertaSonoroAtivo((atual) => !atual)}
+            title={alertaSonoroAtivo ? 'Alerta sonoro ligado — clique para desligar' : 'Alerta sonoro desligado — clique para ligar'}
+            className={`flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium transition-colors ${
+              alertaSonoroAtivo
+                ? 'border-slate-300 text-slate-500 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-400 dark:hover:bg-slate-700'
+                : 'border-red-200 bg-red-50 text-red-500 hover:bg-red-100 dark:border-red-900/60 dark:bg-red-500/10 dark:text-red-400'
+            }`}
+          >
+            {alertaSonoroAtivo ? <Volume2 size={14} /> : <VolumeX size={14} />}
+            {!compacto && (alertaSonoroAtivo ? 'Som ligado' : 'Som desligado')}
+          </button>
           {irPara && (
             <button
               onClick={() => irPara('motoristas')}
