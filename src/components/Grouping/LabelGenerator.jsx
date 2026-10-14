@@ -6,6 +6,17 @@ import { imprimirHtml } from '../../utils/imprimirHtml';
 import { getTipoCarga } from '../../utils/tipoCarga';
 import TipoCargaBadge from '../Shared/TipoCargaBadge.jsx';
 
+// Classe de tamanho do número da Loja na pré-visualização — mesma lógica
+// adaptativa por comprimento do código usada na impressão (ver
+// tamanhoFonteLojaPt mais abaixo), só que com classes Tailwind.
+function tamanhoTailwindLoja(codigo) {
+  const tamanho = String(codigo || '').length;
+  if (tamanho <= 4) return 'text-6xl';
+  if (tamanho <= 6) return 'text-5xl';
+  if (tamanho <= 8) return 'text-4xl';
+  return 'text-3xl';
+}
+
 // Pré-visualização em tela (dentro do modal) — usa a mesma hierarquia visual
 // da etiqueta impressa (Loja em destaque bem maior que o resto), só que com
 // classes Tailwind em vez do CSS de impressão de montarHtmlImpressao.
@@ -22,16 +33,24 @@ function Etiqueta({ loja, indice, total }) {
       <div className="flex items-center justify-between border-b-2 border-slate-800 pb-1.5">
         <span className="text-xs font-black uppercase tracking-wide text-slate-500">PALETE {indice}/{total}</span>
         <div className="flex items-center gap-1.5">
+          {/* Na impressão (ribbon) essas duas caixinhas saem em preto sólido
+              — ver .caixa-tipo/.caixa-box em montarHtmlImpressao — porque o
+              preenchimento colorido saía "apagado". A pré-visualização em
+              tela usa o mesmo preto só na caixinha de Box (a de Tipo mantém
+              a cor do TipoCargaBadge padrão do app, usado em várias outras
+              telas, só aqui na etiqueta impressa que vira preto). */}
           <TipoCargaBadge tipo={loja.tipoCarga} />
-          <span className="rounded bg-slate-800 px-2 py-0.5 text-xs font-bold text-white">{getNomeBox(loja.boxNumero).toUpperCase()}</span>
+          <span className="rounded bg-black px-2 py-0.5 text-xs font-bold text-white">{getNomeBox(loja.boxNumero).toUpperCase()}</span>
         </div>
       </div>
       <div className="flex flex-col items-center justify-center py-2">
         <p className="text-[10px] uppercase tracking-widest text-slate-400">Loja</p>
-        {/* Número da Loja = "nome principal" da etiqueta (pedido do
-            usuário pra aumentar ainda mais) — ver mesmo ajuste em
-            .loja-valor, montarHtmlImpressao abaixo. */}
-        <p className="text-6xl font-black leading-none">{loja.loja}</p>
+        {/* Número da Loja = "nome principal" da etiqueta — pedido do
+            usuário pra dar o máximo de ênfase possível, de forma a dar pra
+            ler de longe. Tamanho adapta pelo comprimento do código (ver
+            tamanhoTailwindLoja acima / tamanhoFonteLojaPt na impressão,
+            abaixo), pra não estourar a etiqueta com códigos mais longos. */}
+        <p className={`${tamanhoTailwindLoja(loja.loja)} font-black leading-none`}>{loja.loja}</p>
         {composicao && <p className="text-[10px] font-semibold text-slate-500">Lotes: {composicao}</p>}
       </div>
       <div className="flex items-end justify-between gap-2 text-xs">
@@ -44,8 +63,11 @@ function Etiqueta({ loja, indice, total }) {
           <p className="truncate font-bold">{loja.nomeLoja}</p>
         </div>
         <div className="min-w-0">
-          <p className="text-[9px] font-bold uppercase text-slate-700">Paletes</p>
-          <p className="font-bold">{total}</p>
+          {/* Pedido do usuário: aumentar mais o rótulo e a quantidade de
+              Paletes também — mesmo destaque que o Nome da Loja já tinha
+              (ver .rodape-valor-paletes em montarHtmlImpressao). */}
+          <p className="text-[10px] font-extrabold uppercase text-slate-700">Paletes</p>
+          <p className="text-xl font-black leading-tight">{total}</p>
         </div>
       </div>
       <div className="flex items-end justify-between gap-2 text-[10px]">
@@ -72,14 +94,32 @@ const ALTURA_ETIQUETA_MM = 50;
 // separar as cargas no box/caminhão, então ele ocupa a maior parte da
 // etiqueta, em fonte bem grande — o resto das informações fica compacto
 // nas bordas.
+// Tamanho do número da Loja (o "nome principal" da etiqueta, pedido do
+// usuário pra aumentar bastante — precisa dar pra ler de longe) se adapta
+// ao comprimento do código: a maioria dos códigos é curta (3-4 caracteres,
+// ex. "0406") e aproveita o tamanho máximo; já um código mais longo (ex.
+// "LOJA44") usa uma fonte um pouco menor, só o suficiente pra não estourar
+// a largura/altura fixa da etiqueta (100mm x 50mm) — sem isso, um código
+// longo em fonte gigante ficaria cortado pela borda da etiqueta.
+function tamanhoFonteLojaPt(codigo) {
+  // Valores calibrados medindo a largura/altura REAL renderizada (fonte em
+  // peso 900, bem mais larga por caractere que um peso normal) contra o
+  // espaço disponível na etiqueta de verdade — cada um é o maior tamanho
+  // que ainda sobra uma margem de segurança sem cortar nem invadir o
+  // rodapé, pra funcionar de forma confiável em impressoras reais (não só
+  // no preview do navegador).
+  const tamanho = String(codigo || '').length;
+  if (tamanho <= 4) return 64;
+  if (tamanho <= 6) return 60;
+  if (tamanho <= 8) return 46;
+  return 36;
+}
+
 function montarHtmlImpressao(loja, total) {
   const etiquetas = Array.from({ length: total }, (_, i) => i + 1);
   const composicaoPaletes = loja.composicaoPaletes || [];
   const tipoCfg = getTipoCarga(loja.tipoCarga);
-  // Cores sólidas equivalentes às usadas em tela (laranja para Seca, ciano
-  // para Resfriada) — aqui em hex porque a impressão é um documento HTML
-  // isolado, sem acesso às classes Tailwind do app.
-  const corTipo = tipoCfg.chave === 'resfriada' ? '#0891b2' : '#c2410c';
+  const tamanhoFonteLoja = tamanhoFonteLojaPt(loja.loja);
   const estilo = `
     * { box-sizing: border-box; }
     @page { size: ${LARGURA_ETIQUETA_MM}mm ${ALTURA_ETIQUETA_MM}mm; margin: 0; }
@@ -88,7 +128,11 @@ function montarHtmlImpressao(loja, total) {
     .etiqueta {
       width: ${LARGURA_ETIQUETA_MM}mm;
       height: ${ALTURA_ETIQUETA_MM}mm;
-      padding: 2.5mm 4mm;
+      /* Padding um pouco mais enxuto que antes (era 2.5mm/4mm) — pedido do
+         usuário pra dar mais ênfase/tamanho ao número da Loja, então esse
+         espaço sobrando foi realocado pro número em vez de ficar de
+         margem. */
+      padding: 1.8mm 3.5mm;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
@@ -99,18 +143,25 @@ function montarHtmlImpressao(loja, total) {
       overflow: hidden;
     }
     .etiqueta:last-child { page-break-after: auto; break-after: auto; }
-    .cabecalho { display: flex; align-items: center; justify-content: space-between; border-bottom: 1pt solid #1e293b; padding-bottom: 1.5mm; }
+    .cabecalho { display: flex; align-items: center; justify-content: space-between; border-bottom: 1pt solid #000; padding-bottom: 1mm; }
     .titulo { font-size: 9pt; font-weight: 800; letter-spacing: 0.5pt; color: #000; text-transform: uppercase; }
-    .caixa-box { background: #1e293b; color: #fff; font-size: 8pt; font-weight: 700; padding: 0.8mm 2.5mm; border-radius: 1mm; }
-    .caixa-tipo { background: ${corTipo}; color: #fff; font-size: 8pt; font-weight: 700; padding: 0.8mm 2.5mm; border-radius: 1mm; margin-right: 1.5mm; }
+    /* Pedido do usuário: numa impressora ribbon, as duas caixinhas
+       (Seca/Resfriada e Box) saíam "apagadas" — o preenchimento colorido
+       (laranja/ciano/azul-marinho) depende da impressora converter a cor
+       pra cinza, e isso costuma sair fraco/desigual no ribbon. Trocado por
+       preto sólido puro (#000) nas duas, sem depender de conversão de
+       cor nenhuma — sai sempre com o máximo de contraste possível. */
+    .caixa-box { background: #000; color: #fff; font-size: 8pt; font-weight: 800; padding: 0.8mm 2.5mm; border-radius: 1mm; }
+    .caixa-tipo { background: #000; color: #fff; font-size: 8pt; font-weight: 800; padding: 0.8mm 2.5mm; border-radius: 1mm; margin-right: 1.5mm; }
     .grupo-badges { display: flex; align-items: center; }
 
-    .loja-destaque { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-    .loja-rotulo { font-size: 7pt; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5pt; color: #000; margin: 0; }
+    .loja-destaque { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 0; }
+    .loja-rotulo { font-size: 6pt; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5pt; color: #000; margin: 0; }
     /* Número da Loja é o "nome principal" da etiqueta — pedido do usuário
-       pra aumentar ainda mais esse valor (era 44pt), já que é o elemento
-       que o operador usa pra separar as cargas no box/caminhão. */
-    .loja-valor { font-size: 58pt; font-weight: 900; line-height: 1; color: #000; margin: 0.5mm 0 0; }
+       pra dar o máximo de ênfase possível, pra dar pra ler de longe com
+       facilidade. Tamanho calculado em tamanhoFonteLojaPt (acima), que
+       adapta pelo comprimento do código pra nunca estourar a etiqueta. */
+    .loja-valor { font-size: ${tamanhoFonteLoja}pt; font-weight: 900; line-height: 1; color: #000; margin: 0.4mm 0 0; white-space: nowrap; }
 
     .rodape-campos { display: flex; align-items: flex-end; gap: 3mm; }
     .rodape-campo { min-width: 0; }
@@ -126,10 +177,17 @@ function montarHtmlImpressao(loja, total) {
        .rodape-campo.destaque) — já tinha sido aumentado antes, bem além do
        tamanho de Carga/Paletes. */
     .rodape-valor-loja { font-size: 13pt; font-weight: 800; color: #000; margin: 0.3mm 0 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    /* Pedido do usuário: aumentar mais o rótulo e a quantidade de Paletes
+       também — é um dos dados mais checados na hora de bater a carga, por
+       isso ganha mais destaque que Carga (mas um pouco menos que o número
+       da Loja acima, que é a prioridade máxima agora pedida pelo usuário —
+       precisa sobrar altura suficiente pra ele). */
+    .rodape-rotulo-paletes { font-size: 7pt; font-weight: 800; text-transform: uppercase; color: #000; margin: 0; }
+    .rodape-valor-paletes { font-size: 15pt; font-weight: 900; line-height: 1.1; color: #000; margin: 0.2mm 0 0; }
 
-    .segunda-linha { display: flex; align-items: flex-end; justify-content: space-between; gap: 3mm; margin-top: 1mm; }
-    .colaboradores { font-size: 9.5pt; font-weight: 700; color: #000; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .data-agrupamento { flex-shrink: 0; font-size: 6pt; font-weight: 700; color: #000; white-space: nowrap; }
+    .segunda-linha { display: flex; align-items: flex-end; justify-content: space-between; gap: 3mm; margin-top: 0.8mm; }
+    .colaboradores { font-size: 8.5pt; font-weight: 700; color: #000; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .data-agrupamento { flex-shrink: 0; font-size: 5.5pt; font-weight: 700; color: #000; white-space: nowrap; }
   `;
 
   const corpo = etiquetas
@@ -152,7 +210,7 @@ function montarHtmlImpressao(loja, total) {
         <div class="rodape-campos">
           <div class="rodape-campo"><p class="rodape-rotulo">Carga</p><p class="rodape-valor">${loja.carga}</p></div>
           <div class="rodape-campo destaque"><p class="rodape-rotulo">Nome da Loja</p><p class="rodape-valor-loja">${loja.nomeLoja}</p></div>
-          <div class="rodape-campo"><p class="rodape-rotulo">Paletes</p><p class="rodape-valor">${total}</p></div>
+          <div class="rodape-campo"><p class="rodape-rotulo-paletes">Paletes</p><p class="rodape-valor-paletes">${total}</p></div>
         </div>
         <div class="segunda-linha">
           <span class="colaboradores">${loja.colaboradores.join(', ') || '—'}</span>
