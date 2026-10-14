@@ -36,24 +36,33 @@ export function useFullscreen() {
   // nem roda) quanto como alternativa caso esse primeiro toque automático
   // não funcione por algum motivo (ex.: iPhone — o Safari no iOS não
   // suporta a Fullscreen API nenhuma, então nem o botão manual aparece lá).
+  //
+  // Importante: só no evento "click" (nunca em "pointerdown"/"touchstart").
+  // A primeira versão disso escutava os dois ao mesmo tempo, pra reagir o
+  // quanto antes — mas vários navegadores/WebViews de Android (confirmado
+  // no celular do usuário) não concedem a permissão de tela cheia ainda
+  // durante o toque (dedo ainda na tela), só depois que o toque é
+  // concluído. Como as duas tentativas compartilhavam a mesma trava (só
+  // tenta uma vez), o pedido feito cedo demais no "pointerdown" já
+  // "gastava" essa trava mesmo sendo negado pelo navegador, e o "click"
+  // seguinte (que teria funcionado) nunca chegava a tentar — por isso o app
+  // ficava preso na versão não-expandida até o toque manual no botão, que
+  // só usa "click" e por isso sempre funcionava. Usando só "click" aqui,
+  // igual ao botão manual (ver alternarTelaCheia abaixo), o primeiro toque
+  // do usuário passa a expandir de verdade.
   useEffect(() => {
     if (!suportado) return;
     const ehCelular = window.matchMedia('(max-width: 768px)').matches;
     if (!ehCelular || document.fullscreenElement) return;
 
-    let jaTentou = false;
     function aoPrimeiroToque() {
-      if (jaTentou) return;
-      jaTentou = true;
       document.documentElement.requestFullscreen?.().catch(() => {
         // Pedido negado pelo navegador — sem travar nada, o app continua
         // funcionando normalmente, só sem entrar em tela cheia sozinho.
       });
     }
-    document.addEventListener('pointerdown', aoPrimeiroToque, { once: true });
     document.addEventListener('click', aoPrimeiroToque, { once: true });
     return () => {
-      document.removeEventListener('pointerdown', aoPrimeiroToque);
       document.removeEventListener('click', aoPrimeiroToque);
     };
   }, [suportado]);
