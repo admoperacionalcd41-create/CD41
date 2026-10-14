@@ -3,6 +3,7 @@ import { X, Users } from 'lucide-react';
 import { useApp } from '../../context/AppContext.jsx';
 import { getNomeBox } from '../../utils/boxLogic';
 import TipoCargaBadge from '../Shared/TipoCargaBadge.jsx';
+import SeletorCadastro from '../Shared/SeletorCadastro.jsx';
 
 const CAMPOS_COLABORADORES = [0, 1, 2, 3];
 
@@ -53,21 +54,16 @@ export default function StartGroupingModal({ loja, aoFechar }) {
           </label>
           <div className="grid grid-cols-2 gap-2">
             {CAMPOS_COLABORADORES.map((i) => (
-              <input
+              <SeletorCadastro
                 key={i}
-                list="lista-colaboradores-agrupamento"
-                value={colaboradores[i]}
-                onChange={(e) => atualizarColaborador(i, e.target.value)}
+                opcoes={state.colaboradoresCadastrados}
+                valor={colaboradores[i]}
+                onSelecionar={(valor) => atualizarColaborador(i, valor)}
                 placeholder={`Colaborador ${i + 1}`}
-                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:border-totvs-500 dark:focus:border-whatsapp-500 focus:outline-none focus:ring-1 focus:ring-totvs-500 dark:focus:ring-whatsapp-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500"
+                permiteVazio
               />
             ))}
           </div>
-          <datalist id="lista-colaboradores-agrupamento">
-            {state.colaboradoresCadastrados.map((nome) => (
-              <option key={nome} value={nome} />
-            ))}
-          </datalist>
         </div>
 
         <button

@@ -1,6 +1,26 @@
 import { eHoje } from './dateHelpers';
 import { lojaPassaFiltroTipoCarga } from './tipoCarga';
 
+/**
+ * "Dia de referência" de um protocolo de carregamento para os relatórios
+ * que agrupam/filtram por data (Meta de Entrega, Entregas por Motorista, e
+ * a data usada na Exportação de Excel desses dois). Normalmente é o dia
+ * real em que o carregamento foi registrado (`protocolo.dataHora`), mas o
+ * operador pode sobrescrever isso informando `diaEntregaReferencia`
+ * (YYYY-MM-DD) na hora de finalizar o carregamento — pedido do usuário:
+ * carregamento feito num dia que só sai (ou só chega na loja) em outro dia,
+ * sem uma regra fixa de "sempre o dia seguinte" (ex.: carregado sexta à
+ * tarde, mas só sai no sábado, ou só na segunda — varia). `dataHora` em si
+ * NUNCA é alterado por isso — continua sendo sempre o horário real do
+ * registro, preservado como auditoria; só a CONTAGEM nos relatórios por
+ * data muda. Funciona com os helpers existentes em dateHelpers.js (eHoje,
+ * eEsteMes, eNoMes, slice(0, N)) porque tanto um datetime ISO completo
+ * quanto uma data "YYYY-MM-DD" pura respondem igual a esses recortes.
+ */
+export function diaReferenciaProtocolo(protocolo) {
+  return protocolo.diaEntregaReferencia || protocolo.dataHora;
+}
+
 /** Lojas cujo dia de referência é o dia operacional atual (state.diaAtual). */
 export function getLojasDoDia(state) {
   return state.lojas.filter((l) => l.diaReferencia === state.diaAtual);
@@ -65,7 +85,7 @@ function getProtocolosDoCodigoLoja(state, codigo, tipoCarga) {
 export function getCodigosEntreguesNaData(state, dataISO, tipoCarga) {
   const codigos = new Set();
   state.protocolos.forEach((p) => {
-    if (!p.dataHora || p.dataHora.slice(0, 10) !== dataISO) return;
+    if (!p.dataHora || diaReferenciaProtocolo(p).slice(0, 10) !== dataISO) return;
     const loja = state.lojas.find((l) => l.id === p.lojaId);
     if (!loja) return;
     if (tipoCarga && loja.tipoCarga !== tipoCarga) return;
@@ -101,7 +121,7 @@ export function getCodigosLojaNoPeriodo(state, diasISO, tipoCarga) {
   // a semana civil vira, a loja "some" da análise por loja mesmo tendo uma
   // entrega de verdade registrada nesta semana.
   state.protocolos.forEach((p) => {
-    if (!p.dataHora || !diasSet.has(p.dataHora.slice(0, 10))) return;
+    if (!p.dataHora || !diasSet.has(diaReferenciaProtocolo(p).slice(0, 10))) return;
     const loja = state.lojas.find((l) => l.id === p.lojaId);
     if (!loja) return;
     if (tipoCarga && loja.tipoCarga !== tipoCarga) return;
@@ -124,7 +144,7 @@ export function getCodigosLojaNoPeriodo(state, diasISO, tipoCarga) {
  */
 export function getEntregaCodigoLojaNaData(state, codigo, dataISO, tipoCarga) {
   const protocolosNoDia = getProtocolosDoCodigoLoja(state, codigo, tipoCarga).filter(
-    (p) => p.dataHora && p.dataHora.slice(0, 10) === dataISO
+    (p) => p.dataHora && diaReferenciaProtocolo(p).slice(0, 10) === dataISO
   );
   const paletes = protocolosNoDia.reduce((soma, p) => soma + (Number(p.paletesEnviados) || 0), 0);
   // Se algum dos protocolos do dia ficou com saldo (envio parcial), marca
@@ -216,10 +236,25 @@ export function getLinhasProcessoDoDia(state, filtroTipoCarga) {
   const cargasHojePorCodigo = new Map();
   getLojasDoDia(state).forEach((loja) => {
     const protocolosDaLoja = state.protocolos.filter((p) => p.lojaId === loja.id);
+    // Pedido do usuário: "os relatórios devem considerar o dia da entrega,
+    // não o dia que carregou o veículo" — vale também aqui (Processo do
+    // Dia e o card de Andamento das Entregas, que reaproveita esta mesma
+    // função). Em vez de `loja.dataCarregamento`/`p.dataHora` (dia real do
+    // registro), usa diaReferenciaProtocolo (dia real, OU o dia informado
+    // em diaEntregaReferencia quando o carregamento foi marcado pra contar
+    // em outro dia — ver LoadingProtocolForm.jsx). Um carregamento marcado
+    // assim só aparece como "Feito" aqui no dia de entrega, não no dia em
+    // que o caminhão saiu de verdade do CD.
+    const protocoloCompletoMaisRecente = protocolosDaLoja
+      .filter((p) => p.statusEnvio === 'completo')
+      .sort((a, b) => new Date(b.dataHora) - new Date(a.dataHora))[0];
+    const diaCompletoRef = protocoloCompletoMaisRecente
+      ? diaReferenciaProtocolo(protocoloCompletoMaisRecente)
+      : loja.dataCarregamento;
     const situacaoChave =
-      loja.status === 'finalizada' && eHoje(loja.dataCarregamento)
+      loja.status === 'finalizada' && eHoje(diaCompletoRef)
         ? 'completo'
-        : protocolosDaLoja.some((p) => p.statusEnvio === 'saldo' && eHoje(p.dataHora))
+        : protocolosDaLoja.some((p) => p.statusEnvio === 'saldo' && eHoje(diaReferenciaProtocolo(p)))
         ? 'parcial'
         : loja.status === 'carregando'
         ? 'em_andamento'
@@ -345,7 +380,9 @@ export function getPermanenciasRegistradas(state, tipoCarga) {
  * ele), contando cada código de loja uma única vez por motorista mesmo que
  * tenha mais de um protocolo pra ela (ex.: uma entrega parcial seguida do
  * saldo, ambas no mesmo veículo). Opcionalmente filtrado por tipo de carga
- * e por uma função de filtro de data (recebe `protocolo.dataHora`).
+ * e por uma função de filtro de data (recebe o dia de referência do
+ * protocolo — ver diaReferenciaProtocolo acima, que já leva em conta um
+ * carregamento marcado pra contar em outro dia).
  */
 export function getEntregasPorMotorista(state, tipoCarga, filtroData) {
   const porMotorista = new Map(); // nome do motorista -> Set de códigos de loja
@@ -353,7 +390,7 @@ export function getEntregasPorMotorista(state, tipoCarga, filtroData) {
   state.protocolos.forEach((p) => {
     const nomeMotorista = (p.motorista || '').trim();
     if (!nomeMotorista) return;
-    if (filtroData && !filtroData(p.dataHora)) return;
+    if (filtroData && !filtroData(diaReferenciaProtocolo(p))) return;
     const loja = state.lojas.find((l) => l.id === p.lojaId);
     if (!loja) return;
     if (tipoCarga && loja.tipoCarga !== tipoCarga) return;

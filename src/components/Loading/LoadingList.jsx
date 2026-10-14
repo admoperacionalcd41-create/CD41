@@ -6,6 +6,7 @@ import {
   formatarDataHora,
   formatarHora,
   formatarDuracao,
+  formatarData,
   paraDataHoraLocalInput,
   deDataHoraLocalInput,
 } from '../../utils/dateHelpers';
@@ -381,7 +382,24 @@ export default function LoadingList({ aoAbrirProtocolo }) {
                           {p.statusEnvio === 'completo' ? 'Completo' : 'Saldo'}
                         </span>
                       </td>
-                      <td className="py-2 pr-3 text-slate-400 dark:text-slate-500">{formatarDataHora(p.dataHora)}</td>
+                      <td className="py-2 pr-3 text-slate-400 dark:text-slate-500">
+                        {formatarDataHora(p.dataHora)}
+                        {/* Pedido do usuário: carregamento registrado hoje
+                            mas que só conta como entrega em outro dia nos
+                            relatórios (ver diaEntregaReferencia no
+                            protocolo) — mostrado aqui pra deixar visível
+                            que esse ajuste foi aplicado, já que dataHora
+                            (acima) continua sempre mostrando o horário real
+                            do registro, sem alteração. */}
+                        {p.diaEntregaReferencia && (
+                          <div
+                            className="mt-0.5 font-semibold text-amber-600 dark:text-amber-400"
+                            title="Esse carregamento conta nos relatórios (Meta de Entrega, Entregas por Motorista, Exportar Excel) como se fosse desse dia, não do dia real do registro acima."
+                          >
+                            Conta como entrega em {formatarData(p.diaEntregaReferencia)}
+                          </div>
+                        )}
+                      </td>
                       <td className="py-2 pr-3">
                         {p.entregaNotasFiscais ? (
                           <div>

@@ -6,6 +6,7 @@ import TipoCargaBadge from '../Shared/TipoCargaBadge.jsx';
 import { lojaPassaFiltroTipoCarga } from '../../utils/tipoCarga';
 import { calcularDistanciaMetros, formatarDistancia, RAIO_GEOFENCE_METROS, buscarEnderecoPorCoordenada } from '../../utils/geo';
 import { mapaDeslocamentoPorVeiculo } from '../../utils/deslocamento';
+import SeletorCadastro from '../Shared/SeletorCadastro.jsx';
 
 // Tela simples para uso dos motoristas: digitam o próprio nome e veem as
 // lojas de entrega dos carregamentos feitos por eles, com um botão grande
@@ -218,6 +219,14 @@ export default function DriversPage() {
     setMotoristaBuscado(limpo || null);
   }
 
+  // Seleção pelo menu suspenso já busca na hora — evita um toque extra no
+  // botão "Buscar" num fluxo pensado pra toque em celular/tablet (ver
+  // comentário no topo do arquivo).
+  function aoSelecionarMotorista(valor) {
+    setMotoristaDigitado(valor);
+    setMotoristaBuscado(valor || null);
+  }
+
   return (
     <div className="mx-auto max-w-2xl space-y-4">
       <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
@@ -227,19 +236,13 @@ export default function DriversPage() {
         </p>
 
         <form onSubmit={aoBuscar} className="mt-4 flex gap-2">
-          <input
-            list="lista-motoristas-motoristas"
-            value={motoristaDigitado}
-            onChange={(evento) => setMotoristaDigitado(evento.target.value)}
-            placeholder="Nome do motorista"
-            autoFocus
-            className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-lg font-semibold text-slate-800 focus:border-totvs-500 dark:focus:border-whatsapp-500 focus:outline-none focus:ring-2 focus:ring-totvs-500 dark:focus:ring-whatsapp-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+          <SeletorCadastro
+            opcoes={state.motoristasCadastrados || []}
+            valor={motoristaDigitado}
+            onSelecionar={aoSelecionarMotorista}
+            placeholder="Selecione o motorista"
+            className="px-4 py-3 text-lg font-semibold"
           />
-          <datalist id="lista-motoristas-motoristas">
-            {(state.motoristasCadastrados || []).map((m) => (
-              <option key={m} value={m} />
-            ))}
-          </datalist>
           <button
             type="submit"
             className="flex-shrink-0 rounded-lg bg-totvs-600 dark:bg-whatsapp-600 px-6 py-3 text-base font-semibold text-white transition-colors hover:bg-totvs-700 dark:hover:bg-whatsapp-700"

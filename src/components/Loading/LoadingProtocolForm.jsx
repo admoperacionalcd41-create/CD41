@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
-import { X, Truck, MessageSquareText, Check } from 'lucide-react';
+import { X, Truck, MessageSquareText, Check, CalendarClock } from 'lucide-react';
 import { useApp } from '../../context/AppContext.jsx';
 import { getNomeBox } from '../../utils/boxLogic';
 import { montarMensagemProtocolo } from '../../utils/notificacoes';
+import { hojeISO, somarDias } from '../../utils/dateHelpers';
 import TipoCargaBadge from '../Shared/TipoCargaBadge.jsx';
 import SequenciaCarregamentoCaminhao from './SequenciaCarregamentoCaminhao.jsx';
+import SeletorCadastro from '../Shared/SeletorCadastro.jsx';
 
 // Descreve um número de palete junto com sua composição, quando os
 // agrupadores juntaram lotes diferentes nele (ex.: "2 (lotes 2 + 5)") —
@@ -89,6 +91,18 @@ export default function LoadingProtocolForm({ lojas, aoFechar, aoRegistrar }) {
   // registrada por padrão (ver AppContext.jsx), então simplesmente
   // continua lá e aparece de novo na próxima carga dessa loja.
   const [respostaObservacao, setRespostaObservacao] = useState({});
+
+  // Pedido do usuário: às vezes o carregamento é feito hoje mas só sai (ou
+  // só chega na loja) em outro dia — sem regra fixa de "sempre amanhã"
+  // (ex.: carregado sexta à tarde, mas só sai no sábado, ou só na segunda).
+  // Por padrão desligado (continua contando no dia real do registro, como
+  // sempre foi); quando ligado, revela um campo de data livre (qualquer
+  // dia a partir de hoje) pra informar em qual dia esse carregamento deve
+  // CONTAR nos relatórios de entrega (ver diaEntregaReferencia no
+  // protocolo, AppContext.jsx). Começa sugerindo amanhã (o caso mais
+  // comum), mas o operador pode trocar pra qualquer outra data.
+  const [contarEmOutroDia, setContarEmOutroDia] = useState(false);
+  const [diaEntregaReferencia, setDiaEntregaReferencia] = useState(() => somarDias(hojeISO(), 1));
 
   if (!lojas || lojas.length === 0) return null;
   const emLote = lojas.length > 1;
@@ -176,6 +190,7 @@ export default function LoadingProtocolForm({ lojas, aoFechar, aoRegistrar }) {
         quantidades,
         ordemCarregamento,
         lotesRestantesPorLoja,
+        diaEntregaReferencia: contarEmOutroDia ? diaEntregaReferencia : null,
       });
       if (aoRegistrar) {
         const totalLote = ordemCarregamento.length;
@@ -183,6 +198,7 @@ export default function LoadingProtocolForm({ lojas, aoFechar, aoRegistrar }) {
           montarMensagemProtocolo({
             placa: placaFinal,
             motorista,
+            diaEntregaReferencia: contarEmOutroDia ? diaEntregaReferencia : null,
             itens: lojas.map((l) => {
               const posicaoCarregamento = ordemCarregamento.indexOf(l.id) + 1;
               return {
@@ -225,12 +241,14 @@ export default function LoadingProtocolForm({ lojas, aoFechar, aoRegistrar }) {
       statusEnvio,
       paletesEnviados: quantidade,
       lotesRestantes: statusEnvio === 'saldo' ? loteRestante : [],
+      diaEntregaReferencia: contarEmOutroDia ? diaEntregaReferencia : null,
     });
     if (aoRegistrar) {
       aoRegistrar(
         montarMensagemProtocolo({
           placa: placaFinal,
           motorista,
+          diaEntregaReferencia: contarEmOutroDia ? diaEntregaReferencia : null,
           itens: [
             {
               carga: loja.carga,
@@ -436,19 +454,16 @@ export default function LoadingProtocolForm({ lojas, aoFechar, aoRegistrar }) {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Placa do veículo</label>
-              <input
-                list="lista-placas-carregamento"
-                value={placa}
-                onChange={(e) => setPlaca(e.target.value)}
-                required
-                placeholder="ABC-1D23"
-                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm uppercase text-slate-800 focus:border-totvs-500 dark:focus:border-whatsapp-500 focus:outline-none focus:ring-1 focus:ring-totvs-500 dark:focus:ring-whatsapp-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+              <SeletorCadastro
+                opcoes={(state.placasCadastradas || []).map((p) => ({
+                  valor: p.placa,
+                  rotulo: p.placa,
+                  extra: p.possuiPlataforma ? 'c/ plataforma' : null,
+                }))}
+                valor={placa}
+                onSelecionar={setPlaca}
+                placeholder="Selecione a placa"
               />
-              <datalist id="lista-placas-carregamento">
-                {(state.placasCadastradas || []).map((p) => (
-                  <option key={p.placa} value={p.placa} />
-                ))}
-              </datalist>
               {placaCadastrada && (
                 <p
                   className={`mt-1 text-[11px] font-medium ${
@@ -463,18 +478,12 @@ export default function LoadingProtocolForm({ lojas, aoFechar, aoRegistrar }) {
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Motorista</label>
-              <input
-                list="lista-motoristas-carregamento"
-                value={motorista}
-                onChange={(e) => setMotorista(e.target.value)}
-                required
-                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-totvs-500 dark:focus:border-whatsapp-500 focus:outline-none focus:ring-1 focus:ring-totvs-500 dark:focus:ring-whatsapp-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+              <SeletorCadastro
+                opcoes={state.motoristasCadastrados || []}
+                valor={motorista}
+                onSelecionar={setMotorista}
+                placeholder="Selecione o motorista"
               />
-              <datalist id="lista-motoristas-carregamento">
-                {(state.motoristasCadastrados || []).map((m) => (
-                  <option key={m} value={m} />
-                ))}
-              </datalist>
             </div>
           </div>
 
@@ -496,6 +505,45 @@ export default function LoadingProtocolForm({ lojas, aoFechar, aoRegistrar }) {
                 />
               ))}
             </div>
+          </div>
+
+          {/* Pedido do usuário: carregamento feito hoje que só sai (ou só
+              chega na loja) em outro dia, sem regra fixa de "sempre
+              amanhã" — ex.: carregado sexta à tarde, mas só sai no sábado,
+              ou só na segunda. Desligado por padrão: conta no dia real do
+              registro, como sempre. `dataHora` do protocolo nunca muda por
+              causa disso — só a data usada nos relatórios de entrega (Meta
+              de Entrega, Entregas por Motorista, Exportar Excel). */}
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-2.5 dark:border-slate-700 dark:bg-slate-900/40">
+            <label className="flex items-center gap-2 text-xs font-medium text-slate-600 dark:text-slate-300">
+              <input
+                type="checkbox"
+                checked={contarEmOutroDia}
+                onChange={(e) => setContarEmOutroDia(e.target.checked)}
+                className="h-3.5 w-3.5 rounded border-slate-300 text-totvs-600 focus:ring-totvs-500 dark:border-slate-600 dark:text-whatsapp-500 dark:focus:ring-whatsapp-500"
+              />
+              <CalendarClock size={13} className="flex-shrink-0 text-slate-400 dark:text-slate-500" />
+              Esse carregamento só sai (ou só chega) em outro dia
+            </label>
+            {contarEmOutroDia && (
+              <div className="mt-2">
+                <label className="mb-1 block text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                  Contar nos relatórios de entrega como se fosse do dia:
+                </label>
+                <input
+                  type="date"
+                  value={diaEntregaReferencia}
+                  min={hojeISO()}
+                  onChange={(e) => setDiaEntregaReferencia(e.target.value)}
+                  required
+                  className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-800 focus:border-totvs-500 dark:focus:border-whatsapp-500 focus:outline-none focus:ring-1 focus:ring-totvs-500 dark:focus:ring-whatsapp-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+                />
+                <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">
+                  O horário real do carregamento continua registrado normalmente — só a contagem nos relatórios muda
+                  pra essa data.
+                </p>
+              </div>
+            )}
           </div>
 
           {!emLote && (
@@ -582,12 +630,18 @@ export default function LoadingProtocolForm({ lojas, aoFechar, aoRegistrar }) {
         <button
           type="submit"
           disabled={
-            emLote
+            // Placa e motorista agora vêm de um menu suspenso (SeletorCadastro)
+            // em vez de um <input required> nativo — a validação de obrigatório
+            // precisa ser feita aqui, já que um <button> não participa da
+            // validação nativa do formulário.
+            !placa ||
+            !motorista ||
+            (emLote
               ? lojas.some((l) => statusPorLoja[l.id] === 'saldo' && (lotesRestantesPorLoja[l.id] || []).length === 0) ||
                 // Sem mais teto em `l.paletesAgrupados` — só exige quantidade
                 // positiva (ver mesma decisão em enviar()).
                 lojas.some((l) => (Number(quantidadesInformadasPorLoja[l.id]) || 0) <= 0)
-              : (statusEnvio === 'saldo' && loteRestante.length === 0) || (Number(paletesEnviadosInput) || 0) <= 0
+              : (statusEnvio === 'saldo' && loteRestante.length === 0) || (Number(paletesEnviadosInput) || 0) <= 0)
           }
           className="mt-5 w-full rounded-md bg-emerald-600 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300 dark:disabled:bg-slate-600"
         >

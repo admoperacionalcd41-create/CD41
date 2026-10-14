@@ -443,7 +443,8 @@ function aplicarAcaoInterna(state, acao) {
     }
 
     case 'FINALIZAR_CARREGAMENTO': {
-      const { lojaId, placa, motorista, lacres, statusEnvio, paletesEnviados, lotesRestantes } = acao.payload;
+      const { lojaId, placa, motorista, lacres, statusEnvio, paletesEnviados, lotesRestantes, diaEntregaReferencia } =
+        acao.payload;
       const loja = state.lojas.find((l) => l.id === lojaId);
       if (!loja || loja.boxNumero == null) {
         return { ...state, ultimoErro: 'Loja inválida para finalização de carregamento.' };
@@ -492,6 +493,16 @@ function aplicarAcaoInterna(state, acao) {
           ? []
           : (lotesRestantes || []).map((n) => descreverPalete(composicaoAnterior, n)),
         dataHora: new Date().toISOString(),
+        // Pedido do usuário: carregamento feito hoje mas que só sai (ou só
+        // chega na loja) em outro dia — não necessariamente o seguinte,
+        // pode pular pro dia útil seguinte (ex.: carregado sexta à tarde,
+        // mas só sai no sábado ou só na segunda, sem regra fixa). Opcional
+        // (YYYY-MM-DD); quando informado, os relatórios por data (Meta de
+        // Entrega, Entregas por Motorista, Exportar Excel) contam esse
+        // protocolo nesse dia em vez do dia real do registro — ver
+        // diaReferenciaProtocolo em selectors.js. `dataHora` continua sendo
+        // sempre o horário real do registro, sem alteração.
+        diaEntregaReferencia: diaEntregaReferencia || null,
         boxNumero: loja.boxNumero,
         vagasLiberadas,
       };
@@ -543,7 +554,16 @@ function aplicarAcaoInterna(state, acao) {
     // loja continua com seu próprio registro de protocolo, então nada mais
     // no restante do app precisa saber sobre carregamentos em lote.
     case 'FINALIZAR_CARREGAMENTO_MULTIPLO': {
-      const { lojaIds, placa, motorista, lacres, quantidades = {}, ordemCarregamento, lotesRestantesPorLoja = {} } = acao.payload;
+      const {
+        lojaIds,
+        placa,
+        motorista,
+        lacres,
+        quantidades = {},
+        ordemCarregamento,
+        lotesRestantesPorLoja = {},
+        diaEntregaReferencia,
+      } = acao.payload;
       const lojasSelecionadas = lojaIds
         .map((id) => state.lojas.find((l) => l.id === id))
         .filter((l) => l && l.boxNumero != null);
@@ -613,6 +633,10 @@ function aplicarAcaoInterna(state, acao) {
             ? []
             : restantesLoja.map((n) => descreverPalete(composicaoAnteriorLoja, n)),
           dataHora: agora,
+          // Mesmo campo/motivo do FINALIZAR_CARREGAMENTO (loja única) — ver
+          // comentário lá. Comum a todas as lojas da viagem, já que é um
+          // único veículo/uma única saída.
+          diaEntregaReferencia: diaEntregaReferencia || null,
           viagemId,
           boxNumero: loja.boxNumero,
           vagasLiberadas,

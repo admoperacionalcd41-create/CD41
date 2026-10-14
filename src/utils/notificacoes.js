@@ -1,4 +1,5 @@
 import { getNomeBox } from './boxLogic';
+import { hojeISO, formatarData } from './dateHelpers';
 
 // Mensagens padrão enviadas por WhatsApp (ver NotifyWhatsappModal.jsx),
 // centralizadas aqui para as duas situações que disparam notificação hoje:
@@ -19,23 +20,40 @@ export function montarMensagemAgrupamento(loja) {
 // motorista do veículo, e a lista de lojas/cargas que saíram nele (uma ou
 // várias, no caso de protocolo em lote), com a quantidade de paletes
 // enviada de cada uma e se saiu completo ou com saldo.
-export function montarMensagemProtocolo({ placa, motorista, itens }) {
+//
+// Formato pedido pelo usuário — duas linhas por loja, em vez de uma única
+// linha longa:
+//   LOJA40 (BEZERROS) CARGA: 97895
+//   11 pal — LOTE(s) 10, 11 ficou(aram)
+//
+// `diaEntregaReferencia` (opcional, YYYY-MM-DD) vem do mesmo ajuste feito
+// na hora de finalizar o carregamento (ver LoadingProtocolForm.jsx e
+// diaReferenciaProtocolo em selectors.js) — carregamento feito hoje que só
+// sai (ou só chega na loja) em outro dia. Pedido do usuário: mostrar
+// também essa data na mensagem pra equipe, não só nos relatórios — sem
+// informar nada, assume hoje (comportamento normal, sem ajuste).
+export function montarMensagemProtocolo({ placa, motorista, diaEntregaReferencia, itens }) {
   // Protocolo em lote (2+ lojas) traz a posição de entrega prevista de cada
   // uma (ver LoadingProtocolForm -> SequenciaCarregamentoCaminhao) — mostra
   // isso na mensagem pra equipe já saber a ordem de entrega combinada.
   const temSequencia = itens.length > 1 && itens.every((item) => item.posicaoEntrega != null);
-  const linhasLojas = itens.map((item) => {
-    const status = item.statusEnvio === 'saldo' ? ' (saldo — envio parcial)' : '';
+  const linhasLojas = itens.flatMap((item) => {
     // Paletes (números das etiquetas, com a composição de lotes quando
     // houver — ex.: "2 (lotes 2 + 5)") que o operador marcou como tendo
     // ficado no box — só existe em envio parcial (ver LoadingProtocolForm).
     const lotes =
       item.statusEnvio === 'saldo' && item.lotesRestantesDescricao && item.lotesRestantesDescricao.length > 0
-        ? ` — palete(s) ${item.lotesRestantesDescricao.join(', ')} ficou(aram)`
+        ? ` — LOTE(s) ${item.lotesRestantesDescricao.join(', ')} ficou(aram)`
         : '';
     const sequencia = temSequencia ? ` [${item.posicaoEntrega}ª entrega]` : '';
-    return `${item.carga} — Loja ${item.loja} (${item.nomeLoja}): ${item.paletesEnviados} pal.${status}${lotes}${sequencia}`;
+    return [`${item.loja} (${item.nomeLoja}) CARGA: ${item.carga}`, `${item.paletesEnviados} pal${lotes}${sequencia}`];
   });
 
-  return ['Carregamento liberado:', `Placa: ${placa}`, `Motorista: ${motorista}`, ...linhasLojas].join('\n');
+  return [
+    'Carregamento liberado:',
+    `Placa: ${placa}`,
+    `Motorista: ${motorista}`,
+    `Entrega: ${formatarData(diaEntregaReferencia || hojeISO())}`,
+    ...linhasLojas,
+  ].join('\n');
 }

@@ -5,6 +5,7 @@ import { useLocalStorage } from '../../hooks/useLocalStorage';
 import { eHoje, formatarHora, formatarData, formatarDuracao } from '../../utils/dateHelpers';
 import { lojaPassaFiltroTipoCarga } from '../../utils/tipoCarga';
 import { ordenarEntregasDaViagem, calcularDeslocamento } from '../../utils/deslocamento';
+import { diaReferenciaProtocolo } from '../../utils/selectors';
 
 // Chave usada para lembrar o tempo-limite configurado (fica salvo no
 // navegador, como o restante do estado do app) — compartilhada entre o
@@ -138,7 +139,15 @@ export default function AndamentoEntregasCard({ irPara, compacto = false }) {
   const entregasPorVeiculo = useMemo(() => {
     const grupos = {};
     state.protocolos
-      .filter((p) => eHoje(p.dataHora) || !p.saidaLoja)
+      // Pedido do usuário: "os relatórios devem considerar o dia da
+      // entrega, não o dia que carregou o veículo" — um carregamento
+      // marcado pra contar em outro dia (ver diaEntregaReferencia,
+      // LoadingProtocolForm.jsx) só entra aqui no dia de entrega
+      // combinado, não no dia real em que o caminhão saiu do CD. O `||
+      // !p.saidaLoja` continua garantindo que nada pendente (chegada/saída
+      // ainda não fechada) suma do card, mesmo que o dia de referência já
+      // tenha passado.
+      .filter((p) => eHoje(diaReferenciaProtocolo(p)) || !p.saidaLoja)
       .forEach((p) => {
         const loja = lojasPorId[p.lojaId];
         if (!loja || !lojaPassaFiltroTipoCarga(loja, filtroTipoCarga)) return;
@@ -409,11 +418,12 @@ export default function AndamentoEntregasCard({ irPara, compacto = false }) {
                   // anterior de verdade.
                   const entregaAnterior = indice > 0 ? veiculo.entregas[indice - 1] : null;
                   const deslocamento = calcularDeslocamento(entrega, entregaAnterior, agoraMs);
-                  // Pendência arrastada de um dia anterior (ver useMemo
-                  // acima) — mostra a data do carregamento pra deixar claro
-                  // que não é de hoje, já que sem isso ficaria parecendo uma
-                  // entrega de hoje igual às outras.
-                  const deOutroDia = !eHoje(entrega.dataHora);
+                  // Pendência arrastada de um dia anterior, OU um
+                  // carregamento marcado pra contar como entrega em outro
+                  // dia (ver diaReferenciaProtocolo) — mostra a data pra
+                  // deixar claro que não é de hoje, já que sem isso ficaria
+                  // parecendo uma entrega de hoje igual às outras.
+                  const deOutroDia = !eHoje(diaReferenciaProtocolo(entrega));
                   // Pedido do usuário: desloc + parado (+ "desde", quando em
                   // andamento) agora podem aparecer juntos na mesma entrega
                   // (ex.: "Na loja" mostra os três). Tudo isso dentro do
@@ -435,7 +445,12 @@ export default function AndamentoEntregasCard({ irPara, compacto = false }) {
                             {entrega.loja.loja}
                             {deOutroDia && (
                               <span className="ml-1.5 text-[10px] font-semibold text-amber-600 dark:text-amber-400">
-                                carregado {formatarData(entrega.dataHora.slice(0, 10))}
+                                {/* Carregamento marcado pra contar em outro dia mostra a data de
+                                    entrega combinada; uma pendência arrastada de um dia anterior
+                                    (sem esse ajuste) continua mostrando a data real do carregamento. */}
+                                {entrega.diaEntregaReferencia
+                                  ? `entrega prevista ${formatarData(entrega.diaEntregaReferencia)}`
+                                  : `carregado ${formatarData(entrega.dataHora.slice(0, 10))}`}
                               </span>
                             )}
                           </span>
