@@ -1384,7 +1384,7 @@ function aplicarAcao(state, acao) {
 }
 
 export function AppProvider({ children }) {
-  const [state, setState] = useSyncedAppState(CHAVE_STORAGE, () => gerarDadosIniciais());
+  const [state, setState, statusSincronizacao] = useSyncedAppState(CHAVE_STORAGE, () => gerarDadosIniciais());
 
   // Filtro global de Tipo de Carga (Seca/Resfriada/Todos), selecionado no
   // cabeçalho e válido em todas as abas (exceto Cadastros, que não lista
@@ -1464,8 +1464,13 @@ export function AppProvider({ children }) {
       setFiltroTipoCarga,
       modoSequenciaProcessoDia,
       setModoSequenciaProcessoDia,
+      // Status real da sincronização com o Supabase (ver
+      // useSyncedAppState.js / ConnectionStatus.jsx) — diferente de
+      // "online/offline", que só reflete a internet do aparelho, não se a
+      // última gravação realmente chegou no servidor.
+      statusSincronizacao,
     }),
-    [state, dispatch, actions, filtroTipoCarga, modoSequenciaProcessoDia]
+    [state, dispatch, actions, filtroTipoCarga, modoSequenciaProcessoDia, statusSincronizacao]
   );
 
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;

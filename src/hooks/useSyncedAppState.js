@@ -91,8 +91,13 @@ export function useSyncedAppState(chaveLocal, gerarValorInicial) {
 // uma mesma instância — o único jeito de useEstadoSincronizado chamar hooks
 // em número/ordem diferente seria SUPABASE_CONFIGURADO mudar em tempo de
 // execução, o que não acontece.
+//
+// `status: 'local'` (terceiro item do retorno) sinaliza pra quem consome
+// (ver ConnectionStatus.jsx) que não existe sincronização remota aqui —
+// só localStorage, que "sempre dá certo" (não depende de rede), então não
+// há nada além de online/offline do navegador pra mostrar.
 function useEstadoSomenteLocal(estadoLocal, setEstadoLocal) {
-  return [estadoLocal, setEstadoLocal];
+  return [estadoLocal, setEstadoLocal, { status: 'local' }];
 }
 
 function useEstadoSincronizado(estadoLocal, setEstadoLocal) {
@@ -111,6 +116,33 @@ function useEstadoSincronizado(estadoLocal, setEstadoLocal) {
   // ATRASO_GRAVACAO_MS acima).
   const baseServidorRef = useRef(null);
 
+  // Pedido do usuário: antes, se a gravação no Supabase falhasse (ex.: sinal
+  // fraco no celular do operador), a única coisa que acontecia era um aviso
+  // no console do navegador — a tela continuava mostrando "Online" (que só
+  // reflete a internet do aparelho, não se o salvamento realmente chegou no
+  // banco) e a ação feita podia nunca ser persistida, sem ninguém perceber.
+  // Esse estado torna isso visível (ver ConnectionStatus.jsx) e, junto com
+  // `agendarNovaTentativa` abaixo, garante que a gravação continua sendo
+  // tentada automaticamente até dar certo, em vez de desistir silenciosamente
+  // na primeira falha.
+  //   status: 'sincronizado' | 'salvando' | 'erro'
+  //   mensagem: texto do erro mais recente (só relevante quando status é 'erro')
+  //   tentativas: quantas vezes seguidas a gravação falhou até agora
+  const [statusSincronizacao, setStatusSincronizacao] = useState({
+    status: 'sincronizado',
+    mensagem: null,
+    tentativas: 0,
+  });
+  const tentativasFalhasRef = useRef(0);
+  const retryTimeoutRef = useRef(null);
+
+  useEffect(
+    () => () => {
+      if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current);
+    },
+    []
+  );
+
   useEffect(() => {
     estadoRef.current = estadoLocal;
   }, [estadoLocal]);
@@ -123,6 +155,7 @@ function useEstadoSincronizado(estadoLocal, setEstadoLocal) {
     const agora = new Date().toISOString();
     ultimoTimestampAplicadoRef.current = agora;
     const dadosNormalizados = normalizarEstadoRecebido(dados);
+    setStatusSincronizacao((s) => ({ status: 'salvando', mensagem: null, tentativas: s.tentativas }));
     supabase
       .from('app_state')
       .upsert(
@@ -138,14 +171,51 @@ function useEstadoSincronizado(estadoLocal, setEstadoLocal) {
         if (error) {
           // eslint-disable-next-line no-console
           console.warn('Não foi possível sincronizar o estado com o Supabase:', error.message);
+          tentativasFalhasRef.current += 1;
+          const tentativaAtual = tentativasFalhasRef.current;
+          setStatusSincronizacao({ status: 'erro', mensagem: error.message, tentativas: tentativaAtual });
+
+          // Tenta de novo automaticamente — sem isso, uma ação feita bem
+          // nesse momento (ex.: finalizar um carregamento) ficaria só na
+          // tela de quem fez, nunca chegando no servidor nem aparecendo pra
+          // mais ninguém, até a pessoa mexer em algo de novo (o que agenda
+          // uma nova gravação) ou recarregar a página (perdendo a ação).
+          // Espera crescente a cada falha seguida (5s, 10s, 20s, 40s, até um
+          // teto de 60s) pra não bater no Supabase sem parar se a conexão
+          // continuar ruim por um tempo.
+          if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current);
+          const espera = Math.min(5000 * 2 ** Math.min(tentativaAtual - 1, 4), 60000);
+          retryTimeoutRef.current = setTimeout(() => {
+            retryTimeoutRef.current = null;
+            // Retenta com o estado MAIS RECENTE (estadoRef.current), não o
+            // que falhou — se a pessoa continuou trabalhando enquanto a
+            // gravação falhava, é a versão atual que precisa ser salva.
+            gravarNoSupabase(estadoRef.current);
+          }, espera);
           return;
         }
         // Gravação confirmada: isso é, a partir de agora, o que o servidor
         // tem — vira a nova base pra próxima mesclagem (ver
         // mesclarEstadoSincronizado.js).
+        tentativasFalhasRef.current = 0;
+        if (retryTimeoutRef.current) {
+          clearTimeout(retryTimeoutRef.current);
+          retryTimeoutRef.current = null;
+        }
         baseServidorRef.current = dadosNormalizados;
+        setStatusSincronizacao({ status: 'sincronizado', mensagem: null, tentativas: 0 });
       });
   }, []);
+
+  // Botão "Tentar agora" (ver ConnectionStatus.jsx) — pula a espera da
+  // próxima tentativa automática e grava já, com o estado atual.
+  const tentarSincronizarNovamente = useCallback(() => {
+    if (retryTimeoutRef.current) {
+      clearTimeout(retryTimeoutRef.current);
+      retryTimeoutRef.current = null;
+    }
+    gravarNoSupabase(estadoRef.current);
+  }, [gravarNoSupabase]);
 
   // Só busca/escuta o estado compartilhado depois de haver login — antes
   // disso (tela de login) não há sessão autenticada e as regras de acesso
@@ -164,6 +234,15 @@ function useEstadoSincronizado(estadoLocal, setEstadoLocal) {
         if (error) {
           // eslint-disable-next-line no-console
           console.warn('Não foi possível carregar o estado compartilhado do Supabase:', error.message);
+          // Igual à gravação: deixa visível (ver ConnectionStatus.jsx) em
+          // vez de só no console — aqui sem repetir sozinho (é a carga
+          // inicial, única por sessão), mas o indicador explica o que
+          // houve e sugere recarregar a página.
+          setStatusSincronizacao({
+            status: 'erro',
+            mensagem: 'Não foi possível carregar os dados mais recentes. Recarregue a página.',
+            tentativas: 1,
+          });
           return;
         }
         if (data) {
@@ -247,5 +326,5 @@ function useEstadoSincronizado(estadoLocal, setEstadoLocal) {
     [setEstadoLocal, gravarNoSupabase]
   );
 
-  return [estadoLocal, setEstadoSincronizado];
+  return [estadoLocal, setEstadoSincronizado, { ...statusSincronizacao, tentarNovamente: tentarSincronizarNovamente }];
 }

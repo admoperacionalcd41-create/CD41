@@ -27,10 +27,77 @@ function ordenarPorSequenciaDeCarregamento(itens) {
   return [...itens].sort((a, b) => a.posicaoCarregamento - b.posicaoCarregamento);
 }
 
+// Bug reportado pelo usuário: com 3+ lojas no mesmo protocolo, o texto
+// "Agrupadores" das lojas a partir da 2ª simplesmente não saía na
+// impressão — a etiqueta inteira é uma área FIXA de 50mm de altura (não dá
+// pra rolar nem crescer, é o tamanho físico real da etiqueta), e com
+// tamanhos de fonte fixos, 3+ seções de loja empilhadas não cabiam mais
+// nesse espaço: o conteúdo que passava da altura ficava cortado (mesmo
+// escondido, não "sumia" dos dados — só não aparecia no papel).
+//
+// Correção: o tamanho da fonte se adapta à quantidade de lojas no
+// protocolo — mesma ideia já usada em tamanhoFonteLojaPt (LabelGenerator.jsx)
+// pra o código da loja não estourar a etiqueta. Com 1-2 lojas (o caso mais
+// comum) sobra bastante espaço, então a fonte fica BEM maior que antes
+// (pedido do usuário: "a formatação ficou boa, consegue aumentar mais um
+// pouco?"); com mais lojas no mesmo veículo, a fonte diminui o suficiente
+// pra todas as seções (incluindo Agrupadores) sempre caberem no papel.
+function obterTamanhos(qtdLojas) {
+  if (qtdLojas <= 2) {
+    return {
+      cabecalhoValor: 14,
+      sequencia: 9,
+      lojaValor: 19,
+      campoValor: 15,
+      agrupadores: 8.5,
+      totalRodape: 13,
+      gapLojas: 1.4,
+      paddingSecao: 1,
+    };
+  }
+  if (qtdLojas === 3) {
+    return {
+      cabecalhoValor: 11,
+      sequencia: 7.5,
+      lojaValor: 15,
+      campoValor: 11,
+      agrupadores: 7.5,
+      totalRodape: 10,
+      gapLojas: 0.8,
+      paddingSecao: 0.6,
+    };
+  }
+  if (qtdLojas === 4) {
+    return {
+      cabecalhoValor: 9.5,
+      sequencia: 6.5,
+      lojaValor: 12.5,
+      campoValor: 9,
+      agrupadores: 6.5,
+      totalRodape: 8.5,
+      gapLojas: 0.5,
+      paddingSecao: 0.4,
+    };
+  }
+  // 5+ lojas no mesmo veículo — tamanho mínimo legível, prioriza caber
+  // tudo no papel em vez de ficar maior e cortar o conteúdo.
+  return {
+    cabecalhoValor: 8,
+    sequencia: 5.5,
+    lojaValor: 10.5,
+    campoValor: 7.5,
+    agrupadores: 5.5,
+    totalRodape: 7.5,
+    gapLojas: 0.35,
+    paddingSecao: 0.3,
+  };
+}
+
 function montarHtmlEtiquetaCarregamento(itens) {
   const itensOrdenados = ordenarPorSequenciaDeCarregamento(itens);
   const temSequencia = itensOrdenados.length > 1 && itensOrdenados.every((item) => item.posicaoCarregamento != null);
   const [primeiro] = itensOrdenados;
+  const t = obterTamanhos(itensOrdenados.length);
 
   const estilo = `
     * { box-sizing: border-box; }
@@ -59,17 +126,19 @@ function montarHtmlEtiquetaCarregamento(itens) {
        LabelGenerator.jsx): nada de caixinha preenchida (sai "apagado" na
        impressora ribbon do usuário) — só texto preto em negrito. */
     .campo-cabecalho { display: flex; align-items: baseline; gap: 1.2mm; min-width: 0; }
-    .campo-cabecalho .rotulo { font-size: 7pt; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5pt; color: #000; white-space: nowrap; }
-    .campo-cabecalho .valor { font-size: 11pt; font-weight: 900; color: #000; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .campo-cabecalho .rotulo { font-size: 7.5pt; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5pt; color: #000; white-space: nowrap; }
+    .campo-cabecalho .valor { font-size: ${t.cabecalhoValor}pt; font-weight: 900; color: #000; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
     /* Lista de lojas — cada uma é uma seção compacta. Com só uma loja
-       (protocolo de loja única), a seção some e sobra só os campos. */
-    .lojas { flex: 1; display: flex; flex-direction: column; gap: 0.8mm; min-height: 0; overflow: hidden; }
-    .secao-loja { border-top: 0.5pt solid #000; padding-top: 0.8mm; }
+       (protocolo de loja única), a seção some e sobra só os campos. O
+       tamanho de tudo aqui dentro vem de obterTamanhos(), calibrado pela
+       quantidade de lojas pra NUNCA estourar os 50mm fixos da etiqueta. */
+    .lojas { flex: 1; display: flex; flex-direction: column; gap: ${t.gapLojas}mm; min-height: 0; overflow: hidden; justify-content: center; }
+    .secao-loja { border-top: 0.5pt solid #000; padding-top: ${t.paddingSecao}mm; }
     .secao-loja:first-child { border-top: none; padding-top: 0; }
     .sequencia {
       display: block;
-      font-size: 7pt;
+      font-size: ${t.sequencia}pt;
       font-weight: 800;
       text-transform: uppercase;
       letter-spacing: 0.5pt;
@@ -78,10 +147,10 @@ function montarHtmlEtiquetaCarregamento(itens) {
     }
     .campos-loja { display: flex; align-items: baseline; gap: 3mm; flex-wrap: wrap; }
     .campo-loja { display: flex; align-items: baseline; gap: 1mm; min-width: 0; }
-    .campo-loja .rotulo { font-size: 6.5pt; font-weight: 700; text-transform: uppercase; color: #000; white-space: nowrap; }
-    .campo-loja .valor { font-size: 12pt; font-weight: 900; color: #000; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .campo-loja.loja .valor { font-size: 15pt; }
-    .agrupadores { margin: 0.3mm 0 0; font-size: 7pt; font-weight: 700; color: #000; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .campo-loja .rotulo { font-size: 7pt; font-weight: 700; text-transform: uppercase; color: #000; white-space: nowrap; }
+    .campo-loja .valor { font-size: ${t.campoValor}pt; font-weight: 900; color: #000; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .campo-loja.loja .valor { font-size: ${t.lojaValor}pt; }
+    .agrupadores { margin: 0.3mm 0 0; font-size: ${t.agrupadores}pt; font-weight: 700; color: #000; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .agrupadores .rotulo { font-weight: 800; text-transform: uppercase; }
 
     /* Pedido do usuário: total de paletes (soma de todas as lojas) no
@@ -92,7 +161,7 @@ function montarHtmlEtiquetaCarregamento(itens) {
       margin: 0;
       padding-top: 0.8mm;
       border-top: 1pt solid #000;
-      font-size: 10pt;
+      font-size: ${t.totalRodape}pt;
       font-weight: 900;
       text-transform: uppercase;
       letter-spacing: 0.5pt;
@@ -151,7 +220,9 @@ function montarHtmlEtiquetaCarregamento(itens) {
 // no baú do caminhão) — as seções saem ordenadas por essa sequência de
 // carregamento ("1º CARREGAR", "2º CARREGAR", ...), a mesma usada no
 // desenho do caminhão ao registrar o protocolo (ver
-// SequenciaCarregamentoCaminhao.jsx).
+// SequenciaCarregamentoCaminhao.jsx). O tamanho da fonte se adapta à
+// quantidade de lojas (ver obterTamanhos) pra nenhuma seção ficar cortada
+// pelos 50mm fixos da etiqueta.
 //
 // Cada item: { motorista, placa, loja, paletesEnviados, boxNumero,
 // colaboradores?, posicaoCarregamento? }. `colaboradores` é a lista de quem
