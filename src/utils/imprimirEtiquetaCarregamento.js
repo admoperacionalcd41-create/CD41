@@ -64,14 +64,14 @@ const TAMANHO_MAXIMO = {
 // usuário). Mesmo no piso, o texto continua at least presente e legível em
 // letra pequena — nunca invisível.
 const TAMANHO_MINIMO = {
-  cabecalhoValor: 5.2,
-  sequencia: 3.6,
-  lojaValor: 6,
-  campoValor: 4.1,
-  agrupadores: 3.6,
-  totalRodape: 4.1,
-  gapLojas: 0.05,
-  paddingSecao: 0.03,
+  cabecalhoValor: 5,
+  sequencia: 3.4,
+  lojaValor: 5.6,
+  campoValor: 3.9,
+  agrupadores: 3.4,
+  totalRodape: 3.9,
+  gapLojas: 0.04,
+  paddingSecao: 0.02,
 };
 
 // Granularidade da busca pelo "maior tamanho que ainda cabe" — passos
@@ -88,7 +88,7 @@ function interpolarTamanho(t) {
   return tamanho;
 }
 
-function montarHtmlEtiquetaCarregamento(itens, tamanho = TAMANHO_MAXIMO) {
+function montarHtmlEtiquetaCarregamento(itens, tamanho = TAMANHO_MAXIMO, centralizar = true) {
   const itensOrdenados = ordenarPorSequenciaDeCarregamento(itens);
   const temSequencia = itensOrdenados.length > 1 && itensOrdenados.every((item) => item.posicaoCarregamento != null);
   const [primeiro] = itensOrdenados;
@@ -107,6 +107,20 @@ function montarHtmlEtiquetaCarregamento(itens, tamanho = TAMANHO_MAXIMO) {
       flex-direction: column;
       gap: 0.8mm;
       overflow: hidden;
+      /* Centraliza o grupo (cabeçalho + lojas + total) quando sobra
+         espaço (1-2 lojas, o caso mais comum) — ver nota em .lojas
+         abaixo pra entender por que a centralização tem que acontecer
+         AQUI, no nível de fora, e não dentro de .lojas.
+
+         "centralizar" só é true quando imprimirEtiquetaCarregamento já
+         confirmou, por medição, que o conteúdo cabe inteiro — nesse caso
+         center só distribui espaço vazio (sempre seguro). No caso raro
+         em que nem no tamanho mínimo tudo cabe (ver PASSOS_REDUCAO),
+         "centralizar" vem false: aí o grupo fica grudado no topo
+         (flex-start), pra NUNCA cortar o cabeçalho (motorista/placa) —
+         só o fim da última seção, que é a informação menos crítica,
+         fica sujeita a ficar de fora dos 50mm físicos. */
+      justify-content: ${centralizar ? 'center' : 'flex-start'};
     }
     .cabecalho {
       display: flex;
@@ -120,16 +134,41 @@ function montarHtmlEtiquetaCarregamento(itens, tamanho = TAMANHO_MAXIMO) {
     /* Mesma decisão já tomada nas etiquetas de palete (ver
        LabelGenerator.jsx): nada de caixinha preenchida (sai "apagado" na
        impressora ribbon do usuário) — só texto preto em negrito. */
-    .campo-cabecalho { display: flex; align-items: baseline; gap: 1.2mm; min-width: 0; }
+    .campo-cabecalho { display: flex; align-items: baseline; gap: 1.2mm; min-width: 0; flex-wrap: wrap; }
     .campo-cabecalho .rotulo { font-size: 7.5pt; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5pt; color: #000; white-space: nowrap; }
-    .campo-cabecalho .valor { font-size: ${t.cabecalhoValor}pt; font-weight: 900; color: #000; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    /* Pedido do usuário vale também aqui: NUNCA cortar informação
+       silenciosamente. Nome de motorista/placa comprido quebra pra uma
+       2ª linha (igual ao campo de agrupadores) em vez de truncar com
+       "..." — nome de motorista é informação importante demais pra sumir
+       de propósito, mesmo que raramente precise de 2 linhas na prática. */
+    .campo-cabecalho .valor { font-size: ${t.cabecalhoValor}pt; font-weight: 900; color: #000; white-space: normal; overflow-wrap: break-word; }
 
     /* Lista de lojas — cada uma é uma seção compacta. Com só uma loja
        (protocolo de loja única), a seção some e sobra só os campos. O
        tamanho de tudo aqui dentro vem do "tamanho" escolhido por
        imprimirEtiquetaCarregamento (shrink-to-fit medido), calibrado pra
-       NUNCA estourar os 50mm fixos da etiqueta. */
-    .lojas { flex: 1; display: flex; flex-direction: column; gap: ${t.gapLojas}mm; min-height: 0; justify-content: center; }
+       NUNCA estourar os 50mm fixos da etiqueta.
+
+       IMPORTANTE: SEM "flex: 1" e SEM "min-height: 0" aqui — .lojas
+       precisa ocupar exatamente a altura do seu próprio conteúdo, nunca
+       mais nem menos. Uma versão anterior usava "flex: 1; min-height: 0;
+       justify-content: center" pra centralizar o conteúdo verticalmente,
+       mas isso deixa o flexbox ENCOLHER .lojas abaixo da altura real do
+       seu conteúdo quando o espaço é apertado — e o conteúdo (que não
+       encolhe, é texto) passa a vazar pra FORA da caixa já encolhida de
+       .lojas, pra cima E pra baixo ao mesmo tempo (efeito do
+       justify-content: center), sobrepondo o .cabecalho (vizinho de
+       cima) e o .rodape-total (vizinho de baixo) — e isso acontecia
+       mesmo com TODOS os elementos individualmente ainda "dentro" dos
+       limites do .etiqueta como um todo (a soma cabia, só não cabia
+       dividida do jeito que o layout tentava dividir), então nenhuma
+       medição de "elemento X não passa da borda do .etiqueta" pega esse
+       tipo de sobreposição ENTRE VIZINHOS. A centralização vertical do
+       conteúdo (quando sobra espaço) é feita no nível de fora, com
+       justify-content: center no .etiqueta — ali é seguro, porque
+       .cabecalho, .lojas e .rodape-total nunca são forçados a ficar
+       menores que o próprio conteúdo. */
+    .lojas { display: flex; flex-direction: column; gap: ${t.gapLojas}mm; }
     .secao-loja { border-top: 0.5pt solid #000; padding-top: ${t.paddingSecao}mm; }
     .secao-loja:first-child { border-top: none; padding-top: 0; }
     /* A numeração de sequência de carregamento entra na MESMA linha de
@@ -269,7 +308,19 @@ function medirSeCabeNaEtiqueta(html) {
   const elementos = container.querySelectorAll('.secao-loja, .agrupadores, .rodape-total, .cabecalho');
   for (const elemento of elementos) {
     const r = elemento.getBoundingClientRect();
-    if (r.bottom > limite.bottom + EPS || r.right > limite.right + EPS) return false;
+    // Checa os 4 lados — não só embaixo/direita. Ver nota em `.lojas`
+    // acima: um `justify-content: center` já causou conteúdo vazando por
+    // CIMA (sobrepondo o cabeçalho) que essa checagem, antes só de
+    // bottom/right, deixava passar como "cabe". Mantido mesmo com
+    // flex-start no CSS, como segunda camada de proteção.
+    if (
+      r.bottom > limite.bottom + EPS ||
+      r.right > limite.right + EPS ||
+      r.top < limite.top - EPS ||
+      r.left < limite.left - EPS
+    ) {
+      return false;
+    }
   }
   return true;
 }
@@ -302,10 +353,22 @@ export function imprimirEtiquetaCarregamento(itens) {
 
   let t = 0;
   let html = montarHtmlEtiquetaCarregamento(itens, interpolarTamanho(t));
-  while (!medirSeCabeNaEtiqueta(html) && t < 1) {
+  let coube = medirSeCabeNaEtiqueta(html);
+  while (!coube && t < 1) {
     t = Math.min(1, t + 1 / PASSOS_REDUCAO);
     html = montarHtmlEtiquetaCarregamento(itens, interpolarTamanho(t));
+    coube = medirSeCabeNaEtiqueta(html);
   }
+
+  // Caso extremo (ver TAMANHO_MINIMO): mesmo no tamanho mínimo ainda
+  // legível, não coube tudo — última tentativa, sem centralizar
+  // verticalmente (ver "centralizar" em montarHtmlEtiquetaCarregamento),
+  // pra garantir que SÓ o fim da última seção fica de fora dos 50mm
+  // físicos, nunca o cabeçalho (motorista/placa).
+  if (!coube) {
+    html = montarHtmlEtiquetaCarregamento(itens, interpolarTamanho(1), false);
+  }
+
   limparContainerMedicao();
 
   return imprimirHtml(html);
