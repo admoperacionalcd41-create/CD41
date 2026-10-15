@@ -17,6 +17,26 @@
 -- grupo: 'motorista' (só vê a aba Motoristas) | 'administrativo' (acesso
 -- total: Dashboard, Boxes, Agrupamento, Carregamento, Motoristas,
 -- Relatórios, Cadastros e Importar).
+--
+-- IMPORTANTE pra login de motorista: o campo `nome` precisa ser EXATAMENTE
+-- igual (maiúsculas/minúsculas não importam, mas o resto do texto sim) ao
+-- nome desse motorista cadastrado em Cadastros > Motoristas e usado no
+-- campo "Motorista" dos carregamentos dele. É assim que a aba Motoristas
+-- sabe mostrar só as entregas daquele login, sem lista nenhuma de outros
+-- nomes pra escolher (ver DriversPage.jsx) — um nome digitado diferente
+-- (ex.: com um sobrenome a mais, ou abreviado) faz a tela abrir "sem
+-- nenhuma entrega encontrada" pra esse motorista.
+--
+-- Atenção: isso esconde os outros nomes na TELA de quem loga como
+-- motorista, mas não é uma restrição de acesso aos dados em si — a tabela
+-- app_state abaixo é lida inteira por qualquer usuário autenticado (ver
+-- política "Usuário logado lê o estado"). Então tecnicamente, alguém com
+-- conhecimento técnico (abrindo as ferramentas de desenvolvedor do
+-- navegador) ainda conseguiria ver a resposta bruta com todos os dados.
+-- Pra um motorista de verdade não ver nem isso, precisaria reestruturar o
+-- banco pra não guardar tudo num único registro JSON compartilhado (ver
+-- nota abaixo sobre app_state) — bem mais trabalho, e fora do que esse
+-- sistema faz hoje.
 
 create table if not exists public.profiles (
   id uuid primary key references auth.users (id) on delete cascade,

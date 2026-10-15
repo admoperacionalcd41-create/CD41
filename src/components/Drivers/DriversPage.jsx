@@ -7,6 +7,7 @@ import { lojaPassaFiltroTipoCarga } from '../../utils/tipoCarga';
 import { calcularDistanciaMetros, formatarDistancia, RAIO_GEOFENCE_METROS, buscarEnderecoPorCoordenada } from '../../utils/geo';
 import { mapaDeslocamentoPorVeiculo } from '../../utils/deslocamento';
 import InstalarAppBanner from './InstalarAppBanner.jsx';
+import { useAuth } from '../../context/AuthContext.jsx';
 
 // Tela simples para uso dos motoristas: digitam o próprio nome e veem as
 // lojas de entrega dos carregamentos feitos por eles, com um botão grande
@@ -22,7 +23,38 @@ import InstalarAppBanner from './InstalarAppBanner.jsx';
 // silencioso), pra evitar um GPS impreciso registrando chegada errada.
 export default function DriversPage() {
   const { state, actions, filtroTipoCarga } = useApp();
-  const [motoristaBuscado, setMotoristaBuscado] = useState(null);
+  const { grupo, perfil } = useAuth();
+
+  // Pedido do usuário: cada motorista agora tem o próprio login, e esse
+  // login deve ver só as entregas dele mesmo, sem enxergar o nome dos
+  // outros motoristas. O perfil de quem logou (tabela `profiles`,
+  // campo `nome` — cadastrado manualmente pelo administrador, ver
+  // supabase/schema.sql) é comparado com o nome usado no carregamento; se
+  // o grupo logado for 'motorista', a tela já abre direto nas entregas
+  // dele, sem nenhuma lista de nomes pra escolher. Só quem loga como
+  // 'administrativo' (portaria/operação) continua vendo a lista completa e
+  // pode abrir qualquer motorista — inclusive no modo demonstração local
+  // (sem Supabase configurado), que sempre usa grupo 'administrativo' (ver
+  // App.jsx).
+  //
+  // Importante: isso esconde os outros nomes na TELA, mas os dados em si
+  // continuam sincronizados como um único bloco pra todo mundo autenticado
+  // (ver app_state em supabase/schema.sql) — não é uma restrição de acesso
+  // no banco linha a linha. Pra esse travamento funcionar, o nome em
+  // `profiles.nome` precisa ser exatamente igual (sem diferenciar
+  // maiúsculas/minúsculas) ao nome usado nos carregamentos desse motorista.
+  const nomeMotoristaLogado = grupo === 'motorista' ? (perfil?.nome || '').trim() : null;
+
+  const [motoristaBuscado, setMotoristaBuscado] = useState(nomeMotoristaLogado || null);
+
+  // Se o perfil ainda não tinha carregado no primeiro render (ou mudar por
+  // algum motivo), mantém o motorista logado sempre travado no nome dele.
+  useEffect(() => {
+    if (nomeMotoristaLogado && motoristaBuscado !== nomeMotoristaLogado) {
+      setMotoristaBuscado(nomeMotoristaLogado);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nomeMotoristaLogado]);
   // Filtro de texto acima da lista de motoristas — só aparece quando há
   // muitos nomes cadastrados (ver motoristasFiltrados). Não é um menu
   // suspenso: a lista inteira já fica visível na tela, o filtro só reduz
@@ -289,13 +321,20 @@ export default function DriversPage() {
         </div>
       ) : (
         <div className="space-y-3">
-          <button
-            type="button"
-            onClick={voltarParaLista}
-            className="flex items-center gap-1.5 text-base font-semibold text-totvs-600 hover:underline dark:text-whatsapp-400"
-          >
-            <ArrowLeft size={18} /> Trocar motorista
-          </button>
+          {/* Motorista logado com a própria conta fica travado no nome
+              dele — não faz sentido (e não deve) oferecer "Trocar
+              motorista" nesse caso, já que ele não pode enxergar os
+              outros nomes. Só aparece pra quem loga como administrativo
+              (portaria/operação), que pode mesmo abrir qualquer um. */}
+          {!nomeMotoristaLogado && (
+            <button
+              type="button"
+              onClick={voltarParaLista}
+              className="flex items-center gap-1.5 text-base font-semibold text-totvs-600 hover:underline dark:text-whatsapp-400"
+            >
+              <ArrowLeft size={18} /> Trocar motorista
+            </button>
+          )}
 
           <div className="flex flex-wrap items-center justify-between gap-2 px-1">
             <p className="text-base font-bold text-slate-700 dark:text-slate-200">
@@ -320,7 +359,9 @@ export default function DriversPage() {
 
           {entregas.length === 0 && (
             <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-base text-slate-400 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-500">
-              Nenhuma entrega encontrada para este motorista.
+              {nomeMotoristaLogado
+                ? 'Nenhuma entrega encontrada pro seu nome ainda. Se isso não for o esperado, fale com a administração — pode ser que seu nome cadastrado no login esteja diferente do nome usado no carregamento.'
+                : 'Nenhuma entrega encontrada para este motorista.'}
             </div>
           )}
 
