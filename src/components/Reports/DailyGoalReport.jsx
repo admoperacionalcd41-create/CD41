@@ -1,8 +1,14 @@
-import React, { useMemo } from 'react';
-import { Target, CheckCircle2, XCircle } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { Target, CheckCircle2, XCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useApp } from '../../context/AppContext.jsx';
 import { getCodigosEntreguesNaData, getCodigosLojaNoPeriodo, getEntregaCodigoLojaNaData } from '../../utils/selectors';
-import { getDiasUteisSemanaAtual, formatarDiaSemanaCurto, formatarData, hojeISO } from '../../utils/dateHelpers';
+import { getDiasUteisSemana, formatarDiaSemanaCurto, formatarData, hojeISO } from '../../utils/dateHelpers';
+
+// Quantas semanas passadas o campo abaixo deixa escolher, além da semana
+// atual (pedido do usuário: "preciso de um campo que mostre semanas
+// passadas") — 12 cobre um trimestre inteiro pra trás, o bastante pra olhar
+// histórico recente sem virar uma lista enorme de opções.
+const MAX_SEMANAS_ATRAS = 12;
 
 // Meta operacional: todas as 28 lojas devem sair do CD em cada dia útil.
 // Um envio parcial (fica saldo, aguardando novo carregamento) já conta como
@@ -51,8 +57,17 @@ export default function DailyGoalReport() {
   const tipo = filtroTipoCarga && filtroTipoCarga !== 'todos' ? filtroTipoCarga : undefined;
   const rotuloTipo = ROTULO_TIPO[filtroTipoCarga] || ROTULO_TIPO.todos;
 
+  // 0 = semana atual, 1 = semana passada, 2 = retrasada etc. (ver
+  // getDiasUteisSemana em dateHelpers.js). Local a este relatório — não usa
+  // o seletor de período compartilhado (Hoje/Este mês/Escolher mês) da barra
+  // de ferramentas, que não se aplica aqui (ver `usaPeriodo: false` em
+  // ReportsPage.jsx): Meta de Entrega sempre trabalha em semanas cheias
+  // (segunda a sexta), não em meses.
+  const [semanasAtras, setSemanasAtras] = useState(0);
+  const semanaAtual = semanasAtras === 0;
+
   const dias = useMemo(() => {
-    return getDiasUteisSemanaAtual().map((dataISO) => {
+    return getDiasUteisSemana(semanasAtras).map((dataISO) => {
       // Conta lojas distintas com QUALQUER protocolo naquele dia (completo
       // ou parcial/saldo) — um envio parcial já é considerado "atendido"
       // no dia, mesmo que a loja continue com saldo pendente.
@@ -61,9 +76,13 @@ export default function DailyGoalReport() {
       return { dataISO, entregues, pct, hoje: dataISO === hoje, futuro: dataISO > hoje };
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state, hoje, tipo]);
+  }, [state, hoje, tipo, semanasAtras]);
 
-  const diaDeHoje = dias.find((d) => d.hoje);
+  const primeiroDia = dias[0]?.dataISO;
+  const ultimoDia = dias[dias.length - 1]?.dataISO;
+  const rotuloSemana = primeiroDia && ultimoDia ? `${formatarData(primeiroDia)} a ${formatarData(ultimoDia)}` : '';
+
+  const diaDeHoje = semanaAtual ? dias.find((d) => d.hoje) : null;
   // Só entram na média da semana os dias que já passaram (ou hoje) — os dias
   // futuros ainda não têm como ter entregas, então não devem "puxar pra
   // baixo" o aproveitamento mostrado à diretoria antes da semana terminar.
@@ -132,6 +151,55 @@ export default function DailyGoalReport() {
         )}
       </div>
 
+      {/* Campo de semana (pedido do usuário: "preciso de um campo que
+          mostre semanas passadas") — por padrão mostra a semana atual; as
+          setas e o campo abaixo deixam voltar até MAX_SEMANAS_ATRAS semanas
+          no passado. "Próxima semana" fica travado na semana atual — não dá
+          pra "ver o futuro", já que não existe entrega registrada ainda. */}
+      <div className="mb-5 flex flex-wrap items-center gap-2 rounded-lg border border-slate-100 bg-slate-50/60 px-3 py-2 dark:border-slate-700 dark:bg-slate-900/30">
+        <button
+          type="button"
+          onClick={() => setSemanasAtras((s) => Math.min(MAX_SEMANAS_ATRAS, s + 1))}
+          disabled={semanasAtras >= MAX_SEMANAS_ATRAS}
+          title="Semana anterior"
+          className="rounded-md border border-slate-200 p-1.5 text-slate-500 hover:bg-white disabled:cursor-not-allowed disabled:opacity-30 dark:border-slate-600 dark:text-slate-400 dark:hover:bg-slate-800"
+        >
+          <ChevronLeft size={14} />
+        </button>
+
+        <select
+          value={semanasAtras}
+          onChange={(e) => setSemanasAtras(Number(e.target.value))}
+          className="rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs font-medium text-slate-700 focus:border-totvs-500 dark:focus:border-whatsapp-500 focus:outline-none focus:ring-1 focus:ring-totvs-500 dark:focus:ring-whatsapp-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+        >
+          {Array.from({ length: MAX_SEMANAS_ATRAS + 1 }, (_, i) => i).map((i) => (
+            <option key={i} value={i}>
+              {i === 0 ? `Semana atual (${rotuloSemana})` : `${i} semana${i > 1 ? 's' : ''} atrás (${formatarData(getDiasUteisSemana(i)[0])} a ${formatarData(getDiasUteisSemana(i)[4])})`}
+            </option>
+          ))}
+        </select>
+
+        <button
+          type="button"
+          onClick={() => setSemanasAtras((s) => Math.max(0, s - 1))}
+          disabled={semanaAtual}
+          title="Próxima semana"
+          className="rounded-md border border-slate-200 p-1.5 text-slate-500 hover:bg-white disabled:cursor-not-allowed disabled:opacity-30 dark:border-slate-600 dark:text-slate-400 dark:hover:bg-slate-800"
+        >
+          <ChevronRight size={14} />
+        </button>
+
+        {!semanaAtual && (
+          <button
+            type="button"
+            onClick={() => setSemanasAtras(0)}
+            className="text-xs font-medium text-totvs-600 hover:underline dark:text-whatsapp-400"
+          >
+            Voltar para a semana atual
+          </button>
+        )}
+      </div>
+
       {diaDeHoje ? (
         <div className="mb-5 rounded-lg border border-slate-100 bg-slate-50/60 p-5 text-center dark:border-slate-700 dark:bg-slate-900/30">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
@@ -155,9 +223,13 @@ export default function DailyGoalReport() {
                 } para bater a meta de hoje.`}
           </p>
         </div>
-      ) : (
+      ) : semanaAtual ? (
         <div className="mb-5 rounded-lg border border-dashed border-slate-200 bg-slate-50/60 p-4 text-center text-xs text-slate-400 dark:border-slate-700 dark:bg-slate-900/30 dark:text-slate-500">
           Hoje é fim de semana — a meta diária vale de segunda a sexta.
+        </div>
+      ) : (
+        <div className="mb-5 rounded-lg border border-dashed border-slate-200 bg-slate-50/60 p-4 text-center text-xs text-slate-400 dark:border-slate-700 dark:bg-slate-900/30 dark:text-slate-500">
+          Semana de {rotuloSemana} — {totalDecorrido}/{metaDecorrida} lojas entregues ({pctSemana}%).
         </div>
       )}
 
@@ -199,7 +271,9 @@ export default function DailyGoalReport() {
 
       <div className="mt-5 grid grid-cols-1 gap-3 border-t border-slate-100 pt-4 dark:border-slate-700 sm:grid-cols-3">
         <div className="rounded-lg bg-slate-50 p-3 text-center dark:bg-slate-900/30">
-          <p className="text-xs text-slate-400 dark:text-slate-500">Entregue até agora na semana</p>
+          <p className="text-xs text-slate-400 dark:text-slate-500">
+            {semanaAtual ? 'Entregue até agora na semana' : 'Entregue na semana'}
+          </p>
           <p className="mt-0.5 text-xl font-bold text-slate-700 dark:text-slate-200">
             {totalDecorrido} <span className="text-sm font-medium text-slate-400 dark:text-slate-500">/ {metaDecorrida}</span>
           </p>
@@ -221,7 +295,9 @@ export default function DailyGoalReport() {
       </p>
 
       <div className="mt-6 border-t border-slate-100 pt-4 dark:border-slate-700">
-        <h3 className="mb-1 text-sm font-bold text-slate-700 dark:text-slate-200">Análise por Loja — Semana Atual</h3>
+        <h3 className="mb-1 text-sm font-bold text-slate-700 dark:text-slate-200">
+          Análise por Loja — {semanaAtual ? 'Semana Atual' : `Semana de ${rotuloSemana}`}
+        </h3>
         <p className="mb-3 text-xs text-slate-400 dark:text-slate-500">
           Cada loja precisa sair do CD todos os dias úteis. O número é a quantidade de paletes entregues no dia (em{' '}
           <span className="font-semibold text-amber-600 dark:text-amber-400">âmbar com *</span> quando o envio foi
@@ -229,7 +305,9 @@ export default function DailyGoalReport() {
         </p>
 
         {analisePorLoja.length === 0 ? (
-          <p className="text-sm text-slate-400 dark:text-slate-500">Nenhuma loja de {rotuloTipo.toLowerCase()} registrada nesta semana ainda.</p>
+          <p className="text-sm text-slate-400 dark:text-slate-500">
+            Nenhuma loja de {rotuloTipo.toLowerCase()} registrada nesta semana{semanaAtual ? ' ainda' : ''}.
+          </p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">

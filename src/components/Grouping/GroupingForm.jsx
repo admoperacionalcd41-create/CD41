@@ -1,7 +1,13 @@
 import React, { useMemo, useState } from 'react';
 import { PackagePlus, Info } from 'lucide-react';
 import { useApp } from '../../context/AppContext.jsx';
-import { getVagasDisponiveisCount, BOX_NUMBERS, getTotalVagas, getNomeBox } from '../../utils/boxLogic';
+import {
+  getVagasDisponiveisCount,
+  BOX_NUMBERS,
+  getTotalVagas,
+  getNomeBox,
+  boxTemCargaEmAndamento,
+} from '../../utils/boxLogic';
 import { getTipoCarga, lojaPassaFiltroTipoCarga } from '../../utils/tipoCarga';
 import TipoCargaBadge from '../Shared/TipoCargaBadge.jsx';
 
@@ -15,6 +21,21 @@ export default function GroupingForm() {
     () => state.lojas.filter((l) => l.status === 'pendente' && lojaPassaFiltroTipoCarga(l, filtroTipoCarga)),
     [state.lojas, filtroTipoCarga]
   );
+
+  // Pedido do usuário: "permita gerar somente em box que não está ocupando
+  // as primeiras vagas" — um box que já tem outra carga em Geração de
+  // Carga/Conferência/Agrupando (zona crescente, a partir da vaga 1) fica
+  // indisponível aqui até aquela carga concluir o agrupamento (ver
+  // boxTemCargaEmAndamento em boxLogic.js). Não afeta boxes que só têm
+  // cargas já Agrupadas/Em carregamento (zona decrescente, do fim do box
+  // pra trás) — essas não disputam o mesmo espaço de uma nova alocação.
+  const lojasPorId = useMemo(() => {
+    const mapa = {};
+    state.lojas.forEach((l) => {
+      mapa[l.id] = l;
+    });
+    return mapa;
+  }, [state.lojas]);
 
   const lojaSelecionada = state.lojas.find((l) => l.id === lojaId) || null;
 
@@ -53,7 +74,7 @@ export default function GroupingForm() {
           <PackagePlus size={16} />
         </span>
         <div>
-          <h2 className="text-sm font-bold text-slate-700 dark:text-slate-200">Apontamento de Box</h2>
+          <h2 className="text-sm font-bold text-slate-700 dark:text-slate-200">Geração de Carga</h2>
           <p className="text-xs text-slate-400 dark:text-slate-500">Etapa 1 — reserva rápida das vagas antes da conferência física</p>
         </div>
       </div>
@@ -106,9 +127,11 @@ export default function GroupingForm() {
               const box = state.boxes.find((b) => b.numero === n);
               const disponiveis = getVagasDisponiveisCount(box);
               const insuficiente = qtdNum > 0 && disponiveis < qtdNum;
+              const emAndamento = boxTemCargaEmAndamento(box, lojasPorId);
+              const sufixo = insuficiente ? ' (insuficiente)' : emAndamento ? ' (já tem carga em geração)' : '';
               return (
-                <option key={n} value={n} disabled={insuficiente}>
-                  {getNomeBox(n)} — {disponiveis}/{getTotalVagas(n)} livres{insuficiente ? ' (insuficiente)' : ''}
+                <option key={n} value={n} disabled={insuficiente || emAndamento}>
+                  {getNomeBox(n)} — {disponiveis}/{getTotalVagas(n)} livres{sufixo}
                 </option>
               );
             })}
@@ -121,7 +144,7 @@ export default function GroupingForm() {
           className="flex items-center justify-center gap-1.5 rounded-md bg-totvs-600 dark:bg-whatsapp-600 px-4 py-2 text-sm font-semibold text-white hover:bg-totvs-700 dark:hover:bg-whatsapp-700 disabled:cursor-not-allowed disabled:opacity-40 lg:w-auto"
         >
           <PackagePlus size={15} />
-          Apontar Box
+          Gerar Carga
         </button>
       </div>
 

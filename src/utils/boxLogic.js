@@ -385,6 +385,24 @@ const STATUS_CRESCENTE_NO_BOX = new Set(['apontada', 'conferencia_finalizada', '
 const STATUS_DECRESCENTE_NO_BOX = new Set(['agrupada', 'carregando']);
 
 /**
+ * Verifica se um box já tem alguma loja ocupando a zona CRESCENTE (as
+ * PRIMEIRAS vagas, a partir da 1 — ver STATUS_CRESCENTE_NO_BOX acima): uma
+ * carga em Geração de Carga, Conferência Finalizada ou Agrupando, ainda não
+ * concluída. Usado pra impedir uma NOVA Geração de Carga nesse mesmo box
+ * enquanto essa carga anterior não terminar o agrupamento — pedido do
+ * usuário: só pode gerar carga num box que não está ocupando as primeiras
+ * vagas (ver GroupingForm.jsx). Não bloqueia por causa de lojas na zona
+ * DECRESCENTE (Agrupada/Em carregamento — ocupam as ÚLTIMAS vagas, do fim
+ * pra trás), já que essas não disputam o mesmo espaço que uma nova
+ * alocação crescente usaria.
+ */
+export function boxTemCargaEmAndamento(box, lojasPorId) {
+  return box.vagas.some(
+    (v) => v.ocupada && v.lojaId && STATUS_CRESCENTE_NO_BOX.has(lojasPorId?.[v.lojaId]?.status)
+  );
+}
+
+/**
  * Reempacota as vagas ocupadas de um box, fechando os "buracos" que sobram
  * quando uma loja no meio da fila termina e libera vagas: as lojas que
  * ficam continuam plantadas exatamente nos números que tinham antes, ainda

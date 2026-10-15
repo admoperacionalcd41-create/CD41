@@ -39,12 +39,12 @@ export default function DataImport() {
     setResultado(null);
   }
 
-  // Lojas ainda "pendente" — ou seja, que ainda não passaram pelo
-  // Apontamento de Box (Etapa 1 do Expedição / Processos: a reserva
+  // Lojas ainda "pendente" — ou seja, que ainda não passaram pela
+  // Geração de Carga (Etapa 1 do Expedição / Processos: a reserva
   // rápida das vagas antes da conferência física, ver GroupingForm.jsx) —
   // só essas podem ser excluídas aqui, pra nunca deixar vaga ou protocolo
-  // órfão (ver EXCLUIR_LOJA em AppContext.jsx). Uma loja que já teve o
-  // Apontamento de Box feito precisa ser cancelada nas telas de
+  // órfão (ver EXCLUIR_LOJA em AppContext.jsx). Uma loja que já teve a
+  // Geração de Carga feita precisa ser cancelada nas telas de
   // Agrupamento/Carregamento antes (o que a devolve pra pendente).
   const pendentes = useMemo(
     () => state.lojas.filter((l) => l.status === 'pendente'),
@@ -162,7 +162,7 @@ export default function DataImport() {
         </div>
         <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
           Corrige um import errado antes que a loja entre no fluxo — só aparecem aqui as lojas que ainda{' '}
-          <strong>não tiveram o Apontamento de Box feito</strong> (a reserva rápida das vagas antes da
+          <strong>não tiveram a Geração de Carga feita</strong> (a reserva rápida das vagas antes da
           conferência física, na aba Expedição / Processos). Uma loja que já passou por essa etapa
           precisa ser cancelada lá primeiro (botão "Cancelar" da loja), o que a devolve pra pendente antes
           de poder excluir.

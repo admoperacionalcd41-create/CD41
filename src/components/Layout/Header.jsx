@@ -135,18 +135,23 @@ export default function Header({ tituloAba, abaAtiva, onAbrirMenu }) {
               fora") — de propósito fora das telas de Boxes/Agrupamento,
               pois o pedido da loja pode chegar antes dela ser apontada num
               box. Ver ObservacoesLojaModal.jsx. O ponto laranja avisa que
-              já existe alguma observação anotada hoje. */}
-          <button
-            onClick={() => setMostrarObservacoes(true)}
-            title="Observações das Lojas"
-            aria-label="Observações das Lojas"
-            className="relative flex items-center justify-center rounded-md border border-slate-200 bg-white p-1.5 text-slate-500 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600"
-          >
-            <MessageSquareText size={14} />
-            {quantidadeComObservacao > 0 && (
-              <span className="absolute -right-0.5 -top-0.5 flex h-2 w-2 rounded-full bg-amber-500" />
-            )}
-          </button>
+              já existe alguma observação anotada hoje.
+              Pedido do usuário: escondido na aba Motoristas — é uma opção
+              interna (operação/portaria), sem relevância pros motoristas
+              leigos que usam essa aba só pra registrar chegada/saída. */}
+          {abaAtiva !== 'motoristas' && (
+            <button
+              onClick={() => setMostrarObservacoes(true)}
+              title="Observações das Lojas"
+              aria-label="Observações das Lojas"
+              className="relative flex items-center justify-center rounded-md border border-slate-200 bg-white p-1.5 text-slate-500 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600"
+            >
+              <MessageSquareText size={14} />
+              {quantidadeComObservacao > 0 && (
+                <span className="absolute -right-0.5 -top-0.5 flex h-2 w-2 rounded-full bg-amber-500" />
+              )}
+            </button>
+          )}
 
           {/* Atualiza a página inteira (F5) — jeito rápido de garantir que a
               tela mostra a versão mais nova do sistema e os dados mais

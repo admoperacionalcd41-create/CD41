@@ -117,12 +117,19 @@ export function formatarDiaSemanaCurto(dataISO) {
  * do sistema (state.diaAtual) — é sempre a semana civil de verdade, para o
  * relatório fazer sentido pra quem só olha o calendário.
  */
-export function getDiasUteisSemanaAtual() {
+/**
+ * Datas (YYYY-MM-DD) de segunda a sexta-feira de uma semana civil (relógio
+ * real), `semanasAtras` semanas antes da semana atual (0 = semana atual, 1 =
+ * semana passada, 2 = retrasada, etc.) — usada no relatório Meta de Entrega
+ * pra deixar ver semanas anteriores, não só a atual (pedido do usuário: "um
+ * campo que mostre semanas passadas"), ver DailyGoalReport.jsx.
+ */
+export function getDiasUteisSemana(semanasAtras = 0) {
   const hoje = new Date();
   const diaSemana = hoje.getDay(); // 0=domingo, 1=segunda, ..., 6=sábado
   const deltaParaSegunda = diaSemana === 0 ? -6 : 1 - diaSemana;
   const segunda = new Date(hoje);
-  segunda.setDate(hoje.getDate() + deltaParaSegunda);
+  segunda.setDate(hoje.getDate() + deltaParaSegunda - semanasAtras * 7);
 
   const dias = [];
   for (let i = 0; i < 5; i++) {
@@ -131,4 +138,9 @@ export function getDiasUteisSemanaAtual() {
     dias.push(d.toISOString().slice(0, 10));
   }
   return dias;
+}
+
+/** Datas (YYYY-MM-DD) de segunda a sexta-feira da semana corrente — atalho para `getDiasUteisSemana(0)`. */
+export function getDiasUteisSemanaAtual() {
+  return getDiasUteisSemana(0);
 }

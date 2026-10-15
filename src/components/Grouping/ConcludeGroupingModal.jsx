@@ -64,7 +64,7 @@ export default function ConcludeGroupingModal({ loja, aoFechar, aoConcluir }) {
         <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
           <strong>{getNomeBox(loja.boxNumero)}</strong> • Colaboradores: {loja.colaboradores.join(', ') || '—'}.
           Informe a quantidade de paletes efetivamente conferida ao final do agrupamento físico. Ao
-          confirmar, as vagas crescentes do apontamento serão liberadas e realocadas de trás para
+          confirmar, as vagas crescentes da geração de carga serão liberadas e realocadas de trás para
           frente (ordem decrescente) no mesmo box, conforme essa quantidade final.
         </p>
 
@@ -84,8 +84,8 @@ export default function ConcludeGroupingModal({ loja, aoFechar, aoConcluir }) {
           {Number(quantidade) > 0 && Number(quantidade) !== loja.paletesAgrupados && (
             <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
               {Number(quantidade) < loja.paletesAgrupados
-                ? `Quantidade reduzida em relação ao apontamento (${loja.paletesAgrupados} pal.).`
-                : `Quantidade maior que o apontamento (${loja.paletesAgrupados} pal.).`}
+                ? `Quantidade reduzida em relação à geração de carga (${loja.paletesAgrupados} pal.).`
+                : `Quantidade maior que a geração de carga (${loja.paletesAgrupados} pal.).`}
             </p>
           )}
         </div>

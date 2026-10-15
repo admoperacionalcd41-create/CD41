@@ -15,7 +15,7 @@ function descreverSituacao(cargasHoje) {
   if (!cargasHoje || cargasHoje.length === 0) return 'Sem carga hoje';
   if (cargasHoje.length > 1) return `${cargasHoje.length} cargas hoje`;
   const loja = cargasHoje[0];
-  if (loja.status === 'pendente') return 'Ainda não apontada';
+  if (loja.status === 'pendente') return 'Carga ainda não gerada';
   if (loja.status === 'finalizada') return 'Carregamento finalizado';
   if (loja.boxNumero) return `Box ${loja.boxNumero}`;
   return 'Em andamento';
@@ -24,8 +24,8 @@ function descreverSituacao(cargasHoje) {
 /**
  * Modal acessível pelo botão "Observações das Lojas" no cabeçalho (ver
  * Header.jsx) — de propósito FORA das telas de Boxes/Agrupamento, pra
- * funcionar com a loja em qualquer status do dia, inclusive antes dela ser
- * apontada num box. Busca por código ou nome entre TODAS as lojas já
+ * funcionar com a loja em qualquer status do dia, inclusive antes dela ter
+ * a carga gerada num box. Busca por código ou nome entre TODAS as lojas já
  * conhecidas pelo sistema (ver getLojasConhecidas em selectors.js) — pedido
  * do usuário: antes listava só as importadas hoje, o que impedia anotar uma
  * loja que ainda não teve carga importada no dia; agora a observação é da

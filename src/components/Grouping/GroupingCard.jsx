@@ -22,7 +22,7 @@ export default function GroupingCard({
   // botão/dica muda conforme a etapa atual, para deixar claro pra onde ela
   // vai voltar (ver CANCELAR_AGRUPAMENTO em AppContext.jsx).
   const TITULO_CANCELAR = {
-    apontada: 'Cancelar apontamento e liberar as vagas — a loja volta para Pendente',
+    apontada: 'Cancelar geração de carga e liberar as vagas — a loja volta para Pendente',
     conferencia_finalizada: 'Desfazer a conferência finalizada — a loja volta para Em Execução',
     em_agrupamento: 'Desfazer o início do agrupamento — a loja volta para Conferência Finalizada',
     agrupada: 'Desfazer a conclusão do agrupamento — a loja volta para Agrupando',
@@ -34,8 +34,13 @@ export default function GroupingCard({
     >
       <div className="mb-2 flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="truncate text-sm font-bold text-slate-700 dark:text-slate-200">{loja.carga}</p>
-          <p className="truncate text-xs text-slate-400 dark:text-slate-500">{loja.loja} — {loja.nomeLoja}</p>
+          {/* Pedido do usuário: dar ênfase à LOJA, não à carga — o código e
+              nome da loja viram a linha principal (em negrito), e o número
+              da carga passa a ser só uma informação secundária abaixo. */}
+          <p className="truncate text-sm font-bold text-slate-700 dark:text-slate-200">
+            {loja.loja} — {loja.nomeLoja}
+          </p>
+          <p className="truncate text-xs text-slate-400 dark:text-slate-500">Carga: {loja.carga}</p>
         </div>
         <div className="flex flex-shrink-0 flex-col items-end gap-1">
           <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600 dark:bg-slate-700 dark:text-slate-300">

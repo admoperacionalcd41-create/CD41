@@ -1,12 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { LogIn, LogOut, CheckCircle2, LocateFixed, MapPinOff, Clock, MapPin, Undo2, MessageSquareText, History, ChevronDown, ChevronUp } from 'lucide-react';
+import { LogIn, LogOut, CheckCircle2, LocateFixed, MapPinOff, Clock, MapPin, Undo2, MessageSquareText, History, ChevronDown, ChevronUp, ArrowLeft, Search, User } from 'lucide-react';
 import { useApp } from '../../context/AppContext.jsx';
 import { formatarHora, formatarData, formatarDuracao, paraDataHoraLocalInput, deDataHoraLocalInput, eHoje } from '../../utils/dateHelpers';
 import TipoCargaBadge from '../Shared/TipoCargaBadge.jsx';
 import { lojaPassaFiltroTipoCarga } from '../../utils/tipoCarga';
 import { calcularDistanciaMetros, formatarDistancia, RAIO_GEOFENCE_METROS, buscarEnderecoPorCoordenada } from '../../utils/geo';
 import { mapaDeslocamentoPorVeiculo } from '../../utils/deslocamento';
-import SeletorCadastro from '../Shared/SeletorCadastro.jsx';
 
 // Tela simples para uso dos motoristas: digitam o próprio nome e veem as
 // lojas de entrega dos carregamentos feitos por eles, com um botão grande
@@ -22,8 +21,12 @@ import SeletorCadastro from '../Shared/SeletorCadastro.jsx';
 // silencioso), pra evitar um GPS impreciso registrando chegada errada.
 export default function DriversPage() {
   const { state, actions, filtroTipoCarga } = useApp();
-  const [motoristaDigitado, setMotoristaDigitado] = useState('');
   const [motoristaBuscado, setMotoristaBuscado] = useState(null);
+  // Filtro de texto acima da lista de motoristas — só aparece quando há
+  // muitos nomes cadastrados (ver motoristasFiltrados). Não é um menu
+  // suspenso: a lista inteira já fica visível na tela, o filtro só reduz
+  // quais nomes aparecem nela.
+  const [filtroMotorista, setFiltroMotorista] = useState('');
   const [posicaoAtual, setPosicaoAtual] = useState(null);
   // Endereço da rua já resolvido (geocodificação reversa) pra posição atual
   // do GPS — mantido em segundo plano (ver useEffect abaixo) pra já estar
@@ -213,70 +216,107 @@ export default function DriversPage() {
     return `https://www.google.com/maps?q=${localizacao.latitude},${localizacao.longitude}`;
   }
 
-  function aoBuscar(evento) {
-    evento.preventDefault();
-    const limpo = motoristaDigitado.trim();
-    setMotoristaBuscado(limpo || null);
+  // Pedido do usuário: em vez de um menu suspenso + botão "Buscar", a lista
+  // de motoristas cadastrados já aparece inteira na tela — tocar no nome já
+  // abre direto as lojas de entrega dele, sem toque extra (motoristas
+  // leigos, pensado pra uso no celular).
+  function selecionarMotorista(nome) {
+    setMotoristaBuscado(nome);
   }
 
-  // Seleção pelo menu suspenso já busca na hora — evita um toque extra no
-  // botão "Buscar" num fluxo pensado pra toque em celular/tablet (ver
-  // comentário no topo do arquivo).
-  function aoSelecionarMotorista(valor) {
-    setMotoristaDigitado(valor);
-    setMotoristaBuscado(valor || null);
+  function voltarParaLista() {
+    setMotoristaBuscado(null);
+    setFiltroMotorista('');
   }
+
+  const motoristasFiltrados = useMemo(() => {
+    const lista = state.motoristasCadastrados || [];
+    const termo = filtroMotorista.trim().toLowerCase();
+    const filtrada = termo ? lista.filter((m) => m.toLowerCase().includes(termo)) : lista;
+    return [...filtrada].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  }, [state.motoristasCadastrados, filtroMotorista]);
 
   return (
-    <div className="mx-auto max-w-2xl space-y-4">
-      <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
-        <h2 className="text-base font-bold text-slate-700 dark:text-slate-200">Registro de Chegada e Saída</h2>
-        <p className="mt-1 text-sm text-slate-400 dark:text-slate-500">
-          Digite o nome do motorista para ver as lojas das cargas dele e registrar a chegada e a saída em cada uma.
-        </p>
+    <div className="mx-auto max-w-2xl space-y-5">
+      {!motoristaBuscado ? (
+        <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+          <h2 className="text-xl font-bold text-slate-700 dark:text-slate-200">Registro de Chegada e Saída</h2>
+          <p className="mt-1.5 text-base text-slate-400 dark:text-slate-500">
+            Toque no seu nome na lista para ver as lojas das suas cargas e registrar a chegada e a saída em cada uma.
+          </p>
 
-        <form onSubmit={aoBuscar} className="mt-4 flex gap-2">
-          <SeletorCadastro
-            opcoes={state.motoristasCadastrados || []}
-            valor={motoristaDigitado}
-            onSelecionar={aoSelecionarMotorista}
-            placeholder="Selecione o motorista"
-            className="px-4 py-3 text-lg font-semibold"
-          />
-          <button
-            type="submit"
-            className="flex-shrink-0 rounded-lg bg-totvs-600 dark:bg-whatsapp-600 px-6 py-3 text-base font-semibold text-white transition-colors hover:bg-totvs-700 dark:hover:bg-whatsapp-700"
-          >
-            Buscar
-          </button>
-        </form>
-      </div>
+          {/* Pedido do usuário: lista de motoristas direto na tela (sem menu
+              suspenso) — tocar no nome já abre as entregas dele. O filtro de
+              texto só aparece quando há muitos nomes cadastrados, pra não
+              virar uma lista enorme de rolar no celular sem necessidade. */}
+          {(state.motoristasCadastrados || []).length > 8 && (
+            <div className="relative mt-4">
+              <Search size={18} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
+              <input
+                type="text"
+                value={filtroMotorista}
+                onChange={(e) => setFiltroMotorista(e.target.value)}
+                placeholder="Buscar seu nome..."
+                className="w-full rounded-lg border border-slate-300 bg-white py-3.5 pl-10 pr-4 text-lg text-slate-800 placeholder:text-slate-400 focus:border-totvs-500 dark:focus:border-whatsapp-500 focus:outline-none focus:ring-1 focus:ring-totvs-500 dark:focus:ring-whatsapp-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500"
+              />
+            </div>
+          )}
 
-      {motoristaBuscado && (
+          {motoristasFiltrados.length === 0 ? (
+            <p className="mt-4 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-5 text-center text-base text-slate-400 dark:border-slate-600 dark:bg-slate-900/40 dark:text-slate-500">
+              {(state.motoristasCadastrados || []).length === 0
+                ? 'Nenhum motorista cadastrado. Fale com a portaria/administração.'
+                : 'Nenhum motorista encontrado com esse nome.'}
+            </p>
+          ) : (
+            <div className="mt-4 space-y-2.5">
+              {motoristasFiltrados.map((nome) => (
+                <button
+                  key={nome}
+                  type="button"
+                  onClick={() => selecionarMotorista(nome)}
+                  className="flex w-full items-center gap-3 rounded-lg border border-slate-200 bg-white px-5 py-4 text-left text-lg font-semibold text-slate-700 shadow-sm transition-colors hover:border-totvs-300 hover:bg-totvs-50 active:bg-totvs-100 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:hover:border-whatsapp-500 dark:hover:bg-slate-700"
+                >
+                  <User size={20} className="flex-shrink-0 text-slate-400 dark:text-slate-500" />
+                  {nome}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : (
         <div className="space-y-3">
+          <button
+            type="button"
+            onClick={voltarParaLista}
+            className="flex items-center gap-1.5 text-base font-semibold text-totvs-600 hover:underline dark:text-whatsapp-400"
+          >
+            <ArrowLeft size={18} /> Trocar motorista
+          </button>
+
           <div className="flex flex-wrap items-center justify-between gap-2 px-1">
-            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+            <p className="text-base font-bold text-slate-700 dark:text-slate-200">
               {motoristaBuscado} — {entregas.length} {entregas.length === 1 ? 'entrega encontrada' : 'entregas encontradas'}
             </p>
             {statusLocalizacao === 'ativo' && (
-              <span className="flex items-center gap-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
-                <LocateFixed size={12} /> Localização ativa — detectando chegada
+              <span className="flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                <LocateFixed size={13} /> Localização ativa — detectando chegada
               </span>
             )}
             {statusLocalizacao === 'buscando' && (
-              <span className="flex items-center gap-1 text-[11px] font-medium text-slate-400 dark:text-slate-500">
-                <LocateFixed size={12} className="animate-pulse" /> Buscando localização...
+              <span className="flex items-center gap-1 text-xs font-medium text-slate-400 dark:text-slate-500">
+                <LocateFixed size={13} className="animate-pulse" /> Buscando localização...
               </span>
             )}
             {statusLocalizacao === 'negado' && (
-              <span className="flex items-center gap-1 text-[11px] font-medium text-amber-600 dark:text-amber-400">
-                <MapPinOff size={12} /> Ative a localização do navegador pra detectar a chegada automaticamente
+              <span className="flex items-center gap-1 text-xs font-medium text-amber-600 dark:text-amber-400">
+                <MapPinOff size={13} /> Ative a localização do navegador pra detectar a chegada automaticamente
               </span>
             )}
           </div>
 
           {entregas.length === 0 && (
-            <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-400 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-500">
+            <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-base text-slate-400 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-500">
               Nenhuma entrega encontrada para este motorista.
             </div>
           )}
@@ -445,24 +485,24 @@ function CartaoEntrega({
               (o que acontecia no celular, com o selo "Concluída" disputando
               espaço do lado). O selo de carga (inline-flex) flui junto no
               texto e só desce de linha sozinho se não couber mais nada. */}
-          <p className="text-base font-bold leading-snug text-slate-800 dark:text-slate-100">
+          <p className="text-lg font-bold leading-snug text-slate-800 dark:text-slate-100">
             <span className="font-mono">{entrega.loja.loja}</span> — {entrega.loja.nomeLoja}{' '}
             <TipoCargaBadge tipo={entrega.loja.tipoCarga} className="align-middle" />
           </p>
-          <p className="mt-0.5 text-xs text-slate-400 dark:text-slate-500">
+          <p className="mt-0.5 text-sm text-slate-400 dark:text-slate-500">
             Placa <span className="font-mono font-semibold text-slate-500 dark:text-slate-400">{entrega.placa}</span>
             {concluida && !eHoje(entrega.saidaLoja) && <> — {formatarData(entrega.saidaLoja.slice(0, 10))}</>}
           </p>
         </div>
         {concluida && (
-          <span className="flex flex-shrink-0 items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-600 dark:border dark:border-current dark:bg-emerald-500/10 dark:text-emerald-300">
-            <CheckCircle2 size={14} /> Concluída
+          <span className="flex flex-shrink-0 items-center gap-1 rounded-full bg-emerald-50 px-3 py-1.5 text-sm font-semibold text-emerald-600 dark:border dark:border-current dark:bg-emerald-500/10 dark:text-emerald-300">
+            <CheckCircle2 size={16} /> Concluída
           </span>
         )}
       </div>
 
       {(entrega.entregaNotasFiscais || entrega.chegadaLoja || entrega.saidaLoja || deslocamento) && (
-        <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 border-t border-slate-100 pt-3 text-xs text-slate-500 dark:border-slate-700 dark:text-slate-400">
+        <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5 border-t border-slate-100 pt-3 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
           {entrega.entregaNotasFiscais && (
             <span className="inline-flex items-center">
               NF entregue:{' '}
@@ -560,13 +600,13 @@ function CartaoEntrega({
               )}
               <button
                 onClick={() => aoRegistrar(actions.registrarChegadaLoja, entrega.id)}
-                className={`flex w-full items-center justify-center gap-2 rounded-lg px-4 py-3.5 text-base font-semibold text-white transition-colors ${
+                className={`flex w-full items-center justify-center gap-2 rounded-lg px-4 py-4 text-lg font-semibold text-white transition-colors ${
                   pertoDaLoja
                     ? 'animate-pulse bg-emerald-600 ring-4 ring-emerald-300 hover:bg-emerald-700 active:bg-emerald-800 dark:ring-emerald-700/60'
                     : 'bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800'
                 }`}
               >
-                <LogIn size={20} /> Registrar Chegada na Loja
+                <LogIn size={22} /> Registrar Chegada na Loja
               </button>
               {!pertoDaLoja && distanciaMetros != null && (
                 <p className="mt-1.5 text-center text-[11px] text-slate-400 dark:text-slate-500">
@@ -596,13 +636,13 @@ function CartaoEntrega({
                 }
                 placeholder="Alguma observação? (opcional — fila, atraso, recusa de carga...)"
                 rows={2}
-                className="mb-2 w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 placeholder:text-slate-400 focus:border-totvs-400 dark:focus:border-whatsapp-400 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:placeholder:text-slate-500"
+                className="mb-2 w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2 text-base text-slate-700 placeholder:text-slate-400 focus:border-totvs-400 dark:focus:border-whatsapp-400 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:placeholder:text-slate-500"
               />
               <button
                 onClick={() => aoRegistrarSaida(entrega.id)}
-                className="flex w-full items-center justify-center gap-2 rounded-lg bg-amber-600 px-4 py-3.5 text-base font-semibold text-white transition-colors hover:bg-amber-700 active:bg-amber-800"
+                className="flex w-full items-center justify-center gap-2 rounded-lg bg-amber-600 px-4 py-4 text-lg font-semibold text-white transition-colors hover:bg-amber-700 active:bg-amber-800"
               >
-                <LogOut size={20} /> Registrar Saída da Loja
+                <LogOut size={22} /> Registrar Saída da Loja
               </button>
               <RegistroManual
                 chave={`${entrega.id}-saida`}

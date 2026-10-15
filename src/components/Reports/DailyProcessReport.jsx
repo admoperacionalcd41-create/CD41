@@ -10,7 +10,7 @@ const ROTULO_TIPO = {
   todos: 'Seca + Resfriada',
 };
 
-// Selo de status (Apontamento / Carregamento) dentro da tabela — pedido do
+// Selo de status (Geração de Carga / Carregamento) dentro da tabela — pedido do
 // usuário: validar só pela LOJA (feito/pendente), sem mostrar nada de carga
 // (antes, uma loja com mais de uma carga no dia mostrava a contagem "(2/3)"
 // e o status de cada carga separadamente).
@@ -48,7 +48,7 @@ export default function DailyProcessReport() {
   // (ver AppContext.jsx).
 
   // A lógica de montar essa lista (uma linha por código de loja, sempre com
-  // as lojas fixas do histórico, apontamento/carregamento validados só pra
+  // as lojas fixas do histórico, geração de carga/carregamento validados só pra
   // hoje de verdade) mora em getLinhasProcessoDoDia (selectors.js) — foi
   // extraída de lá pra poder ser reaproveitada também no card de resumo
   // operacional da aba Box / Frota, sem duplicar essa regra em dois
@@ -119,7 +119,7 @@ export default function DailyProcessReport() {
                 reescrita pra começar sozinha com letra maiúscula. */}
             <p className="text-xs text-slate-400 dark:text-slate-500">
               A coluna Loja traz sempre as lojas fixas (todo código já visto em alguma importação), mesmo sem carga
-              hoje; as colunas Apontamento e Carregamento validam só o que foi feito hoje de verdade (registros de
+              hoje; as colunas Geração de Carga e Carregamento validam só o que foi feito hoje de verdade (registros de
               dias anteriores não contam)
             </p>
           </div>
@@ -151,7 +151,7 @@ export default function DailyProcessReport() {
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div className="rounded-lg bg-slate-50 p-3 text-center dark:bg-slate-900/30">
-          <p className="text-xs text-slate-400 dark:text-slate-500">Apontamento feito</p>
+          <p className="text-xs text-slate-400 dark:text-slate-500">Geração de carga feita</p>
           <p className="mt-0.5 text-xl font-bold text-slate-700 dark:text-slate-200">
             {comApontamento} <span className="text-sm font-medium text-slate-400 dark:text-slate-500">/ {total}</span>
           </p>
@@ -201,7 +201,7 @@ export default function DailyProcessReport() {
                   <tr className="border-b border-slate-200 dark:border-slate-700">
                     <th className="w-16 py-2.5 pl-3 pr-1 font-semibold">Posição</th>
                     <th className="py-2.5 pr-3 font-semibold">Loja</th>
-                    <th className="px-2 py-2.5 text-center font-semibold">Apontamento</th>
+                    <th className="px-2 py-2.5 text-center font-semibold">Geração de Carga</th>
                     <th className="px-2 py-2.5 text-center font-semibold">Carregamento</th>
                   </tr>
                 </thead>
@@ -274,7 +274,7 @@ export default function DailyProcessReport() {
               <thead className="sticky top-0 z-10 bg-white text-xs text-slate-500 shadow-sm dark:bg-slate-800 dark:text-slate-400">
                 <tr className="border-b border-slate-200 dark:border-slate-700">
                   <th className="py-2.5 pl-3 pr-3 font-semibold">Loja</th>
-                  <th className="px-2 py-2.5 text-center font-semibold">Apontamento</th>
+                  <th className="px-2 py-2.5 text-center font-semibold">Geração de Carga</th>
                   <th className="px-2 py-2.5 text-center font-semibold">Carregamento</th>
                 </tr>
               </thead>

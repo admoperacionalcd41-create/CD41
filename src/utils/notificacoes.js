@@ -57,3 +57,44 @@ export function montarMensagemProtocolo({ placa, motorista, diaEntregaReferencia
     ...linhasLojas,
   ].join('\n');
 }
+
+function pluralLoja(qtd) {
+  return `${qtd} loja${qtd !== 1 ? 's' : ''}`;
+}
+
+// Mensagem de "Status da operação" (ver botão em Dashboard.jsx e
+// getResumoStatusDoDia em selectors.js) — pedido do usuário: poder mandar
+// pro WhatsApp o que foi gerado, o que já foi entregue e o % de volume
+// concluído x pendente, pra atualizar quem está acompanhando sem precisar
+// abrir o sistema. Duas versões, escolhidas na hora pelo usuário (toggle no
+// modal): "enxuta" (só os totais) e "detalhada" (com a quebra por etapa).
+export function montarMensagemStatusDoDia(resumo, { detalhado = false } = {}) {
+  const cabecalho = `Status da operação — ${formatarData(resumo.data)}`;
+  const lojasPendentes = resumo.lojasGeradas - resumo.lojasEntregues;
+
+  if (!detalhado) {
+    return [
+      cabecalho,
+      `Gerado: ${pluralLoja(resumo.lojasGeradas)} / ${resumo.paletesGerados} paletes`,
+      `Entregue: ${pluralLoja(resumo.lojasEntregues)} / ${resumo.paletesEntregues} paletes`,
+      `Pendente: ${pluralLoja(lojasPendentes)} / ${resumo.paletesPendentes} paletes`,
+      `Volume concluído: ${resumo.percentualConcluido}%`,
+    ].join('\n');
+  }
+
+  const percentualPendente = 100 - resumo.percentualConcluido;
+  return [
+    cabecalho,
+    'GERADO',
+    `${pluralLoja(resumo.lojasGeradas)} / ${resumo.paletesGerados} paletes`,
+    'POR ETAPA',
+    `Pendente: ${pluralLoja(resumo.porEtapa.pendente)}`,
+    `Em agrupamento: ${pluralLoja(resumo.porEtapa.emAgrupamento)}`,
+    `Prontas p/ carregar: ${pluralLoja(resumo.porEtapa.prontasParaCarregar)}`,
+    `Em carregamento: ${pluralLoja(resumo.porEtapa.emCarregamento)}`,
+    `Entregues: ${pluralLoja(resumo.porEtapa.entregues)}`,
+    'ENTREGUE',
+    `${resumo.paletesEntregues} paletes enviados (${resumo.percentualConcluido}% do volume gerado)`,
+    `Pendente: ${resumo.paletesPendentes} paletes (${percentualPendente}%)`,
+  ].join('\n');
+}

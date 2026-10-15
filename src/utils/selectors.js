@@ -326,6 +326,80 @@ export function getResumoDashboard(state) {
   };
 }
 
+/**
+ * Resumo do status operacional do dia — base da mensagem de WhatsApp
+ * "Status da operação" (ver montarMensagemStatusDoDia em notificacoes.js e
+ * o botão em Dashboard.jsx). Usa o mesmo recorte de "hoje" do resto do
+ * Dashboard (getLojasDoDia — dia operacional, state.diaAtual).
+ *
+ * "Gerado" é o volume total informado/planejado para essas lojas
+ * (paletesPlanejados, o valor trazido na importação); cai para o valor mais
+ * recente conhecido (apontado, depois agrupado) só em registros antigos que
+ * não tragam paletesPlanejados preenchido.
+ *
+ * "Entregue" soma paletesEnviados de TODOS os protocolos dessas lojas,
+ * completos OU parciais/saldo — pedido do usuário: um envio parcial já
+ * tirou aquele volume do CD de verdade, então precisa contar no "entregue"
+ * mesmo que a loja em si ainda não esteja com status "finalizada" (ela volta
+ * para "agrupada" com o saldo restante enquanto isso).
+ *
+ * A quebra "por etapa" é por CONTAGEM DE LOJAS (não paletes), pelo status
+ * atual de cada uma — "apontada"/"conferência finalizada" entram em
+ * "pendente" porque ainda não começaram o agrupamento.
+ */
+export function getResumoStatusDoDia(state) {
+  const lojasHoje = getLojasDoDia(state);
+  const idsHoje = new Set(lojasHoje.map((l) => l.id));
+
+  const paletesReferencia = (l) => {
+    if (l.paletesPlanejados > 0) return l.paletesPlanejados;
+    if (l.paletesApontados > 0) return l.paletesApontados;
+    if (l.paletesAgrupados > 0) return l.paletesAgrupados;
+    return l.paletesNoAgrupamento || 0;
+  };
+
+  const paletesGerados = lojasHoje.reduce((soma, l) => soma + paletesReferencia(l), 0);
+
+  const paletesEntregues = state.protocolos
+    .filter((p) => idsHoje.has(p.lojaId))
+    .reduce((soma, p) => soma + (Number(p.paletesEnviados) || 0), 0);
+
+  const paletesPendentes = Math.max(0, paletesGerados - paletesEntregues);
+  const percentualConcluido = paletesGerados > 0 ? Math.round((paletesEntregues / paletesGerados) * 100) : 0;
+
+  const porEtapa = {
+    pendente: 0,
+    emAgrupamento: 0,
+    prontasParaCarregar: 0,
+    emCarregamento: 0,
+    entregues: 0,
+  };
+  lojasHoje.forEach((l) => {
+    if (l.status === 'pendente' || l.status === 'apontada' || l.status === 'conferencia_finalizada') {
+      porEtapa.pendente += 1;
+    } else if (l.status === 'em_agrupamento') {
+      porEtapa.emAgrupamento += 1;
+    } else if (l.status === 'agrupada') {
+      porEtapa.prontasParaCarregar += 1;
+    } else if (l.status === 'carregando') {
+      porEtapa.emCarregamento += 1;
+    } else if (l.status === 'finalizada') {
+      porEtapa.entregues += 1;
+    }
+  });
+
+  return {
+    data: state.diaAtual,
+    lojasGeradas: lojasHoje.length,
+    paletesGerados,
+    lojasEntregues: porEtapa.entregues,
+    paletesEntregues,
+    paletesPendentes,
+    percentualConcluido,
+    porEtapa,
+  };
+}
+
 export function getLojaPorId(state, lojaId) {
   return state.lojas.find((l) => l.id === lojaId) || null;
 }

@@ -91,7 +91,7 @@ function aplicarAcaoInterna(state, acao) {
       if (loja.status !== 'pendente') {
         return {
           ...state,
-          ultimoErro: `Loja ${loja.loja} já está em andamento e não pode ser excluída — cancele o apontamento dela primeiro.`,
+          ultimoErro: `Loja ${loja.loja} já está em andamento e não pode ser excluída — cancele a geração de carga dela primeiro.`,
         };
       }
       return {
@@ -148,7 +148,7 @@ function aplicarAcaoInterna(state, acao) {
       return { ...state, sequenciaLojas: Array.isArray(ordem) ? ordem : [] };
     }
 
-    // Etapa 1 — Apontamento: aponta manualmente a loja para um box, apenas
+    // Etapa 1 — Geração de Carga: aponta manualmente a loja para um box, apenas
     // reservando as vagas físicas em ordem CRESCENTE (estimativa rápida,
     // antes da conferência física). Sinaliza que a loja está "em execução"
     // — o box já está definido, mas o agrupamento em si ainda não começou
@@ -162,7 +162,7 @@ function aplicarAcaoInterna(state, acao) {
         return { ...state, ultimoErro: 'Loja ou box inválido.' };
       }
       if (loja.status !== 'pendente') {
-        return { ...state, ultimoErro: 'Esta loja já foi apontada para um box anteriormente.' };
+        return { ...state, ultimoErro: 'Esta loja já teve a carga gerada para um box anteriormente.' };
       }
 
       const resultado = alocarVagasCrescente(box, quantidadePaletes, lojaId);
@@ -182,7 +182,7 @@ function aplicarAcaoInterna(state, acao) {
                 vagasOcupadas: resultado.vagasAlocadas,
                 paletesAgrupados: quantidadePaletes,
                 paletesNoAgrupamento: quantidadePaletes,
-                // Guarda a quantidade "estimada" do Apontamento (Etapa 1)
+                // Guarda a quantidade "estimada" da Geração de Carga (Etapa 1)
                 // separada de `paletesAgrupados`, que é reescrita pela
                 // Conclusão do Agrupamento (Etapa 4) com a contagem final
                 // reconferida — diferente de `paletesApontados`, que nunca
@@ -195,20 +195,20 @@ function aplicarAcaoInterna(state, acao) {
             : l
         ),
         ultimoErro: null,
-        ultimoAviso: `Loja ${loja.loja} apontada no ${getNomeBox(boxNumero)} (vagas ${resultado.vagasAlocadas.join(', ')}) — em execução.`,
+        ultimoAviso: `Loja ${loja.loja} com carga gerada no ${getNomeBox(boxNumero)} (vagas ${resultado.vagasAlocadas.join(', ')}) — em execução.`,
       };
     }
 
     // Etapa 2 — Conferência Finalizada: marca que a conferência física da
-    // carga apontada no box foi concluída, antes de sinalizar os
+    // carga gerada no box foi concluída, antes de sinalizar os
     // colaboradores e iniciar o agrupamento propriamente dito. Não altera
-    // vagas nem quantidade — é apenas um marco de acompanhamento entre o
-    // apontamento e o início efetivo do agrupamento.
+    // vagas nem quantidade — é apenas um marco de acompanhamento entre a
+    // geração de carga e o início efetivo do agrupamento.
     case 'CONCLUIR_CONFERENCIA': {
       const { lojaId } = acao.payload;
       const loja = state.lojas.find((l) => l.id === lojaId);
       if (!loja || loja.status !== 'apontada') {
-        return { ...state, ultimoErro: 'Esta loja precisa estar apontada em um box antes de finalizar a conferência.' };
+        return { ...state, ultimoErro: 'Esta loja precisa ter a carga gerada em um box antes de finalizar a conferência.' };
       }
 
       return {
@@ -225,7 +225,7 @@ function aplicarAcaoInterna(state, acao) {
 
     // Etapa 3 — Início do Agrupamento: sinaliza apenas quais colaboradores
     // (até 4) estarão executando o agrupamento físico dos paletes nesse box.
-    // As vagas permanecem como estão (crescentes, do apontamento) — a
+    // As vagas permanecem como estão (crescentes, da geração de carga) — a
     // quantidade de paletes só é reconfirmada ao concluir o agrupamento.
     case 'INICIAR_AGRUPAMENTO': {
       const { lojaId, colaboradores } = acao.payload;
@@ -253,8 +253,8 @@ function aplicarAcaoInterna(state, acao) {
 
     // Etapa 4 — Conclusão do Agrupamento: os colaboradores terminaram de
     // montar a carga no box e informam a quantidade de paletes efetivamente
-    // conferida (geralmente menor que a estimativa do apontamento). As
-    // vagas crescentes do apontamento são liberadas e realocadas em ordem
+    // conferida (geralmente menor que a estimativa da geração de carga). As
+    // vagas crescentes da geração de carga são liberadas e realocadas em ordem
     // DECRESCENTE (preenchimento reverso clássico) para essa quantidade
     // final; a loja fica pronta para gerar etiqueta e seguir para o
     // carregamento.
@@ -307,7 +307,7 @@ function aplicarAcaoInterna(state, acao) {
     // "Cancelar" em qualquer uma das quatro etapas anteriores ao
     // carregamento volta a loja exatamente para a etapa/tela anterior do
     // processo (não zera tudo de volta para "pendente", exceto quando a
-    // etapa atual É a primeira — apontada — caso em que não existe etapa
+    // etapa atual É a primeira — geração de carga — caso em que não existe etapa
     // anterior além de pendente, e as vagas reservadas são liberadas):
     //   agrupada              -> em_agrupamento (desfaz a conclusão: solta
     //                            as vagas decrescentes e realoca em
@@ -317,7 +317,7 @@ function aplicarAcaoInterna(state, acao) {
     //                            e a data de início; vagas não mudam, pois o
     //                            início do agrupamento não mexe nelas)
     //   conferencia_finalizada-> apontada (só desfaz o marco da conferência;
-    //                            vagas do apontamento continuam intactas)
+    //                            vagas da geração de carga continuam intactas)
     //   apontada              -> pendente (libera as vagas reservadas)
     case 'CANCELAR_AGRUPAMENTO': {
       const { lojaId } = acao.payload;
@@ -351,7 +351,7 @@ function aplicarAcaoInterna(state, acao) {
               : l
           ),
           ultimoErro: null,
-          ultimoAviso: `Apontamento da loja ${loja.loja} cancelado — vagas liberadas.`,
+          ultimoAviso: `Geração de carga da loja ${loja.loja} cancelada — vagas liberadas.`,
         };
       }
 
@@ -362,7 +362,7 @@ function aplicarAcaoInterna(state, acao) {
             l.id === lojaId ? { ...l, status: 'apontada', dataConferencia: null } : l
           ),
           ultimoErro: null,
-          ultimoAviso: `Loja ${loja.loja} voltou para Em Execução (apontada) — conferência desfeita.`,
+          ultimoAviso: `Loja ${loja.loja} voltou para Em Execução (carga gerada) — conferência desfeita.`,
         };
       }
 
@@ -380,7 +380,7 @@ function aplicarAcaoInterna(state, acao) {
       }
 
       // agrupada -> em_agrupamento: desfaz a realocação decrescente da
-      // conclusão, voltando as vagas para o padrão crescente do apontamento
+      // conclusão, voltando as vagas para o padrão crescente da geração de carga
       // (com a quantidade que estava confirmada), para permitir concluir de
       // novo com uma quantidade diferente se for o caso.
       const box = state.boxes.find((b) => b.numero === loja.boxNumero);

@@ -38,7 +38,7 @@ const RELATORIOS = [
     chave: 'processo',
     rotulo: 'Processo do Dia',
     Icone: ListChecks,
-    descricao: 'Mostra, loja por loja, se o apontamento pro box e o carregamento já foram feitos hoje.',
+    descricao: 'Mostra, loja por loja, se a geração de carga pro box e o carregamento já foram feitos hoje.',
     Componente: DailyProcessReport,
     usaPeriodo: false,
   },
