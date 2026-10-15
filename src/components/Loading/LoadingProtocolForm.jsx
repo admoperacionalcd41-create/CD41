@@ -3,7 +3,7 @@ import { X, Truck, MessageSquareText, Check, CalendarClock } from 'lucide-react'
 import { useApp } from '../../context/AppContext.jsx';
 import { getNomeBox } from '../../utils/boxLogic';
 import { montarMensagemProtocolo } from '../../utils/notificacoes';
-import { imprimirEtiquetasCarregamento } from '../../utils/imprimirEtiquetaCarregamento';
+import { imprimirEtiquetaCarregamento } from '../../utils/imprimirEtiquetaCarregamento';
 import { hojeISO, somarDias } from '../../utils/dateHelpers';
 import TipoCargaBadge from '../Shared/TipoCargaBadge.jsx';
 import SequenciaCarregamentoCaminhao from './SequenciaCarregamentoCaminhao.jsx';
@@ -206,27 +206,24 @@ export default function LoadingProtocolForm({ lojas, aoFechar, aoRegistrar }) {
         diaEntregaReferencia: contarEmOutroDia ? diaEntregaReferencia : null,
       });
 
-      const totalLote = ordemCarregamento.length;
-
-      // Pedido do usuário: imprimir a etiqueta de carregamento (uma por
-      // loja, na sequência de entrega combinada) ANTES de abrir a tela de
-      // notificar a equipe por WhatsApp — ver imprimirEtiquetaCarregamento.js.
-      imprimirEtiquetasCarregamento(
-        lojas.map((l) => {
-          const posicaoCarregamento = ordemCarregamento.indexOf(l.id) + 1;
-          return {
-            motorista,
-            placa: placaFinal,
-            loja: l.loja,
-            paletesEnviados: quantidades[l.id],
-            boxNumero: l.boxNumero,
-            colaboradores: l.colaboradores,
-            posicaoEntrega: totalLote - posicaoCarregamento + 1,
-          };
-        })
+      // Pedido do usuário: imprimir UMA ÚNICA etiqueta de carregamento (com
+      // uma seção por loja, na sequência de carregamento combinada no
+      // desenho do caminhão) ANTES de abrir a tela de notificar a equipe
+      // por WhatsApp — ver imprimirEtiquetaCarregamento.js.
+      imprimirEtiquetaCarregamento(
+        lojas.map((l) => ({
+          motorista,
+          placa: placaFinal,
+          loja: l.loja,
+          paletesEnviados: quantidades[l.id],
+          boxNumero: l.boxNumero,
+          colaboradores: l.colaboradores,
+          posicaoCarregamento: ordemCarregamento.indexOf(l.id) + 1,
+        }))
       );
 
       if (aoRegistrar) {
+        const totalLote = ordemCarregamento.length;
         aoRegistrar(
           montarMensagemProtocolo({
             placa: placaFinal,
@@ -278,8 +275,8 @@ export default function LoadingProtocolForm({ lojas, aoFechar, aoRegistrar }) {
     });
 
     // Mesma impressão da etiqueta de carregamento do fluxo em lote (ver
-    // acima) — aqui sem sequência de entrega, pois é uma única loja.
-    imprimirEtiquetasCarregamento([
+    // acima) — aqui sem numeração de sequência, pois é uma única loja.
+    imprimirEtiquetaCarregamento([
       {
         motorista,
         placa: placaFinal,
