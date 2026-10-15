@@ -28,42 +28,56 @@ export function useFullscreen() {
   // página carrega — a Fullscreen API só aceita o pedido como resposta
   // DIRETA a um gesto do usuário (toque/clique), por segurança, senão
   // qualquer site poderia forçar tela cheia sem o usuário querer. Por isso,
-  // em telas de celular, assim que o usuário toca em QUALQUER lugar da tela
-  // pela primeira vez, entramos em tela cheia automaticamente — na prática
-  // o app "abre expandido", já que isso acontece no primeiríssimo toque,
-  // antes de qualquer outra ação dele. O botão manual (ver Header.jsx)
-  // continua existindo, tanto pra quem está no desktop (onde este efeito
-  // nem roda) quanto como alternativa caso esse primeiro toque automático
-  // não funcione por algum motivo (ex.: iPhone — o Safari no iOS não
-  // suporta a Fullscreen API nenhuma, então nem o botão manual aparece lá).
+  // em telas de celular, tentamos entrar em tela cheia a cada toque do
+  // usuário (enquanto ainda não estiver em tela cheia) — na prática o app
+  // "abre expandido", já que isso acontece bem no início do uso, antes de
+  // qualquer ação de verdade. O botão manual (ver Header.jsx) continua
+  // existindo, tanto pra quem está no desktop (onde este efeito nem roda)
+  // quanto como alternativa caso esse toque automático não funcione por
+  // algum motivo (ex.: iPhone — o Safari no iOS não suporta a Fullscreen
+  // API nenhuma, então nem o botão manual aparece lá).
   //
-  // Importante: só no evento "click" (nunca em "pointerdown"/"touchstart").
-  // A primeira versão disso escutava os dois ao mesmo tempo, pra reagir o
-  // quanto antes — mas vários navegadores/WebViews de Android (confirmado
-  // no celular do usuário) não concedem a permissão de tela cheia ainda
-  // durante o toque (dedo ainda na tela), só depois que o toque é
-  // concluído. Como as duas tentativas compartilhavam a mesma trava (só
-  // tenta uma vez), o pedido feito cedo demais no "pointerdown" já
-  // "gastava" essa trava mesmo sendo negado pelo navegador, e o "click"
-  // seguinte (que teria funcionado) nunca chegava a tentar — por isso o app
-  // ficava preso na versão não-expandida até o toque manual no botão, que
-  // só usa "click" e por isso sempre funcionava. Usando só "click" aqui,
-  // igual ao botão manual (ver alternarTelaCheia abaixo), o primeiro toque
-  // do usuário passa a expandir de verdade.
+  // Histórico de duas tentativas anteriores que não bastaram sozinhas:
+  //   1) Só em "pointerdown": alguns navegadores/WebViews de Android negam
+  //      o pedido feito ainda durante o toque (dedo na tela) — precisa ser
+  //      num gesto já concluído.
+  //   2) Só em "click", só uma vez ("once: true"): resolve o caso acima,
+  //      mas o PRIMEIRO toque do usuário na tela nem sempre é um clique de
+  //      verdade — pode ser o início de uma rolagem (arrastar o dedo pra
+  //      ver a lista), que nunca dispara "click" nenhum. Com uma trava de
+  //      "só tenta uma vez" presa a esse evento, o app ficava esperando um
+  //      clique que podia demorar a acontecer (ou nunca acontecer, se o
+  //      usuário só rolar a tela e tocar em botões que navegam sem
+  //      disparar o "click" do jeito esperado).
+  //
+  // Solução: tenta em TRÊS eventos (pointerdown, touchend e click) — cobre
+  // tanto o início quanto o fim de um toque/rolagem, além de cliques de
+  // mouse — e cada tentativa checa `document.fullscreenElement` na hora,
+  // em vez de uma trava fixa de "só tenta uma vez": um pedido negado (ex.:
+  // o de pointerdown) simplesmente não trava nada, e o próximo evento do
+  // mesmo toque (touchend) ou do próximo toque tenta de novo. Uma vez que
+  // a tela cheia é concedida, a checagem no topo já sai de imediato (sem
+  // custo) em qualquer novo evento.
   useEffect(() => {
     if (!suportado) return;
     const ehCelular = window.matchMedia('(max-width: 768px)').matches;
-    if (!ehCelular || document.fullscreenElement) return;
+    if (!ehCelular) return;
 
-    function aoPrimeiroToque() {
+    function aoTocar() {
+      if (document.fullscreenElement) return;
       document.documentElement.requestFullscreen?.().catch(() => {
-        // Pedido negado pelo navegador — sem travar nada, o app continua
-        // funcionando normalmente, só sem entrar em tela cheia sozinho.
+        // Esse evento específico não foi aceito pelo navegador — sem
+        // travar nada, o próximo evento (do mesmo toque ou do próximo)
+        // tenta de novo.
       });
     }
-    document.addEventListener('click', aoPrimeiroToque, { once: true });
+    document.addEventListener('pointerdown', aoTocar);
+    document.addEventListener('touchend', aoTocar);
+    document.addEventListener('click', aoTocar);
     return () => {
-      document.removeEventListener('click', aoPrimeiroToque);
+      document.removeEventListener('pointerdown', aoTocar);
+      document.removeEventListener('touchend', aoTocar);
+      document.removeEventListener('click', aoTocar);
     };
   }, [suportado]);
 
