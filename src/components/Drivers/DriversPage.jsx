@@ -6,6 +6,7 @@ import TipoCargaBadge from '../Shared/TipoCargaBadge.jsx';
 import { lojaPassaFiltroTipoCarga } from '../../utils/tipoCarga';
 import { calcularDistanciaMetros, formatarDistancia, RAIO_GEOFENCE_METROS, buscarEnderecoPorCoordenada } from '../../utils/geo';
 import { mapaDeslocamentoPorVeiculo } from '../../utils/deslocamento';
+import InstalarAppBanner from './InstalarAppBanner.jsx';
 
 // Tela simples para uso dos motoristas: digitam o próprio nome e veem as
 // lojas de entrega dos carregamentos feitos por eles, com um botão grande
@@ -238,6 +239,8 @@ export default function DriversPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-5">
+      <InstalarAppBanner />
+
       {!motoristaBuscado ? (
         <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800">
           <h2 className="text-xl font-bold text-slate-700 dark:text-slate-200">Registro de Chegada e Saída</h2>
