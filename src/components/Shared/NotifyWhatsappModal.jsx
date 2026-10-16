@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, MessageCircle, AlertTriangle, Send, Settings2 } from 'lucide-react';
+import { X, MessageCircle, AlertTriangle, Send, Settings2, SendHorizontal } from 'lucide-react';
 import { useApp } from '../../context/AppContext.jsx';
 import { abrirWhatsapp } from '../../utils/whatsapp';
 
@@ -7,9 +7,27 @@ import { abrirWhatsapp } from '../../utils/whatsapp';
 // concluir um agrupamento (GroupingPage.jsx) quanto ao registrar um
 // protocolo de carregamento (LoadingPage.jsx). Recebe a mensagem já pronta
 // (ver utils/notificacoes.js) e lista os contatos cadastrados em
-// Cadastros > Notificação, cada um com seu próprio botão "Enviar". Cada
-// envio é um clique manual — o WhatsApp não tem um jeito de mandar sozinho,
-// nem pra um contato nem pra um grupo.
+// Cadastros > Notificação.
+//
+// Pedido do usuário: em vez de precisar clicar "Enviar" contato por
+// contato, um único botão "Enviar para todos" no topo. IMPORTANTE (e
+// avisado na tela, pra não parecer bug): o WhatsApp não tem, em lugar
+// nenhum, um jeito de mandar mensagem sozinho sem toque humano — nem pra
+// um contato, nem pra um grupo, nem por nenhum site/app de terceiro
+// (inclusive este). Todo link de "clique para conversar" (wa.me) só
+// preenche o texto; a pessoa ainda precisa apertar Enviar DENTRO do
+// WhatsApp, em cada conversa — isso é assim pra qualquer empresa que use
+// esse recurso, não é uma limitação só do Doca Manager. O que esse botão
+// faz de verdade é abrir a conversa já pronta para todos os contatos de
+// uma vez (só falta apertar Enviar dentro de cada uma), em vez de precisar
+// voltar aqui pra abrir uma de cada vez.
+//
+// Isso funciona bem no computador (abre uma aba por contato). No celular é
+// mais limitado: ao abrir o link, o aparelho troca para o app do WhatsApp
+// na hora — então só a primeira conversa abre, e as outras ficam
+// esperando (não dá pra abrir várias ao mesmo tempo nesse caso). Por isso
+// o botão individual "Enviar" de cada contato continua existindo embaixo,
+// pra repetir ou continuar de onde parou.
 export default function NotifyWhatsappModal({ titulo = 'Notificar equipe', mensagem, aoFechar, irPara }) {
   const { state } = useApp();
   const [statusPorTelefone, setStatusPorTelefone] = useState({});
@@ -20,6 +38,23 @@ export default function NotifyWhatsappModal({ titulo = 'Notificar equipe', mensa
   function aoEnviar(contato) {
     const abriu = abrirWhatsapp(contato.telefone, mensagem);
     setStatusPorTelefone((prev) => ({ ...prev, [contato.telefone]: abriu ? 'ok' : 'bloqueado' }));
+  }
+
+  // Dispara a abertura para TODOS os contatos de uma vez, num laço só,
+  // sem nenhuma espera (setTimeout/await) entre uma chamada e outra — é
+  // isso que mantém as aberturas "coladas" no mesmo clique do usuário, pra
+  // o navegador não bloquear como pop-up indesejado (ver abrirWhatsapp,
+  // whatsapp.js). Ainda assim, o navegador pode bloquear algumas (comum
+  // acontecer com muitos contatos de uma vez, ou no celular) — por isso
+  // cada contato continua marcado com seu próprio status abaixo, igual ao
+  // envio individual, pra dar pra ver quais abriram e reenviar só as que
+  // faltaram.
+  function aoEnviarParaTodos() {
+    const novoStatus = {};
+    contatos.forEach((contato) => {
+      novoStatus[contato.telefone] = abrirWhatsapp(contato.telefone, mensagem) ? 'ok' : 'bloqueado';
+    });
+    setStatusPorTelefone((prev) => ({ ...prev, ...novoStatus }));
   }
 
   return (
@@ -57,6 +92,14 @@ export default function NotifyWhatsappModal({ titulo = 'Notificar equipe', mensa
             </div>
           ) : (
             <div className="space-y-1.5">
+              {contatos.length > 1 && (
+                <button
+                  onClick={aoEnviarParaTodos}
+                  className="mb-2 flex w-full items-center justify-center gap-1.5 rounded-md bg-emerald-600 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700"
+                >
+                  <SendHorizontal size={15} /> Enviar para todos ({contatos.length})
+                </button>
+              )}
               {contatos.map((contato) => {
                 const status = statusPorTelefone[contato.telefone];
                 return (
@@ -91,9 +134,11 @@ export default function NotifyWhatsappModal({ titulo = 'Notificar equipe', mensa
             <div className="mt-3 flex items-start gap-2 rounded-lg bg-amber-50 p-3 text-xs text-amber-700 dark:border dark:border-current dark:bg-amber-500/10 dark:text-amber-300">
               <AlertTriangle size={14} className="mt-0.5 flex-shrink-0" />
               <span>
-                O navegador não deixou abrir o WhatsApp. Se estiver usando o app pela
-                pré-visualização do claude.ai, isso é esperado — acesse o app pelo link hospedado
-                fora dali para essa abertura funcionar direto.
+                O navegador não deixou abrir o WhatsApp de um ou mais contatos marcados acima. Se
+                estiver usando o app pela pré-visualização do claude.ai, isso é esperado — acesse o
+                app pelo link hospedado fora dali. Fora disso, costuma acontecer no celular (só abre
+                uma conversa por vez) ou quando o navegador bloqueia várias abas de uma vez só —
+                toque em "Enviar" individualmente nesses contatos para continuar.
               </span>
             </div>
           )}
