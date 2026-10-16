@@ -3,7 +3,6 @@ import { X, Truck, MessageSquareText, Check, CalendarClock } from 'lucide-react'
 import { useApp } from '../../context/AppContext.jsx';
 import { getNomeBox } from '../../utils/boxLogic';
 import { montarMensagemProtocolo } from '../../utils/notificacoes';
-import { imprimirEtiquetaCarregamento } from '../../utils/imprimirEtiquetaCarregamento';
 import { hojeISO, somarDias } from '../../utils/dateHelpers';
 import TipoCargaBadge from '../Shared/TipoCargaBadge.jsx';
 import SequenciaCarregamentoCaminhao from './SequenciaCarregamentoCaminhao.jsx';
@@ -206,22 +205,6 @@ export default function LoadingProtocolForm({ lojas, aoFechar, aoRegistrar }) {
         diaEntregaReferencia: contarEmOutroDia ? diaEntregaReferencia : null,
       });
 
-      // Pedido do usuário: imprimir UMA ÚNICA etiqueta de carregamento (com
-      // uma seção por loja, na sequência de carregamento combinada no
-      // desenho do caminhão) ANTES de abrir a tela de notificar a equipe
-      // por WhatsApp — ver imprimirEtiquetaCarregamento.js.
-      imprimirEtiquetaCarregamento(
-        lojas.map((l) => ({
-          motorista,
-          placa: placaFinal,
-          loja: l.loja,
-          paletesEnviados: quantidades[l.id],
-          boxNumero: l.boxNumero,
-          colaboradores: l.colaboradores,
-          posicaoCarregamento: ordemCarregamento.indexOf(l.id) + 1,
-        }))
-      );
-
       if (aoRegistrar) {
         const totalLote = ordemCarregamento.length;
         aoRegistrar(
@@ -273,19 +256,6 @@ export default function LoadingProtocolForm({ lojas, aoFechar, aoRegistrar }) {
       lotesRestantes: statusEnvio === 'saldo' ? loteRestante : [],
       diaEntregaReferencia: contarEmOutroDia ? diaEntregaReferencia : null,
     });
-
-    // Mesma impressão da etiqueta de carregamento do fluxo em lote (ver
-    // acima) — aqui sem numeração de sequência, pois é uma única loja.
-    imprimirEtiquetaCarregamento([
-      {
-        motorista,
-        placa: placaFinal,
-        loja: loja.loja,
-        paletesEnviados: quantidade,
-        boxNumero: loja.boxNumero,
-        colaboradores: loja.colaboradores,
-      },
-    ]);
 
     if (aoRegistrar) {
       aoRegistrar(

@@ -1,15 +1,19 @@
 import { getNomeBox } from './boxLogic';
 import { imprimirHtml } from './imprimirHtml';
 
-// Etiqueta de carregamento — impressa ao finalizar o protocolo (loja única
-// ou lote), ANTES de abrir a tela de notificar a equipe por WhatsApp (ver
-// LoadingProtocolForm.jsx, função `enviar`). Pedido do usuário: identificar
-// fisicamente o que está saindo no veículo (motorista, placa) junto com a
-// loja/paletes/box/agrupadores de cada carga, no mesmo tamanho físico já
-// calibrado para a etiqueta de palete (ver
-// LARGURA_ETIQUETA_MM/ALTURA_ETIQUETA_MM em LabelGenerator.jsx — repetido
-// aqui porque são módulos de impressão independentes, mas o valor tem que
-// ser o mesmo).
+// Etiqueta de carregamento — identifica fisicamente o que está saindo no
+// veículo (motorista, placa) junto com a loja/paletes/box/agrupadores de
+// cada carga, no mesmo tamanho físico já calibrado para a etiqueta de
+// palete (ver LARGURA_ETIQUETA_MM/ALTURA_ETIQUETA_MM em LabelGenerator.jsx
+// — repetido aqui porque são módulos de impressão independentes, mas o
+// valor tem que ser o mesmo).
+//
+// Pedido do usuário (revisão): a impressão deixou de ser automática ao
+// finalizar o protocolo (loja única ou lote) — não é viável imprimir pelo
+// celular na hora do registro. Agora é só sob pedido, pelo botão
+// "Etiqueta" em "Últimos Protocolos Registrados" (ver LoadingList.jsx,
+// função `aoImprimirEtiqueta`), igual ao botão "Etiquetas" já existente
+// para carga agrupada (ver LabelGenerator.jsx).
 //
 // Pedido do usuário (revisão): UMA ÚNICA etiqueta por protocolo, mesmo em
 // lote com várias lojas — não mais uma etiqueta separada por loja. Cada

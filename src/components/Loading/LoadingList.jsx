@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { PlayCircle, FileSignature, FileCheck, Truck, Printer, Ban, AlertTriangle, Info, MapPin, Clock } from 'lucide-react';
+import { PlayCircle, FileSignature, FileCheck, Truck, Printer, Tag, Ban, AlertTriangle, Info, MapPin, Clock } from 'lucide-react';
 import { useApp } from '../../context/AppContext.jsx';
 import { getLojasProntasParaCarregar, getLojasEmCarregamento } from '../../utils/selectors';
 import {
@@ -13,6 +13,7 @@ import {
 import { getStatusLoja } from '../../utils/statusStyles';
 import { getNomeBox } from '../../utils/boxLogic';
 import { imprimirProtocolo } from '../../utils/imprimirProtocolo';
+import { imprimirEtiquetaCarregamento } from '../../utils/imprimirEtiquetaCarregamento';
 import TipoCargaBadge from '../Shared/TipoCargaBadge.jsx';
 import { lojaPassaFiltroTipoCarga } from '../../utils/tipoCarga';
 
@@ -29,6 +30,14 @@ export default function LoadingList({ aoAbrirProtocolo }) {
   // null = nada a mostrar; 'ok' = impressão preparada (mostra dica de Ctrl+P);
   // 'erro' = falha real ao preparar o conteúdo para impressão.
   const [statusImpressao, setStatusImpressao] = useState(null);
+  // Mesma ideia do statusImpressao acima, só que para o botão "Etiqueta"
+  // (etiqueta de carregamento) — pedido do usuário: a impressão da etiqueta
+  // deixou de ser automática ao registrar o protocolo (ver
+  // LoadingProtocolForm.jsx, não é viável imprimir pelo celular na hora) e
+  // passou a ser manual, por aqui, igual ao botão "Imprimir" do protocolo
+  // acima e ao botão "Etiquetas" já existente em LabelGenerator.jsx para
+  // carga agrupada.
+  const [statusImpressaoEtiqueta, setStatusImpressaoEtiqueta] = useState(null);
   // Entrega das notas fiscais ao motorista (ver coluna "Entrega NFs" na
   // tabela abaixo) — mesmo padrão de horário manual usado em Motoristas
   // para chegada/saída na loja, só que local a este arquivo (o registro
@@ -132,6 +141,47 @@ export default function LoadingList({ aoAbrirProtocolo }) {
       : [];
     const abriu = imprimirProtocolo(protocolo, loja, outrasLojas);
     setStatusImpressao(abriu ? 'ok' : 'erro');
+  }
+
+  // Botão "Etiqueta" — mesma etiqueta de carregamento que antes saía
+  // automaticamente ao finalizar o protocolo (ver LoadingProtocolForm.jsx),
+  // agora só sob pedido explícito, igual ao botão "Imprimir" acima. Para um
+  // protocolo em lote (viagemId), reconstrói TODAS as lojas daquela viagem
+  // — não só a linha clicada — pra sair a mesma etiqueta única com uma
+  // seção por loja, na ordem de carregamento, que o fluxo antigo gerava.
+  function aoImprimirEtiqueta(protocolo) {
+    const lojaBase = state.lojas.find((l) => l.id === protocolo.lojaId);
+    if (!lojaBase) return;
+    const itens = protocolo.viagemId
+      ? state.protocolos
+          .filter((p) => p.viagemId === protocolo.viagemId)
+          .map((p) => {
+            const l = state.lojas.find((x) => x.id === p.lojaId);
+            return l
+              ? {
+                  motorista: p.motorista,
+                  placa: p.placa,
+                  loja: l.loja,
+                  paletesEnviados: p.paletesEnviados,
+                  boxNumero: p.boxNumero,
+                  colaboradores: l.colaboradores,
+                  posicaoCarregamento: p.posicaoCarregamento,
+                }
+              : null;
+          })
+          .filter(Boolean)
+      : [
+          {
+            motorista: protocolo.motorista,
+            placa: protocolo.placa,
+            loja: lojaBase.loja,
+            paletesEnviados: protocolo.paletesEnviados,
+            boxNumero: protocolo.boxNumero,
+            colaboradores: lojaBase.colaboradores,
+          },
+        ];
+    const sucesso = imprimirEtiquetaCarregamento(itens);
+    setStatusImpressaoEtiqueta(sucesso ? 'ok' : 'erro');
   }
 
   function aoCancelar(protocoloId) {
@@ -315,6 +365,21 @@ export default function LoadingList({ aoAbrirProtocolo }) {
           <div className="mb-3 flex items-start gap-2 rounded-lg bg-amber-50 p-3 text-xs text-amber-700 dark:border dark:border-current dark:bg-amber-500/10 dark:text-amber-300">
             <AlertTriangle size={14} className="mt-0.5 flex-shrink-0" />
             <span>Não foi possível preparar a impressão do protocolo. Tente novamente.</span>
+          </div>
+        )}
+        {statusImpressaoEtiqueta === 'ok' && (
+          <div className="mb-3 flex items-start gap-2 rounded-lg bg-blue-50 p-3 text-xs text-blue-700 dark:border dark:border-current dark:bg-blue-500/10 dark:text-blue-300">
+            <Info size={14} className="mt-0.5 flex-shrink-0" />
+            <span>
+              Etiqueta de carregamento pronta para impressão. Se a caixa de impressão não abrir automaticamente,
+              pressione <strong>Ctrl+P</strong> (ou <strong>Cmd+P</strong> no Mac).
+            </span>
+          </div>
+        )}
+        {statusImpressaoEtiqueta === 'erro' && (
+          <div className="mb-3 flex items-start gap-2 rounded-lg bg-amber-50 p-3 text-xs text-amber-700 dark:border dark:border-current dark:bg-amber-500/10 dark:text-amber-300">
+            <AlertTriangle size={14} className="mt-0.5 flex-shrink-0" />
+            <span>Não foi possível preparar a impressão da etiqueta. Tente novamente.</span>
           </div>
         )}
         {ultimosProtocolos.length === 0 ? (
@@ -510,6 +575,14 @@ export default function LoadingList({ aoAbrirProtocolo }) {
                               className="flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
                             >
                               <Printer size={12} /> Imprimir
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => aoImprimirEtiqueta(p)}
+                              title="Imprimir etiqueta de carregamento"
+                              className="flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
+                            >
+                              <Tag size={12} /> Etiqueta
                             </button>
                             <button
                               type="button"
