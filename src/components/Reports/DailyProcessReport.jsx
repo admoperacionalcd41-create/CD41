@@ -202,7 +202,15 @@ export default function DailyProcessReport() {
       const temaEscuro = document.documentElement.classList.contains('dark');
       const canvas = await html2canvas(capturaRef.current, {
         backgroundColor: temaEscuro ? '#1e293b' : '#ffffff',
-        scale: Math.min(2, window.devicePixelRatio || 1.5),
+        // Pedido do usuário: aumentar a resolução da imagem copiada — o
+        // fator anterior (no máximo 2x, e só 1x na maioria dos monitores
+        // comuns, que têm devicePixelRatio 1) saía com texto borrado ao dar
+        // zoom ou imprimir a imagem copiada. Agora usa pelo menos 3x
+        // sempre, e mais que isso em telas de densidade mais alta (ex.:
+        // celulares com devicePixelRatio 3+) — a tabela tem muita linha e
+        // coluna, então vale a pena gastar mais memória/tempo aqui pra
+        // ganhar nitidez.
+        scale: Math.max(3, window.devicePixelRatio || 1),
         useCORS: true,
         // Pedido do usuário (print ruim reportado): o modo padrão de
         // renderização do html2canvas (via <canvas>, redesenhando cada
