@@ -8,9 +8,45 @@ import { imprimirHtml } from './imprimirHtml';
 // disparo automático não funcionar).
 const ID_AREA_RELATORIO = 'area-impressao-relatorio';
 
-export function imprimirRelatorioAtivo(titulo, subtitulo) {
+// Aproximação de pixels por milímetro a 96dpi (padrão CSS: 1in = 96px =
+// 25,4mm) — usada só pra estimar a área útil de uma folha A4 na hora de
+// calcular o fator de escala de `achatarEmUmaFolha` abaixo. É uma
+// aproximação razoável pra esse fim (não precisa ser exata: o objetivo é
+// garantir que o conteúdo caiba, não acertar o tamanho exato no papel).
+const PX_POR_MM = 96 / 25.4;
+
+/**
+ * Imprime o relatório atualmente aberto na aba Relatórios.
+ *
+ * `opcoes.paisagem` (pedido do usuário, Processo do Dia): imprime em
+ * orientação paisagem em vez do padrão do navegador (retrato) — útil pra
+ * relatórios com muitas colunas lado a lado.
+ *
+ * `opcoes.achatarEmUmaFolha` (pedido do usuário, Processo do Dia): mede o
+ * tamanho natural (sem cortes) do conteúdo ANTES de montar a impressão e
+ * calcula um fator de escala (nunca maior que 1) pra caber na área útil
+ * aproximada de uma folha A4, aplicado via CSS transform numa dupla de
+ * divs — a de fora reserva o espaço já na proporção final (senão o
+ * navegador reservaria o espaço do tamanho ORIGINAL, não do encolhido, e o
+ * conteúdo não ficaria garantido numa página só), a de dentro aplica o
+ * transform propriamente dito. Quanto mais linhas o relatório tiver no
+ * dia, menor o texto sai impresso — é o preço de garantir uma folha só
+ * mesmo com uma lista que varia de tamanho dia a dia.
+ */
+export function imprimirRelatorioAtivo(titulo, subtitulo, opcoes = {}) {
+  const { paisagem = false, achatarEmUmaFolha = false } = opcoes;
   const area = document.getElementById(ID_AREA_RELATORIO);
   if (!area) return false;
+
+  // Mede o tamanho natural ANTES de montar o HTML de impressão — `area`
+  // ainda é o elemento AO VIVO na tela aqui, então `scrollWidth`/
+  // `scrollHeight` pegam o conteúdo inteiro mesmo que uma parte dele (ex.:
+  // a tabela do Processo do Dia, com `max-h-[70vh] overflow-auto` na tela)
+  // esteja visualmente cortada/com scroll nesse momento — essas duas
+  // propriedades sempre refletem o tamanho TOTAL do conteúdo, não só a
+  // parte visível.
+  const larguraNatural = area.scrollWidth;
+  const alturaNatural = area.scrollHeight;
 
   // O relatório usa classes Tailwind "dark:..." — como a cópia impressa é
   // injetada dentro do próprio <html>, se o modo escuro estiver ativo ela
@@ -38,7 +74,30 @@ export function imprimirRelatorioAtivo(titulo, subtitulo) {
   });
   const horaAgora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
+  const estiloPagina = paisagem ? '@page { size: A4 landscape; margin: 10mm; }' : '';
+
+  // Fator de escala pra caber numa folha só (ver comentário do JSDoc acima)
+  // — a área útil aqui já desconta o padding de 12px do wrapper e o
+  // cabeçalho (título/subtítulo/data) que entra ANTES do conteúdo
+  // escalado, então o espaço disponível pro conteúdo em si é um pouco
+  // menor que a folha inteira; ~28mm de folga cobre esse cabeçalho com
+  // margem confortável pra a maioria dos casos.
+  let aberturaEscala = '';
+  let fechamentoEscala = '';
+  if (achatarEmUmaFolha && larguraNatural > 0 && alturaNatural > 0) {
+    const [larguraPaginaMm, alturaPaginaMm] = paisagem ? [277, 190] : [190, 277];
+    const larguraMaxPx = larguraPaginaMm * PX_POR_MM;
+    const alturaMaxPx = (alturaPaginaMm - 28) * PX_POR_MM;
+    const fator = Math.min(1, larguraMaxPx / larguraNatural, alturaMaxPx / alturaNatural);
+    const alturaEscaladaPx = Math.round(alturaNatural * fator);
+    aberturaEscala = `<div style="width:${larguraNatural}px;height:${alturaEscaladaPx}px;overflow:hidden;"><div style="width:${larguraNatural}px;transform:scale(${fator.toFixed(
+      3
+    )});transform-origin:top left;">`;
+    fechamentoEscala = '</div></div>';
+  }
+
   const html = `<!DOCTYPE html><html><body>
+    ${estiloPagina ? `<style>${estiloPagina}</style>` : ''}
     <div style="padding:12px;background:#ffffff;color:#1e293b;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;">
       <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;border-bottom:2px solid #1e293b;padding-bottom:8px;margin-bottom:16px;">
         <div>
@@ -47,7 +106,7 @@ export function imprimirRelatorioAtivo(titulo, subtitulo) {
         </div>
         <p style="font-size:10px;color:#94a3b8;margin:0;white-space:nowrap;">Doca Manager — ${dataHoje} às ${horaAgora}</p>
       </div>
-      ${area.innerHTML}
+      ${aberturaEscala}${area.innerHTML}${fechamentoEscala}
     </div>
   </body></html>`;
 

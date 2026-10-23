@@ -41,6 +41,11 @@ const RELATORIOS = [
     descricao: 'Mostra, loja por loja, se a geração de carga pro box e o carregamento já foram feitos hoje.',
     Componente: DailyProcessReport,
     usaPeriodo: false,
+    // Pedido do usuário: impressão em paisagem e achatada pra caber numa
+    // folha só (relatório tem muita coluna lado a lado — ver
+    // imprimirRelatorio.js). Os outros relatórios não definem essa opção
+    // (ficam no padrão retrato, sem o encolhimento forçado).
+    impressao: { paisagem: true, achatarEmUmaFolha: true },
   },
   {
     chave: 'meta',
@@ -102,7 +107,7 @@ export default function ReportsPage() {
     const subtitulo = relatorioAtivo.usaPeriodo
       ? `${relatorioAtivo.descricao} — ${descreverPeriodo(periodoRelatorio)}`
       : relatorioAtivo.descricao;
-    imprimirRelatorioAtivo(relatorioAtivo.rotulo, subtitulo);
+    imprimirRelatorioAtivo(relatorioAtivo.rotulo, subtitulo, relatorioAtivo.impressao || {});
   }
 
   return (

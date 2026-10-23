@@ -1,7 +1,8 @@
-import React, { useMemo } from 'react';
-import { ListChecks, CheckCircle2, XCircle, ArrowUpDown } from 'lucide-react';
+import React, { useMemo, useRef, useState } from 'react';
+import { ListChecks, CheckCircle2, XCircle, ArrowUpDown, Camera, Loader2 } from 'lucide-react';
 import { useApp } from '../../context/AppContext.jsx';
-import { getLinhasProcessoDoDia } from '../../utils/selectors';
+import { getLinhasProcessoDoDia, getEntregaCodigoLojaNaData, getVolumeExpedicaoHoje } from '../../utils/selectors';
+import { getDiasUteisSemana, formatarDiaSemanaCurto, hojeISO } from '../../utils/dateHelpers';
 import TipoCargaBadge from '../Shared/TipoCargaBadge.jsx';
 
 const ROTULO_TIPO = {
@@ -10,12 +11,24 @@ const ROTULO_TIPO = {
   todos: 'Seca + Resfriada',
 };
 
-// Selo de status (Geração de Carga / Cargas no Box / Carregamento) dentro
-// da tabela — pedido do usuário: validar só pela LOJA (feito/pendente),
-// sem mostrar nada de carga (antes, uma loja com mais de uma carga no dia
-// mostrava a contagem "(2/3)" e o status de cada carga separadamente).
-// `rotuloFeito`/`rotuloPendente` permitem reaproveitar o mesmo selo com um
-// texto diferente na coluna "Cargas no Box" (ver abaixo).
+// Formata peso/volume no padrão pt-BR (vírgula decimal, sem casas
+// desnecessárias) — mesma regra usada nos cards do Dashboard e no resumo da
+// aba Box / Frota.
+function formatarNumeroBR(valor) {
+  return valor.toLocaleString('pt-BR', { maximumFractionDigits: 1 });
+}
+
+// Selo de status (Expedição de Hoje / Cargas em Andamento / Carregamento
+// de Hoje) dentro da tabela — pedido do usuário: validar só pela LOJA
+// (feito/pendente), sem mostrar nada de carga (antes, uma loja com mais de
+// uma carga no dia mostrava a contagem "(2/3)" e o status de cada carga
+// separadamente). `rotuloFeito`/`rotuloPendente` permitem reaproveitar o
+// mesmo selo com um texto diferente na coluna "Cargas em Andamento" (ver
+// abaixo). Os nomes internos (apontamentoFeito, "Geração de Carga" em
+// selectors.js) continuam os mesmos por baixo — só o TERMO exibido pro
+// usuário mudou pra "Expedição de Hoje"/"Carregamento de Hoje" (pedido do
+// usuário), mesma lógica já usada em ResumoProcessoCard.jsx pra não mexer
+// em dado já persistido.
 function Selo({ feito, rotuloFeito = 'Feito', rotuloPendente = 'Pendente' }) {
   return (
     <span
@@ -28,6 +41,60 @@ function Selo({ feito, rotuloFeito = 'Feito', rotuloPendente = 'Pendente' }) {
       {feito ? <CheckCircle2 size={12} /> : <XCircle size={12} />}
       {feito ? rotuloFeito : rotuloPendente}
     </span>
+  );
+}
+
+// Pedido do usuário: depois da coluna Carregamento de Hoje, as mesmas
+// colunas Segunda a Sexta + Semana do relatório Meta de Entrega (ver
+// DailyGoalReport.jsx — mesma apresentação de célula: número em negrito
+// (âmbar com * para envio parcial, verde para completo), X vermelho para
+// falta, traço para sem dado/futuro). Componente à parte porque as duas
+// tabelas de Processo do Dia (padrão e modo sequência) usam exatamente a
+// mesma coluna de células, uma ao lado da outra.
+function CelulasSemana({ codigo, porCodigoSemana }) {
+  const info = porCodigoSemana.get(codigo);
+  if (!info) return null;
+  const { porDia, diasEntreguesSemana, diasAvaliadosSemana, semanaCompleta } = info;
+  return (
+    <>
+      {porDia.map((p) => (
+        <td
+          key={p.dataISO}
+          className="px-2 py-2.5 text-center"
+          title={
+            p.status === 'sem_dado'
+              ? 'Sem carga programada nesse dia'
+              : p.status === 'entregue'
+                ? `${p.paletes} palete${p.paletes !== 1 ? 's' : ''} entregues${p.parcial ? ' — envio parcial, ficou saldo' : ''}`
+                : undefined
+          }
+        >
+          {p.status === 'entregue' && (
+            <span
+              className={`font-bold ${
+                p.parcial ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'
+              }`}
+            >
+              {p.paletes}
+              {p.parcial && <span className="align-super text-[9px]">*</span>}
+            </span>
+          )}
+          {p.status === 'faltou' && <XCircle size={14} className="mx-auto text-red-500" />}
+          {(p.status === 'futuro' || p.status === 'sem_dado') && (
+            <span className="text-slate-300 dark:text-slate-600">—</span>
+          )}
+        </td>
+      ))}
+      <td className="py-2.5 pl-3 text-right font-semibold">
+        {diasAvaliadosSemana > 0 ? (
+          <span className={semanaCompleta ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}>
+            {diasEntreguesSemana}/{diasAvaliadosSemana}
+          </span>
+        ) : (
+          <span className="text-slate-300 dark:text-slate-600">—</span>
+        )}
+      </td>
+    </>
   );
 }
 
@@ -61,10 +128,140 @@ export default function DailyProcessReport() {
   );
 
   const total = linhas.length;
+  // Pedido do usuário: os totalizadores que antes ficavam em cards separados
+  // acima da tabela (um pra cada coluna, mais um "Processo completo") foram
+  // pro lado do nome de cada coluna correspondente — ver os <th> de
+  // Expedição de Hoje e Carregamento de Hoje abaixo. A coluna Cargas em
+  // Andamento ficou de fora de propósito (pedido do usuário) e o
+  // "Processo completo" foi removido (já aparece na cabeceira de seção da
+  // tabela, "Processo completo (N)", então o card isolado ficaria
+  // redundante).
   const comApontamento = linhas.filter((l) => l.apontamentoFeito).length;
-  const comCargaNoBox = linhas.filter((l) => l.cargaNoBox).length;
   const comCarregamento = linhas.filter((l) => l.carregamentoFeito).length;
-  const completas = linhas.filter((l) => l.completo).length;
+
+  // Pedido do usuário: o totalizador do cabeçalho de Expedição de Hoje
+  // passou a puxar o volume cúbico (m³) das cargas de hoje — feito x total
+  // — em vez da contagem de lojas acima (comApontamento/total). Só por
+  // CARGA mesmo (não por código de loja), ver getVolumeExpedicaoHoje em
+  // selectors.js. Quando o lote importado não traz volume (temVolume
+  // false), cai de volta pra contagem de lojas, pra não mostrar "0/0".
+  const volumeExpedicao = useMemo(
+    () => getVolumeExpedicaoHoje(state, filtroTipoCarga),
+    [state.lojas, state.diaAtual, filtroTipoCarga]
+  );
+
+  // Pedido do usuário: card único de resumo no topo, com Expedição de Hoje
+  // e Carregamento de Hoje em % — usa a MESMA base de cada totalizador que
+  // já aparece no cabeçalho da coluna correspondente (volume em m³ feito x
+  // total pra Expedição quando o lote importado traz essa informação, senão
+  // cai pra contagem de lojas; sempre contagem de lojas pra Carregamento),
+  // só que expressa como percentual em vez de "feito/total".
+  const pctExpedicao = volumeExpedicao.temVolume
+    ? volumeExpedicao.volumeTotal > 0
+      ? Math.round((volumeExpedicao.volumeFeito / volumeExpedicao.volumeTotal) * 100)
+      : 0
+    : total > 0
+    ? Math.round((comApontamento / total) * 100)
+    : 0;
+  const pctCarregamento = total > 0 ? Math.round((comCarregamento / total) * 100) : 0;
+
+  // Pedido do usuário: botão pra copiar a tela como imagem (área de
+  // transferência), só do card de resumo pra baixo — por isso o botão em
+  // si fica FORA do elemento referenciado por capturaRef (ver JSX abaixo),
+  // senão ele apareceria na própria imagem copiada. html2canvas é
+  // carregado sob demanda (import dinâmico) pra não pesar o bundle
+  // principal com uma lib que só é usada quando o botão é clicado.
+  const capturaRef = useRef(null);
+  const [statusCopia, setStatusCopia] = useState('ocioso'); // ocioso | copiando | copiado | baixado | erro
+
+  async function aoCopiarComoImagem() {
+    if (!capturaRef.current || statusCopia === 'copiando') return;
+    setStatusCopia('copiando');
+    try {
+      const { default: html2canvas } = await import('html2canvas');
+      const temaEscuro = document.documentElement.classList.contains('dark');
+      const canvas = await html2canvas(capturaRef.current, {
+        backgroundColor: temaEscuro ? '#1e293b' : '#ffffff',
+        scale: Math.min(2, window.devicePixelRatio || 1.5),
+        useCORS: true,
+      });
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+      if (!blob) throw new Error('Não foi possível gerar a imagem.');
+      if (navigator.clipboard && typeof window.ClipboardItem === 'function') {
+        await navigator.clipboard.write([new window.ClipboardItem({ 'image/png': blob })]);
+        setStatusCopia('copiado');
+      } else {
+        // Navegador sem suporte a copiar imagem pra área de transferência
+        // (ex.: Firefox) — baixa o arquivo em vez de falhar calado.
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `processo-do-dia-${hojeISO()}.png`;
+        link.click();
+        URL.revokeObjectURL(url);
+        setStatusCopia('baixado');
+      }
+    } catch (erro) {
+      console.error('Erro ao copiar Processo do Dia como imagem:', erro);
+      setStatusCopia('erro');
+    } finally {
+      setTimeout(() => setStatusCopia('ocioso'), 2500);
+    }
+  }
+
+  // Pedido do usuário: depois da coluna Carregamento de Hoje, mostrar o
+  // mesmo relatório de Meta de Entrega (DailyGoalReport.jsx) — as colunas de
+  // Segunda a Sexta da semana atual, mais uma coluna Semana (dias
+  // entregues / dias avaliados), lado a lado com as colunas já existentes
+  // aqui. Reaproveita o mesmo seletor usado lá (getEntregaCodigoLojaNaData)
+  // em vez de duplicar a lógica de "entregue/faltou/sem dado" — só a
+  // apresentação em colunas extras é nova. Diferente de DailyGoalReport
+  // (que só lista lojas com carga programada na semana), aqui aparece TODA
+  // loja já conhecida (mesma base de `linhas`), então uma loja sem nenhuma
+  // atividade na semana mostra "—" em vez de contar como falta (ver
+  // diasAvaliadosSemana === 0 abaixo).
+  const tipo = filtroTipoCarga && filtroTipoCarga !== 'todos' ? filtroTipoCarga : undefined;
+  const hoje = hojeISO();
+  const diasSemanaAtual = useMemo(() => getDiasUteisSemana(0), []);
+  const porCodigoSemana = useMemo(() => {
+    const mapa = new Map();
+    linhas.forEach((l) => {
+      const porDia = diasSemanaAtual.map((dataISO) => {
+        const futuro = dataISO > hoje;
+        if (futuro) return { dataISO, status: 'futuro' };
+        const { temAtividade, entregue, paletes, parcial } = getEntregaCodigoLojaNaData(state, l.codigo, dataISO, tipo);
+        if (!temAtividade) return { dataISO, status: 'sem_dado' };
+        if (entregue) return { dataISO, status: 'entregue', paletes, parcial };
+        return { dataISO, status: 'faltou' };
+      });
+      const diasEntreguesSemana = porDia.filter((p) => p.status === 'entregue').length;
+      const diasAvaliadosSemana = porDia.filter((p) => p.status === 'entregue' || p.status === 'faltou').length;
+      const semanaCompleta = diasAvaliadosSemana > 0 && diasEntreguesSemana === diasAvaliadosSemana;
+      mapa.set(l.codigo, { porDia, diasEntreguesSemana, diasAvaliadosSemana, semanaCompleta });
+    });
+    return mapa;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state, tipo, diasSemanaAtual.join(','), linhas]);
+
+  // Pedido do usuário: totalizador no cabeçalho de cada coluna de dia da
+  // semana (Seg a Sex), no mesmo formato "feito/total" das outras colunas —
+  // ex.: "Seg 1/28". Conta quantas lojas entregaram naquele dia específico
+  // (porDia[].status === 'entregue', já calculado acima em
+  // porCodigoSemana), sobre o total de lojas conhecidas (mesmo `total` =
+  // linhas.length usado nos outros cabeçalhos), não só as que tinham
+  // atividade programada naquele dia.
+  const totaisPorDia = useMemo(() => {
+    const mapa = new Map();
+    diasSemanaAtual.forEach((dataISO) => {
+      let entregues = 0;
+      porCodigoSemana.forEach((info) => {
+        const dia = info.porDia.find((p) => p.dataISO === dataISO);
+        if (dia?.status === 'entregue') entregues += 1;
+      });
+      mapa.set(dataISO, entregues);
+    });
+    return mapa;
+  }, [porCodigoSemana, diasSemanaAtual]);
 
   // Não agrupa mais por praça/cidade (`nomeLoja`) — o pedido foi tirar essa
   // organização. Em vez disso, separa só em duas faixas visuais (o que
@@ -109,8 +306,76 @@ export default function DailyProcessReport() {
     moverSequencia(indice, indiceNovo);
   }
 
+  // Pedido do usuário: texto do botão de copiar como imagem muda conforme
+  // o resultado (copiando / copiado / baixado, quando o navegador não
+  // suporta copiar imagem direto / erro) — volta pro texto padrão sozinho
+  // depois de alguns segundos (ver setTimeout em aoCopiarComoImagem).
+  const TEXTO_BOTAO_COPIA = {
+    ocioso: 'Copiar como imagem',
+    copiando: 'Copiando…',
+    copiado: 'Copiado!',
+    baixado: 'Imagem baixada',
+    erro: 'Erro ao copiar — tente de novo',
+  };
+
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+    <>
+      {/* Pedido do usuário: botão que copia a tela (do card de resumo pra
+          baixo) como imagem pra área de transferência. Fica FORA do
+          elemento referenciado por capturaRef de propósito — se estivesse
+          dentro, o próprio botão apareceria na imagem copiada. `print:hidden`
+          pelo mesmo motivo do lado da impressão (ver imprimirRelatorio.js):
+          o botão em si não deve aparecer no papel. */}
+      <div className="mb-3 flex justify-end print:hidden">
+        <button
+          type="button"
+          onClick={aoCopiarComoImagem}
+          disabled={statusCopia === 'copiando'}
+          title="Copia o resumo e a tabela abaixo como uma imagem, pronta pra colar no WhatsApp ou e-mail"
+          className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+            statusCopia === 'copiado' || statusCopia === 'baixado'
+              ? 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-300'
+              : statusCopia === 'erro'
+              ? 'border-red-300 bg-red-50 text-red-700 dark:border-red-600 dark:bg-red-500/10 dark:text-red-300'
+              : 'border-slate-200 text-slate-500 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-400 dark:hover:bg-slate-700/40'
+          }`}
+        >
+          {statusCopia === 'copiando' ? (
+            <Loader2 size={14} className="animate-spin" />
+          ) : statusCopia === 'copiado' || statusCopia === 'baixado' ? (
+            <CheckCircle2 size={14} />
+          ) : (
+            <Camera size={14} />
+          )}
+          {TEXTO_BOTAO_COPIA[statusCopia]}
+        </button>
+      </div>
+
+      <div ref={capturaRef}>
+        {/* Pedido do usuário: card único no topo com o resumo do dia em %
+            — Expedição de Hoje (% concluída) e Carregamento de Hoje (%
+            feito). Mesma base de cálculo dos totalizadores que já aparecem
+            no cabeçalho de cada coluna (ver pctExpedicao/pctCarregamento
+            acima), só que em percentual em vez de "feito/total". */}
+        <div className="mb-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+          <h2 className="mb-3 text-sm font-bold text-slate-700 dark:text-slate-200">
+            Resumo do Dia — {rotuloTipo}
+          </h2>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-lg bg-slate-50 p-4 text-center dark:bg-slate-900/30">
+              <p className="text-xs text-slate-400 dark:text-slate-500">Expedição de Hoje</p>
+              <p className="mt-1 text-3xl font-bold text-totvs-600 dark:text-whatsapp-400">{pctExpedicao}%</p>
+              <p className="text-[11px] text-slate-400 dark:text-slate-500">concluída</p>
+            </div>
+            <div className="rounded-lg bg-slate-50 p-4 text-center dark:bg-slate-900/30">
+              <p className="text-xs text-slate-400 dark:text-slate-500">Carregamento de Hoje</p>
+              <p className="mt-1 text-3xl font-bold text-totvs-600 dark:text-whatsapp-400">{pctCarregamento}%</p>
+              <p className="text-[11px] text-slate-400 dark:text-slate-500">feito</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <ListChecks size={18} className="text-totvs-600 dark:text-whatsapp-400" />
@@ -122,9 +387,10 @@ export default function DailyProcessReport() {
                 reescrita pra começar sozinha com letra maiúscula. */}
             <p className="text-xs text-slate-400 dark:text-slate-500">
               A coluna Loja traz sempre as lojas fixas (todo código já visto em alguma importação), mesmo sem carga
-              hoje; as colunas Geração de Carga e Carregamento validam só o que foi feito hoje de verdade (registros de
-              dias anteriores não contam). Cargas no Box é diferente: mostra se tem carga ocupando o box AGORA, mesmo
-              que tenha entrado lá num dia anterior e ainda não tenha sido carregada
+              hoje; as colunas Expedição de Hoje e Carregamento de Hoje validam só o que foi feito hoje de verdade
+              (registros de dias anteriores não contam). Cargas em Andamento é diferente: mostra se tem carga
+              ocupando o box AGORA, incluindo cargas de ontem que ainda não foram carregadas. As colunas de Segunda a
+              Sexta e Semana são o mesmo acompanhamento do relatório Meta de Entrega, só que lado a lado com o resto
             </p>
           </div>
         </div>
@@ -133,7 +399,8 @@ export default function DailyProcessReport() {
             opcional; não substitui a separação padrão pendente/completo,
             que continua sendo a visão default. Era por arrastar e soltar,
             trocado por campo de número a pedido do usuário (arrastar ficou
-            lento com a lista grande). */}
+            lento com a lista grande). `print:hidden` — não faz sentido no
+            papel (ver imprimirRelatorio.js). */}
         <button
           type="button"
           onClick={() => setModoSequencia((v) => !v)}
@@ -142,7 +409,7 @@ export default function DailyProcessReport() {
               ? 'Voltar pra visão padrão (pendente / completo)'
               : 'Organizar a ordem das lojas digitando a posição de cada uma'
           }
-          className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-semibold transition-colors ${
+          className={`print:hidden flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-semibold transition-colors ${
             modoSequencia
               ? 'border-totvs-300 bg-totvs-50 text-totvs-700 dark:border-whatsapp-600 dark:bg-whatsapp-500/10 dark:text-whatsapp-300'
               : 'border-slate-200 text-slate-500 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-400 dark:hover:bg-slate-700/40'
@@ -153,39 +420,7 @@ export default function DailyProcessReport() {
         </button>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <div className="rounded-lg bg-slate-50 p-3 text-center dark:bg-slate-900/30">
-          <p className="text-xs text-slate-400 dark:text-slate-500">Geração de carga feita</p>
-          <p className="mt-0.5 text-xl font-bold text-slate-700 dark:text-slate-200">
-            {comApontamento} <span className="text-sm font-medium text-slate-400 dark:text-slate-500">/ {total}</span>
-          </p>
-        </div>
-        <div className="rounded-lg bg-slate-50 p-3 text-center dark:bg-slate-900/30">
-          <p className="text-xs text-slate-400 dark:text-slate-500">Com carga no box</p>
-          <p className="mt-0.5 text-xl font-bold text-slate-700 dark:text-slate-200">
-            {comCargaNoBox} <span className="text-sm font-medium text-slate-400 dark:text-slate-500">/ {total}</span>
-          </p>
-        </div>
-        <div className="rounded-lg bg-slate-50 p-3 text-center dark:bg-slate-900/30">
-          <p className="text-xs text-slate-400 dark:text-slate-500">Carregamento feito</p>
-          <p className="mt-0.5 text-xl font-bold text-slate-700 dark:text-slate-200">
-            {comCarregamento}{' '}
-            <span className="text-sm font-medium text-slate-400 dark:text-slate-500">/ {total}</span>
-          </p>
-        </div>
-        <div className="rounded-lg bg-slate-50 p-3 text-center dark:bg-slate-900/30">
-          <p className="text-xs text-slate-400 dark:text-slate-500">Processo completo</p>
-          <p
-            className={`mt-0.5 text-xl font-bold ${
-              total > 0 && completas === total ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-700 dark:text-slate-200'
-            }`}
-          >
-            {completas} <span className="text-sm font-medium text-slate-400 dark:text-slate-500">/ {total}</span>
-          </p>
-        </div>
-      </div>
-
-      <div className="mt-5 border-t border-slate-100 pt-4 dark:border-slate-700">
+      <div className="mt-1 border-t border-slate-100 pt-4 dark:border-slate-700">
         {total === 0 ? (
           <p className="text-sm text-slate-400 dark:text-slate-500">
             Nenhuma loja de {rotuloTipo.toLowerCase()} programada para o dia operacional atual ainda. Importe os dados na
@@ -205,15 +440,45 @@ export default function DailyProcessReport() {
               ordem é salva automaticamente e vale pros próximos dias também — lojas novas entram no fim da lista até
               serem organizadas.
             </p>
-            <div className="max-h-[70vh] overflow-auto rounded-lg border border-slate-100 dark:border-slate-700">
+            <div className="max-h-[70vh] overflow-auto rounded-lg border border-slate-100 dark:border-slate-700 print:max-h-none print:overflow-visible">
               <table className="w-full text-left text-sm">
                 <thead className="sticky top-0 z-10 bg-white text-xs text-slate-500 shadow-sm dark:bg-slate-800 dark:text-slate-400">
                   <tr className="border-b border-slate-200 dark:border-slate-700">
                     <th className="w-16 py-2.5 pl-3 pr-1 font-semibold">Posição</th>
                     <th className="py-2.5 pr-3 font-semibold">Loja</th>
-                    <th className="px-2 py-2.5 text-center font-semibold">Geração de Carga</th>
-                    <th className="px-2 py-2.5 text-center font-semibold">Cargas no Box</th>
-                    <th className="px-2 py-2.5 text-center font-semibold">Carregamento</th>
+                    <th className="px-2 py-2.5 text-center font-semibold">
+                      Expedição de Hoje
+                      <br />
+                      <span className="text-[10px] font-normal normal-case text-slate-400 dark:text-slate-500">
+                        {volumeExpedicao.temVolume
+                          ? `${formatarNumeroBR(volumeExpedicao.volumeFeito)}/${formatarNumeroBR(volumeExpedicao.volumeTotal)} m³`
+                          : `${comApontamento}/${total}`}
+                      </span>
+                    </th>
+                    <th className="px-2 py-2.5 text-center font-semibold">
+                      Cargas em Andamento
+                      <br />
+                      <span className="text-[10px] font-normal normal-case text-slate-400 dark:text-slate-500">
+                        (incluindo cargas de ontem)
+                      </span>
+                    </th>
+                    <th className="px-2 py-2.5 text-center font-semibold">
+                      Carregamento de Hoje
+                      <br />
+                      <span className="text-[10px] font-normal normal-case text-slate-400 dark:text-slate-500">
+                        {comCarregamento}/{total}
+                      </span>
+                    </th>
+                    {diasSemanaAtual.map((dataISO) => (
+                      <th key={dataISO} className="px-2 py-2.5 text-center font-semibold">
+                        {formatarDiaSemanaCurto(dataISO)}
+                        <br />
+                        <span className="text-[10px] font-normal normal-case text-slate-400 dark:text-slate-500">
+                          {totaisPorDia.get(dataISO) ?? 0}/{total}
+                        </span>
+                      </th>
+                    ))}
+                    <th className="py-2.5 pl-3 text-right font-semibold">Semana</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -262,11 +527,12 @@ export default function DailyProcessReport() {
                         <Selo feito={loja.apontamentoFeito} />
                       </td>
                       <td className="px-2 py-2.5 text-center">
-                        <Selo feito={loja.cargaNoBox} rotuloFeito="No box" rotuloPendente="Vazio" />
+                        <Selo feito={loja.cargaNoBox} rotuloFeito="Em andamento" rotuloPendente="Vazio" />
                       </td>
                       <td className="px-2 py-2.5 text-center">
                         <Selo feito={loja.carregamentoFeito} />
                       </td>
+                      <CelulasSemana codigo={loja.codigo} porCodigoSemana={porCodigoSemana} />
                     </tr>
                   ))}
                 </tbody>
@@ -280,7 +546,7 @@ export default function DailyProcessReport() {
           // tabela; o que ficou da passagem pelos cards foi tirar de vez o
           // detalhe por carga (número de carga, contagem "(2/3)", status
           // individual de cada carga), que não volta aqui.
-          <div className="max-h-[70vh] overflow-auto rounded-lg border border-slate-100 dark:border-slate-700">
+          <div className="max-h-[70vh] overflow-auto rounded-lg border border-slate-100 dark:border-slate-700 print:max-h-none print:overflow-visible">
             <table className="w-full text-left text-sm">
               {/* Cabeçalho fixo (sticky) — com uma lista de 28+ lojas rolando
                   dentro do card, vale sempre poder ver o nome das colunas
@@ -288,9 +554,39 @@ export default function DailyProcessReport() {
               <thead className="sticky top-0 z-10 bg-white text-xs text-slate-500 shadow-sm dark:bg-slate-800 dark:text-slate-400">
                 <tr className="border-b border-slate-200 dark:border-slate-700">
                   <th className="py-2.5 pl-3 pr-3 font-semibold">Loja</th>
-                  <th className="px-2 py-2.5 text-center font-semibold">Geração de Carga</th>
-                  <th className="px-2 py-2.5 text-center font-semibold">Cargas no Box</th>
-                  <th className="px-2 py-2.5 text-center font-semibold">Carregamento</th>
+                  <th className="px-2 py-2.5 text-center font-semibold">
+                    Expedição de Hoje
+                    <br />
+                    <span className="text-[10px] font-normal normal-case text-slate-400 dark:text-slate-500">
+                      {volumeExpedicao.temVolume
+                        ? `${formatarNumeroBR(volumeExpedicao.volumeFeito)}/${formatarNumeroBR(volumeExpedicao.volumeTotal)} m³`
+                        : `${comApontamento}/${total}`}
+                    </span>
+                  </th>
+                  <th className="px-2 py-2.5 text-center font-semibold">
+                    Cargas em Andamento
+                    <br />
+                    <span className="text-[10px] font-normal normal-case text-slate-400 dark:text-slate-500">
+                      (incluindo cargas de ontem)
+                    </span>
+                  </th>
+                  <th className="px-2 py-2.5 text-center font-semibold">
+                    Carregamento de Hoje
+                    <br />
+                    <span className="text-[10px] font-normal normal-case text-slate-400 dark:text-slate-500">
+                      {comCarregamento}/{total}
+                    </span>
+                  </th>
+                  {diasSemanaAtual.map((dataISO) => (
+                    <th key={dataISO} className="px-2 py-2.5 text-center font-semibold">
+                      {formatarDiaSemanaCurto(dataISO)}
+                      <br />
+                      <span className="text-[10px] font-normal normal-case text-slate-400 dark:text-slate-500">
+                        {totaisPorDia.get(dataISO) ?? 0}/{total}
+                      </span>
+                    </th>
+                  ))}
+                  <th className="py-2.5 pl-3 text-right font-semibold">Semana</th>
                 </tr>
               </thead>
               {[
@@ -307,7 +603,7 @@ export default function DailyProcessReport() {
                         cabe numa tela só. */}
                     <tr>
                       <td
-                        colSpan={4}
+                        colSpan={10}
                         className={`px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide ${
                           secao.chave === 'pendentes'
                             ? 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300'
@@ -347,11 +643,12 @@ export default function DailyProcessReport() {
                           <Selo feito={loja.apontamentoFeito} />
                         </td>
                         <td className="px-2 py-2.5 text-center">
-                          <Selo feito={loja.cargaNoBox} rotuloFeito="No box" rotuloPendente="Vazio" />
+                          <Selo feito={loja.cargaNoBox} rotuloFeito="Em andamento" rotuloPendente="Vazio" />
                         </td>
                         <td className="px-2 py-2.5 text-center">
                           <Selo feito={loja.carregamentoFeito} />
                         </td>
+                        <CelulasSemana codigo={loja.codigo} porCodigoSemana={porCodigoSemana} />
                       </tr>
                     ))}
                   </tbody>
@@ -360,6 +657,8 @@ export default function DailyProcessReport() {
           </div>
         )}
       </div>
-    </div>
+        </div>
+      </div>
+    </>
   );
 }

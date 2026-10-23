@@ -319,6 +319,28 @@ export function getLinhasProcessoDoDia(state, filtroTipoCarga) {
 }
 
 /**
+ * Volume cúbico (m³) das cargas de hoje, pro cabeçalho da coluna Expedição
+ * de Hoje do relatório Processo do Dia (pedido do usuário): soma o volume
+ * de TODAS as cargas do dia operacional atual (`volumeTotal`) e, separado,
+ * só das que já tiveram a expedição feita hoje de verdade (`volumeFeito` —
+ * mesma regra de "apontada" usada em getLinhasProcessoDoDia: status !=
+ * pendente e dataApontamento é hoje). É por CARGA, não por código de loja
+ * (uma loja com 2 cargas hoje, uma apontada e outra não, soma só o volume
+ * da que foi apontada em volumeFeito, mas as duas em volumeTotal).
+ * `temVolume` decide se o cabeçalho deve mostrar esse dado (alguns lotes
+ * importados não trazem volume/cubagem).
+ */
+export function getVolumeExpedicaoHoje(state, filtroTipoCarga) {
+  const cargasHoje = getLojasDoDia(state).filter((l) => lojaPassaFiltroTipoCarga(l, filtroTipoCarga));
+  const volumeTotal = cargasHoje.reduce((soma, l) => soma + (l.volume ?? 0), 0);
+  const volumeFeito = cargasHoje
+    .filter((l) => l.status !== 'pendente' && eHoje(l.dataApontamento))
+    .reduce((soma, l) => soma + (l.volume ?? 0), 0);
+  const temVolume = cargasHoje.some((l) => l.volume != null);
+  return { volumeFeito, volumeTotal, temVolume };
+}
+
+/**
  * Cargas IMPORTADAS hoje de verdade (dataImportacao no calendário real, via
  * eHoje — não o dia operacional/diaReferencia, que só avança quando alguém
  * aciona "avançar dia" e por isso pode misturar cargas importadas ontem
