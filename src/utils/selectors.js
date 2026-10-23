@@ -269,12 +269,30 @@ export function getLinhasProcessoDoDia(state, filtroTipoCarga) {
     cargasHojePorCodigo.get(loja.loja).push(carga);
   });
 
+  // Coluna "Cargas no Box" (pedido do usuário): diferente de Geração de
+  // Carga/Carregamento acima (que só validam o que foi feito HOJE), esta
+  // olha o estado ATUAL do box, em qualquer dia — verdadeiro quando existe
+  // alguma carga daquele código ainda ocupando uma vaga agora, mesmo que
+  // tenha entrado no box num dia anterior e ainda não tenha sido
+  // finalizada (ex.: saldo que ficou no box de uma carga de ontem). Por
+  // isso percorre `state.lojas` inteiro (todos os dias), não só
+  // `getLojasDoDia`. Status 'pendente' ainda não tem box; 'finalizada' já
+  // liberou a vaga (ver liberarTodasVagas em boxLogic.js) — os dois ficam
+  // de fora, o resto dos status sempre tem um box ocupado.
+  const cargaNoBoxPorCodigo = new Set();
+  state.lojas.forEach((l) => {
+    if (l.boxNumero != null && l.status !== 'pendente' && l.status !== 'finalizada') {
+      cargaNoBoxPorCodigo.add(l.loja);
+    }
+  });
+
   return Array.from(lojasConhecidas.entries())
     .map(([codigo, info]) => {
       const cargas = cargasHojePorCodigo.get(codigo) || [];
       const tiposCarga = cargas.length > 0 ? [...new Set(cargas.map((c) => c.tipoCarga))] : [info.tipoCarga];
       const apontamentoFeito = cargas.some((c) => c.apontada);
       const apontamentoContagem = cargas.filter((c) => c.apontada).length;
+      const cargaNoBox = cargaNoBoxPorCodigo.has(codigo);
       const carregamentoFeito = cargas.some((c) => c.situacaoChave === 'completo' || c.situacaoChave === 'parcial');
       const carregamentoContagem = cargas.filter(
         (c) => c.situacaoChave === 'completo' || c.situacaoChave === 'parcial'
@@ -287,6 +305,7 @@ export function getLinhasProcessoDoDia(state, filtroTipoCarga) {
         tiposCarga,
         apontamentoFeito,
         apontamentoContagem,
+        cargaNoBox,
         carregamentoFeito,
         carregamentoContagem,
         completo,

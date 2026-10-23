@@ -10,11 +10,13 @@ const ROTULO_TIPO = {
   todos: 'Seca + Resfriada',
 };
 
-// Selo de status (Geração de Carga / Carregamento) dentro da tabela — pedido do
-// usuário: validar só pela LOJA (feito/pendente), sem mostrar nada de carga
-// (antes, uma loja com mais de uma carga no dia mostrava a contagem "(2/3)"
-// e o status de cada carga separadamente).
-function Selo({ feito }) {
+// Selo de status (Geração de Carga / Cargas no Box / Carregamento) dentro
+// da tabela — pedido do usuário: validar só pela LOJA (feito/pendente),
+// sem mostrar nada de carga (antes, uma loja com mais de uma carga no dia
+// mostrava a contagem "(2/3)" e o status de cada carga separadamente).
+// `rotuloFeito`/`rotuloPendente` permitem reaproveitar o mesmo selo com um
+// texto diferente na coluna "Cargas no Box" (ver abaixo).
+function Selo({ feito, rotuloFeito = 'Feito', rotuloPendente = 'Pendente' }) {
   return (
     <span
       className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
@@ -24,7 +26,7 @@ function Selo({ feito }) {
       }`}
     >
       {feito ? <CheckCircle2 size={12} /> : <XCircle size={12} />}
-      {feito ? 'Feito' : 'Pendente'}
+      {feito ? rotuloFeito : rotuloPendente}
     </span>
   );
 }
@@ -60,6 +62,7 @@ export default function DailyProcessReport() {
 
   const total = linhas.length;
   const comApontamento = linhas.filter((l) => l.apontamentoFeito).length;
+  const comCargaNoBox = linhas.filter((l) => l.cargaNoBox).length;
   const comCarregamento = linhas.filter((l) => l.carregamentoFeito).length;
   const completas = linhas.filter((l) => l.completo).length;
 
@@ -120,7 +123,8 @@ export default function DailyProcessReport() {
             <p className="text-xs text-slate-400 dark:text-slate-500">
               A coluna Loja traz sempre as lojas fixas (todo código já visto em alguma importação), mesmo sem carga
               hoje; as colunas Geração de Carga e Carregamento validam só o que foi feito hoje de verdade (registros de
-              dias anteriores não contam)
+              dias anteriores não contam). Cargas no Box é diferente: mostra se tem carga ocupando o box AGORA, mesmo
+              que tenha entrado lá num dia anterior e ainda não tenha sido carregada
             </p>
           </div>
         </div>
@@ -149,11 +153,17 @@ export default function DailyProcessReport() {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div className="rounded-lg bg-slate-50 p-3 text-center dark:bg-slate-900/30">
           <p className="text-xs text-slate-400 dark:text-slate-500">Geração de carga feita</p>
           <p className="mt-0.5 text-xl font-bold text-slate-700 dark:text-slate-200">
             {comApontamento} <span className="text-sm font-medium text-slate-400 dark:text-slate-500">/ {total}</span>
+          </p>
+        </div>
+        <div className="rounded-lg bg-slate-50 p-3 text-center dark:bg-slate-900/30">
+          <p className="text-xs text-slate-400 dark:text-slate-500">Com carga no box</p>
+          <p className="mt-0.5 text-xl font-bold text-slate-700 dark:text-slate-200">
+            {comCargaNoBox} <span className="text-sm font-medium text-slate-400 dark:text-slate-500">/ {total}</span>
           </p>
         </div>
         <div className="rounded-lg bg-slate-50 p-3 text-center dark:bg-slate-900/30">
@@ -202,6 +212,7 @@ export default function DailyProcessReport() {
                     <th className="w-16 py-2.5 pl-3 pr-1 font-semibold">Posição</th>
                     <th className="py-2.5 pr-3 font-semibold">Loja</th>
                     <th className="px-2 py-2.5 text-center font-semibold">Geração de Carga</th>
+                    <th className="px-2 py-2.5 text-center font-semibold">Cargas no Box</th>
                     <th className="px-2 py-2.5 text-center font-semibold">Carregamento</th>
                   </tr>
                 </thead>
@@ -251,6 +262,9 @@ export default function DailyProcessReport() {
                         <Selo feito={loja.apontamentoFeito} />
                       </td>
                       <td className="px-2 py-2.5 text-center">
+                        <Selo feito={loja.cargaNoBox} rotuloFeito="No box" rotuloPendente="Vazio" />
+                      </td>
+                      <td className="px-2 py-2.5 text-center">
                         <Selo feito={loja.carregamentoFeito} />
                       </td>
                     </tr>
@@ -275,6 +289,7 @@ export default function DailyProcessReport() {
                 <tr className="border-b border-slate-200 dark:border-slate-700">
                   <th className="py-2.5 pl-3 pr-3 font-semibold">Loja</th>
                   <th className="px-2 py-2.5 text-center font-semibold">Geração de Carga</th>
+                  <th className="px-2 py-2.5 text-center font-semibold">Cargas no Box</th>
                   <th className="px-2 py-2.5 text-center font-semibold">Carregamento</th>
                 </tr>
               </thead>
@@ -292,7 +307,7 @@ export default function DailyProcessReport() {
                         cabe numa tela só. */}
                     <tr>
                       <td
-                        colSpan={3}
+                        colSpan={4}
                         className={`px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide ${
                           secao.chave === 'pendentes'
                             ? 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300'
@@ -330,6 +345,9 @@ export default function DailyProcessReport() {
                         </td>
                         <td className="px-2 py-2.5 text-center">
                           <Selo feito={loja.apontamentoFeito} />
+                        </td>
+                        <td className="px-2 py-2.5 text-center">
+                          <Selo feito={loja.cargaNoBox} rotuloFeito="No box" rotuloPendente="Vazio" />
                         </td>
                         <td className="px-2 py-2.5 text-center">
                           <Selo feito={loja.carregamentoFeito} />
