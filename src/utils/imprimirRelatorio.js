@@ -40,13 +40,23 @@ export function imprimirRelatorioAtivo(titulo, subtitulo, opcoes = {}) {
 
   // Mede o tamanho natural ANTES de montar o HTML de impressão — `area`
   // ainda é o elemento AO VIVO na tela aqui, então `scrollWidth`/
-  // `scrollHeight` pegam o conteúdo inteiro mesmo que uma parte dele (ex.:
-  // a tabela do Processo do Dia, com `max-h-[70vh] overflow-auto` na tela)
-  // esteja visualmente cortada/com scroll nesse momento — essas duas
-  // propriedades sempre refletem o tamanho TOTAL do conteúdo, não só a
-  // parte visível.
+  // `scrollHeight` pegam o conteúdo inteiro mesmo que uma parte dele esteja
+  // visualmente cortada/com scroll nesse momento.
   const larguraNatural = area.scrollWidth;
-  const alturaNatural = area.scrollHeight;
+  // A altura, porém, PRECISA descontar o que tem `print:hidden` (ex.: a
+  // barra de título/"Sequenciar lojas" e o botão de copiar como imagem do
+  // Processo do Dia) — na TELA esses elementos ainda estão visíveis
+  // normalmente (o `display:none` só entra em @media print), então contam
+  // no scrollHeight medido aqui, mas não vão ocupar espaço nenhum no papel.
+  // Sem descontar isso, o fator de escala calculado abaixo sai menor do que
+  // precisava (encolhe mais do que o necessário).
+  let alturaNatural = area.scrollHeight;
+  area.querySelectorAll('.print\\:hidden').forEach((elementoOculto) => {
+    const altura = elementoOculto.getBoundingClientRect().height;
+    const estilo = window.getComputedStyle(elementoOculto);
+    const margemVertical = parseFloat(estilo.marginTop || '0') + parseFloat(estilo.marginBottom || '0');
+    alturaNatural -= altura + margemVertical;
+  });
 
   // O relatório usa classes Tailwind "dark:..." — como a cópia impressa é
   // injetada dentro do próprio <html>, se o modo escuro estiver ativo ela
@@ -74,7 +84,13 @@ export function imprimirRelatorioAtivo(titulo, subtitulo, opcoes = {}) {
   });
   const horaAgora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
-  const estiloPagina = paisagem ? '@page { size: A4 landscape; margin: 10mm; }' : '';
+  // A regra @page de orientação (paisagem/retrato) é aplicada por
+  // imprimirHtml() direto num <style> próprio no <head> (ver
+  // definirOrientacaoDePagina em imprimirHtml.js) — não aqui embutida no
+  // HTML do corpo copiado pra dentro da área de impressão. Tentativa
+  // anterior fazia isso (um <style> dentro do próprio <body> impresso) e
+  // não demonstrou aplicar a orientação de forma confiável no preview de
+  // impressão do navegador.
 
   // Fator de escala pra caber numa folha só (ver comentário do JSDoc acima)
   // — a área útil aqui já desconta o padding de 12px do wrapper e o
@@ -89,15 +105,23 @@ export function imprimirRelatorioAtivo(titulo, subtitulo, opcoes = {}) {
     const larguraMaxPx = larguraPaginaMm * PX_POR_MM;
     const alturaMaxPx = (alturaPaginaMm - 28) * PX_POR_MM;
     const fator = Math.min(1, larguraMaxPx / larguraNatural, alturaMaxPx / alturaNatural);
+    // IMPORTANTE: a div de FORA precisa reservar o espaço já no tamanho
+    // ESCALADO (largura E altura) — reservar só a altura escalada mas
+    // deixar a largura no tamanho ORIGINAL (bug de uma versão anterior
+    // desta função) faz o navegador enxergar um bloco bem mais largo que a
+    // folha, e muitos navegadores reagem a isso aplicando um "encolher pra
+    // caber" PRÓPRIO deles por cima do nosso — encolhendo tudo de novo,
+    // bem mais do que o necessário, e empurrando o conteúdo pro canto
+    // superior esquerdo da folha.
+    const larguraEscaladaPx = Math.round(larguraNatural * fator);
     const alturaEscaladaPx = Math.round(alturaNatural * fator);
-    aberturaEscala = `<div style="width:${larguraNatural}px;height:${alturaEscaladaPx}px;overflow:hidden;"><div style="width:${larguraNatural}px;transform:scale(${fator.toFixed(
+    aberturaEscala = `<div style="width:${larguraEscaladaPx}px;height:${alturaEscaladaPx}px;overflow:hidden;"><div style="width:${larguraNatural}px;transform:scale(${fator.toFixed(
       3
     )});transform-origin:top left;">`;
     fechamentoEscala = '</div></div>';
   }
 
   const html = `<!DOCTYPE html><html><body>
-    ${estiloPagina ? `<style>${estiloPagina}</style>` : ''}
     <div style="padding:12px;background:#ffffff;color:#1e293b;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;">
       <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;border-bottom:2px solid #1e293b;padding-bottom:8px;margin-bottom:16px;">
         <div>
@@ -110,5 +134,5 @@ export function imprimirRelatorioAtivo(titulo, subtitulo, opcoes = {}) {
     </div>
   </body></html>`;
 
-  return imprimirHtml(html);
+  return imprimirHtml(html, { paisagem });
 }

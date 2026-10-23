@@ -224,6 +224,19 @@ export function getLojasConhecidas(state) {
  * avança ao clicar em "Encerrar Dia" e pode ficar parado por mais de um
  * dia).
  */
+// Ordem de progressão do status de uma carga (mesmas chaves de STATUS_LOJA
+// em statusStyles.js) — usada só pra achar o status "mais avançado" entre
+// as cargas apontadas hoje de uma loja (ver statusExpedicaoHoje abaixo).
+const ORDEM_STATUS_CARGA = [
+  'pendente',
+  'apontada',
+  'conferencia_finalizada',
+  'em_agrupamento',
+  'agrupada',
+  'carregando',
+  'finalizada',
+];
+
 export function getLinhasProcessoDoDia(state, filtroTipoCarga) {
   const lojasConhecidas = new Map();
   state.lojas.forEach((l) => {
@@ -264,6 +277,12 @@ export function getLinhasProcessoDoDia(state, filtroTipoCarga) {
       tipoCarga: loja.tipoCarga,
       apontada: loja.status !== 'pendente' && eHoje(loja.dataApontamento),
       situacaoChave,
+      // Pedido do usuário: a coluna Expedição de Hoje do Processo do Dia
+      // precisa mostrar o status REAL da loja no box (Em Execução,
+      // Conferência Finalizada, Agrupando, Agrupada etc.), não só um
+      // "Feito"/"Pendente" genérico — guarda o status da carga pra resolver
+      // isso mais abaixo (statusExpedicaoHoje).
+      status: loja.status,
     };
     if (!cargasHojePorCodigo.has(loja.loja)) cargasHojePorCodigo.set(loja.loja, []);
     cargasHojePorCodigo.get(loja.loja).push(carga);
@@ -298,6 +317,20 @@ export function getLinhasProcessoDoDia(state, filtroTipoCarga) {
         (c) => c.situacaoChave === 'completo' || c.situacaoChave === 'parcial'
       ).length;
       const completo = apontamentoFeito && carregamentoFeito;
+      // Pedido do usuário: status real da loja pra coluna Expedição de Hoje
+      // (em vez do booleano apontamentoFeito) — pega o status "mais
+      // avançado" entre as cargas apontadas HOJE (mesma semântica de
+      // apontamentoFeito: só considera o que foi apontado hoje); sem
+      // nenhuma carga apontada hoje, mostra 'pendente'.
+      const cargasApontadasHoje = cargas.filter((c) => c.apontada);
+      const statusExpedicaoHoje =
+        cargasApontadasHoje.length > 0
+          ? cargasApontadasHoje.reduce(
+              (maisAvancado, c) =>
+                ORDEM_STATUS_CARGA.indexOf(c.status) > ORDEM_STATUS_CARGA.indexOf(maisAvancado) ? c.status : maisAvancado,
+              cargasApontadasHoje[0].status
+            )
+          : 'pendente';
       return {
         codigo,
         nomeLoja: info.nomeLoja,
@@ -309,6 +342,7 @@ export function getLinhasProcessoDoDia(state, filtroTipoCarga) {
         carregamentoFeito,
         carregamentoContagem,
         completo,
+        statusExpedicaoHoje,
       };
     })
     .filter((loja) => loja.tiposCarga.some((tipo) => lojaPassaFiltroTipoCarga({ tipoCarga: tipo }, filtroTipoCarga)))

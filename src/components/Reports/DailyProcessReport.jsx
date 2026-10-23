@@ -3,6 +3,7 @@ import { ListChecks, CheckCircle2, XCircle, ArrowUpDown, Camera, Loader2 } from 
 import { useApp } from '../../context/AppContext.jsx';
 import { getLinhasProcessoDoDia, getEntregaCodigoLojaNaData, getVolumeExpedicaoHoje } from '../../utils/selectors';
 import { getDiasUteisSemana, formatarDiaSemanaCurto, hojeISO } from '../../utils/dateHelpers';
+import { getStatusLoja } from '../../utils/statusStyles';
 import TipoCargaBadge from '../Shared/TipoCargaBadge.jsx';
 
 const ROTULO_TIPO = {
@@ -40,6 +41,25 @@ function Selo({ feito, rotuloFeito = 'Feito', rotuloPendente = 'Pendente' }) {
     >
       {feito ? <CheckCircle2 size={12} /> : <XCircle size={12} />}
       {feito ? rotuloFeito : rotuloPendente}
+    </span>
+  );
+}
+
+// Selo da coluna Expedição de Hoje (pedido do usuário): em vez do booleano
+// genérico "No Box"/"Pendente" do <Selo> acima, mostra o status REAL da
+// loja no momento (ex.: "Em Execução", "Conferência Finalizada",
+// "Agrupando", "Agrupada") — mesmo texto/cor já usados em todo o app pra
+// esse status (ver STATUS_LOJA em statusStyles.js e o mesmo padrão de selo
+// em GroupingHistory.jsx/AndamentoEntregasCard.jsx). `statusExpedicaoHoje`
+// (selectors.js) já resolve pra 'pendente' quando a loja ainda não teve
+// nenhuma carga apontada hoje.
+function SeloStatusExpedicao({ status }) {
+  const info = getStatusLoja(status);
+  return (
+    <span
+      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${info.corBadge}`}
+    >
+      {info.texto}
     </span>
   );
 }
@@ -184,6 +204,16 @@ export default function DailyProcessReport() {
         backgroundColor: temaEscuro ? '#1e293b' : '#ffffff',
         scale: Math.min(2, window.devicePixelRatio || 1.5),
         useCORS: true,
+        // Pedido do usuário (print ruim reportado): o modo padrão de
+        // renderização do html2canvas (via <canvas>, redesenhando cada
+        // elemento "na mão") não reconhece certos ícones SVG embutidos
+        // (confirmado com o XCircle de "faltou" em CelulasSemana abaixo —
+        // saía como um glifo vermelho quebrado em vez do X dentro do
+        // círculo). `foreignObjectRendering: true` manda o próprio
+        // navegador rasterizar o conteúdo via <foreignObject> do SVG, bem
+        // suportado no Chrome/Chromium, e resolve esse tipo de ícone sem
+        // precisar reescrever cada um à mão.
+        foreignObjectRendering: true,
       });
       const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
       if (!blob) throw new Error('Não foi possível gerar a imagem.');
@@ -543,11 +573,11 @@ export default function DailyProcessReport() {
                         </div>
                       </td>
                       <td className="px-2 py-2.5 text-center">
-                        {/* Pedido do usuário: "Feito" renomeado pra "No Box"
-                            nessa coluna — reflete o que de fato acontece
-                            quando a expedição é concluída (o box já foi
-                            atribuído nesse momento, ver boxLogic.js). */}
-                        <Selo feito={loja.apontamentoFeito} rotuloFeito="No Box" />
+                        {/* Pedido do usuário: em vez de um "Feito"/"Pendente"
+                            genérico, mostra o status real da loja no box
+                            nesse momento (Em Execução, Conferência
+                            Finalizada, Agrupando, Agrupada etc.). */}
+                        <SeloStatusExpedicao status={loja.statusExpedicaoHoje} />
                       </td>
                       <td className="px-2 py-2.5 text-center">
                         <Selo feito={loja.cargaNoBox} rotuloFeito="Em andamento" rotuloPendente="Vazio" />
@@ -671,10 +701,9 @@ export default function DailyProcessReport() {
                           </div>
                         </td>
                         <td className="px-2 py-2.5 text-center">
-                          {/* Pedido do usuário: "Feito" renomeado pra "No
-                              Box" nessa coluna (ver comentário na outra
-                              tabela, modo sequência, acima). */}
-                          <Selo feito={loja.apontamentoFeito} rotuloFeito="No Box" />
+                          {/* Pedido do usuário: ver comentário na outra
+                              tabela, modo sequência, acima. */}
+                          <SeloStatusExpedicao status={loja.statusExpedicaoHoje} />
                         </td>
                         <td className="px-2 py-2.5 text-center">
                           <Selo feito={loja.cargaNoBox} rotuloFeito="Em andamento" rotuloPendente="Vazio" />

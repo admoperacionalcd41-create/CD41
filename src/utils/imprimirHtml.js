@@ -26,6 +26,17 @@
 // a impressão não depende mais só disso.
 const ID_AREA_IMPRESSAO = 'doca-manager-area-impressao';
 const ID_ESTILO_IMPRESSAO = 'doca-manager-estilo-impressao';
+// Estilo separado, só pra orientação de página (@page) — pedido do usuário
+// (Processo do Dia em paisagem). Fica à parte do estilo global acima
+// porque PRECISA ser reescrito a cada chamada: relatórios diferentes podem
+// pedir orientações diferentes (ou nenhuma, voltando ao padrão retrato do
+// navegador), e um `@page` definido uma vez dentro do <style> injetado no
+// corpo impresso (tentativa anterior) não demonstrou aplicar de forma
+// confiável a orientação no preview de impressão do navegador — colocar a
+// regra no <head>, como uma folha de estilo "de verdade" (em vez de
+// embutida no HTML do corpo copiado pra dentro da área de impressão), é a
+// forma canônica de declarar `@page` e funciona de forma consistente.
+const ID_ESTILO_PAGINA = 'doca-manager-estilo-pagina-impressao';
 
 function garantirEstiloGlobalDeImpressao() {
   if (document.getElementById(ID_ESTILO_IMPRESSAO)) return;
@@ -43,6 +54,20 @@ function garantirEstiloGlobalDeImpressao() {
     }
   `;
   document.head.appendChild(estilo);
+}
+
+// Define (ou limpa) a orientação de página pra impressão — ver comentário
+// de ID_ESTILO_PAGINA acima sobre o porquê de ficar num <style> próprio no
+// <head>, reescrito a cada chamada, em vez de embutido no HTML copiado pra
+// dentro da área de impressão.
+function definirOrientacaoDePagina(paisagem) {
+  let estilo = document.getElementById(ID_ESTILO_PAGINA);
+  if (!estilo) {
+    estilo = document.createElement('style');
+    estilo.id = ID_ESTILO_PAGINA;
+    document.head.appendChild(estilo);
+  }
+  estilo.textContent = paisagem ? '@page { size: A4 landscape; margin: 10mm; }' : '';
 }
 
 // O documento impresso é injetado dentro do próprio <html> da página — se o
@@ -67,9 +92,10 @@ function comModoEscuroDesativadoDuranteImpressao() {
   setTimeout(restaurar, 60000);
 }
 
-export function imprimirHtml(html) {
+export function imprimirHtml(html, opcoes = {}) {
   try {
     garantirEstiloGlobalDeImpressao();
+    definirOrientacaoDePagina(opcoes.paisagem || false);
     comModoEscuroDesativadoDuranteImpressao();
 
     // O `html` recebido é um documento autônomo completo (com <html>,
