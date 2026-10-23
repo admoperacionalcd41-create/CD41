@@ -351,76 +351,84 @@ export default function DailyProcessReport() {
         </button>
       </div>
 
-      <div ref={capturaRef}>
-        {/* Pedido do usuário: card único no topo com o resumo do dia em %
-            — Expedição de Hoje (% concluída) e Carregamento de Hoje (%
-            feito). Mesma base de cálculo dos totalizadores que já aparecem
-            no cabeçalho de cada coluna (ver pctExpedicao/pctCarregamento
-            acima), só que em percentual em vez de "feito/total". */}
-        <div className="mb-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
-          <h2 className="mb-3 text-sm font-bold text-slate-700 dark:text-slate-200">
-            Resumo do Dia — {rotuloTipo}
-          </h2>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-lg bg-slate-50 p-4 text-center dark:bg-slate-900/30">
-              <p className="text-xs text-slate-400 dark:text-slate-500">Expedição de Hoje</p>
-              <p className="mt-1 text-3xl font-bold text-totvs-600 dark:text-whatsapp-400">{pctExpedicao}%</p>
-              <p className="text-[11px] text-slate-400 dark:text-slate-500">concluída</p>
-            </div>
-            <div className="rounded-lg bg-slate-50 p-4 text-center dark:bg-slate-900/30">
-              <p className="text-xs text-slate-400 dark:text-slate-500">Carregamento de Hoje</p>
-              <p className="mt-1 text-3xl font-bold text-totvs-600 dark:text-whatsapp-400">{pctCarregamento}%</p>
-              <p className="text-[11px] text-slate-400 dark:text-slate-500">feito</p>
+      <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+        {/* Pedido do usuário: título/explicação/botão "Sequenciar lojas"
+            ficam ACIMA do card de resumo agora — e por isso saem tanto da
+            imagem copiada quanto do papel (`print:hidden`), já que os
+            pedidos anteriores foram "só do card resumo pra baixo" pros dois
+            (copiar como imagem e imprimir). O título do relatório já
+            aparece de qualquer forma no cabeçalho que imprimirRelatorio.js
+            monta por fora (ver ReportsPage.jsx), então não duplica no
+            papel. */}
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 print:hidden">
+          <div className="flex items-center gap-2">
+            <ListChecks size={18} className="text-totvs-600 dark:text-whatsapp-400" />
+            <div>
+              <h2 className="text-sm font-bold text-slate-700 dark:text-slate-200">Processo do Dia — {rotuloTipo}</h2>
+              {/* Pedido do usuário: "Dia operacional: DD/MM/AAAA" ocultado em
+                  todas as abas (inclusive aqui, que tinha essa mesma data no
+                  início da legenda) — o resto da explicação continua, só
+                  reescrita pra começar sozinha com letra maiúscula. */}
+              <p className="text-xs text-slate-400 dark:text-slate-500">
+                A coluna Loja traz sempre as lojas fixas (todo código já visto em alguma importação), mesmo sem carga
+                hoje; as colunas Expedição de Hoje e Carregamento de Hoje validam só o que foi feito hoje de verdade
+                (registros de dias anteriores não contam). Cargas em Andamento é diferente: mostra se tem carga
+                ocupando o box AGORA, incluindo cargas de ontem que ainda não foram carregadas. As colunas de Segunda a
+                Sexta e Semana são o mesmo acompanhamento do relatório Meta de Entrega, só que lado a lado com o resto
+              </p>
             </div>
           </div>
+
+          {/* Pedido do usuário: opção pra sequenciar as lojas — modo à
+              parte, opcional; não substitui a separação padrão
+              pendente/completo, que continua sendo a visão default. Era por
+              arrastar e soltar, trocado por campo de número a pedido do
+              usuário (arrastar ficou lento com a lista grande). */}
+          <button
+            type="button"
+            onClick={() => setModoSequencia((v) => !v)}
+            title={
+              modoSequencia
+                ? 'Voltar pra visão padrão (pendente / completo)'
+                : 'Organizar a ordem das lojas digitando a posição de cada uma'
+            }
+            className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-semibold transition-colors ${
+              modoSequencia
+                ? 'border-totvs-300 bg-totvs-50 text-totvs-700 dark:border-whatsapp-600 dark:bg-whatsapp-500/10 dark:text-whatsapp-300'
+                : 'border-slate-200 text-slate-500 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-400 dark:hover:bg-slate-700/40'
+            }`}
+          >
+            <ArrowUpDown size={14} />
+            {modoSequencia ? 'Modo sequência (ativo)' : 'Sequenciar lojas'}
+          </button>
         </div>
 
-        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <ListChecks size={18} className="text-totvs-600 dark:text-whatsapp-400" />
-          <div>
-            <h2 className="text-sm font-bold text-slate-700 dark:text-slate-200">Processo do Dia — {rotuloTipo}</h2>
-            {/* Pedido do usuário: "Dia operacional: DD/MM/AAAA" ocultado em
-                todas as abas (inclusive aqui, que tinha essa mesma data no
-                início da legenda) — o resto da explicação continua, só
-                reescrita pra começar sozinha com letra maiúscula. */}
-            <p className="text-xs text-slate-400 dark:text-slate-500">
-              A coluna Loja traz sempre as lojas fixas (todo código já visto em alguma importação), mesmo sem carga
-              hoje; as colunas Expedição de Hoje e Carregamento de Hoje validam só o que foi feito hoje de verdade
-              (registros de dias anteriores não contam). Cargas em Andamento é diferente: mostra se tem carga
-              ocupando o box AGORA, incluindo cargas de ontem que ainda não foram carregadas. As colunas de Segunda a
-              Sexta e Semana são o mesmo acompanhamento do relatório Meta de Entrega, só que lado a lado com o resto
-            </p>
+        <div ref={capturaRef}>
+          {/* Pedido do usuário: card único logo abaixo da barra de título/
+              Sequenciar lojas, com o resumo do dia em % — Expedição de Hoje
+              (% concluída) e Carregamento de Hoje (% feito). Mesma base de
+              cálculo dos totalizadores que já aparecem no cabeçalho de cada
+              coluna (ver pctExpedicao/pctCarregamento acima), só que em
+              percentual em vez de "feito/total". */}
+          <div className="mb-4 rounded-lg border border-slate-100 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900/30">
+            <h3 className="mb-3 text-sm font-bold text-slate-700 dark:text-slate-200">
+              Resumo do Dia — {rotuloTipo}
+            </h3>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-lg bg-white p-4 text-center dark:bg-slate-800">
+                <p className="text-xs text-slate-400 dark:text-slate-500">Expedição de Hoje</p>
+                <p className="mt-1 text-3xl font-bold text-totvs-600 dark:text-whatsapp-400">{pctExpedicao}%</p>
+                <p className="text-[11px] text-slate-400 dark:text-slate-500">concluída</p>
+              </div>
+              <div className="rounded-lg bg-white p-4 text-center dark:bg-slate-800">
+                <p className="text-xs text-slate-400 dark:text-slate-500">Carregamento de Hoje</p>
+                <p className="mt-1 text-3xl font-bold text-totvs-600 dark:text-whatsapp-400">{pctCarregamento}%</p>
+                <p className="text-[11px] text-slate-400 dark:text-slate-500">feito</p>
+              </div>
+            </div>
           </div>
-        </div>
 
-        {/* Pedido do usuário: opção pra sequenciar as lojas — modo à parte,
-            opcional; não substitui a separação padrão pendente/completo,
-            que continua sendo a visão default. Era por arrastar e soltar,
-            trocado por campo de número a pedido do usuário (arrastar ficou
-            lento com a lista grande). `print:hidden` — não faz sentido no
-            papel (ver imprimirRelatorio.js). */}
-        <button
-          type="button"
-          onClick={() => setModoSequencia((v) => !v)}
-          title={
-            modoSequencia
-              ? 'Voltar pra visão padrão (pendente / completo)'
-              : 'Organizar a ordem das lojas digitando a posição de cada uma'
-          }
-          className={`print:hidden flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-semibold transition-colors ${
-            modoSequencia
-              ? 'border-totvs-300 bg-totvs-50 text-totvs-700 dark:border-whatsapp-600 dark:bg-whatsapp-500/10 dark:text-whatsapp-300'
-              : 'border-slate-200 text-slate-500 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-400 dark:hover:bg-slate-700/40'
-          }`}
-        >
-          <ArrowUpDown size={14} />
-          {modoSequencia ? 'Modo sequência (ativo)' : 'Sequenciar lojas'}
-        </button>
-      </div>
-
-      <div className="mt-1 border-t border-slate-100 pt-4 dark:border-slate-700">
+          <div className="mt-1 border-t border-slate-100 pt-4 dark:border-slate-700">
         {total === 0 ? (
           <p className="text-sm text-slate-400 dark:text-slate-500">
             Nenhuma loja de {rotuloTipo.toLowerCase()} programada para o dia operacional atual ainda. Importe os dados na
@@ -440,7 +448,18 @@ export default function DailyProcessReport() {
               ordem é salva automaticamente e vale pros próximos dias também — lojas novas entram no fim da lista até
               serem organizadas.
             </p>
-            <div className="max-h-[70vh] overflow-auto rounded-lg border border-slate-100 dark:border-slate-700 print:max-h-none print:overflow-visible">
+            {/* Pedido do usuário: o `max-h-[70vh] overflow-auto` que existia
+                aqui criava uma SEGUNDA barra de rolagem (a tabela rolava
+                dentro de si mesma, além da rolagem normal da página) — além
+                de atrapalhar a visão, isso cortava a tabela na captura de
+                "copiar como imagem" (html2canvas só pega o que está visível
+                dentro da área com scroll) e exigia a gambiarra separada
+                `print:max-h-none` pra impressão. Removido: a tabela agora só
+                flui com o resto da página (uma rolagem só). O cabeçalho
+                continua "sticky" (ver thead abaixo), só que agora gruda no
+                topo da área de rolagem da página inteira, não mais só
+                dentro desses 70vh. */}
+            <div className="rounded-lg border border-slate-100 dark:border-slate-700">
               <table className="w-full text-left text-sm">
                 <thead className="sticky top-0 z-10 bg-white text-xs text-slate-500 shadow-sm dark:bg-slate-800 dark:text-slate-400">
                   <tr className="border-b border-slate-200 dark:border-slate-700">
@@ -524,7 +543,11 @@ export default function DailyProcessReport() {
                         </div>
                       </td>
                       <td className="px-2 py-2.5 text-center">
-                        <Selo feito={loja.apontamentoFeito} />
+                        {/* Pedido do usuário: "Feito" renomeado pra "No Box"
+                            nessa coluna — reflete o que de fato acontece
+                            quando a expedição é concluída (o box já foi
+                            atribuído nesse momento, ver boxLogic.js). */}
+                        <Selo feito={loja.apontamentoFeito} rotuloFeito="No Box" />
                       </td>
                       <td className="px-2 py-2.5 text-center">
                         <Selo feito={loja.cargaNoBox} rotuloFeito="Em andamento" rotuloPendente="Vazio" />
@@ -546,11 +569,19 @@ export default function DailyProcessReport() {
           // tabela; o que ficou da passagem pelos cards foi tirar de vez o
           // detalhe por carga (número de carga, contagem "(2/3)", status
           // individual de cada carga), que não volta aqui.
-          <div className="max-h-[70vh] overflow-auto rounded-lg border border-slate-100 dark:border-slate-700 print:max-h-none print:overflow-visible">
+          //
+          // Pedido do usuário: removido o `max-h-[70vh] overflow-auto` que
+          // existia aqui — criava uma segunda barra de rolagem (além da
+          // rolagem normal da página) e cortava a tabela tanto na captura de
+          // "copiar como imagem" (html2canvas só pega o que está visível
+          // dentro de uma área com scroll) quanto exigia a gambiarra
+          // separada `print:max-h-none` pra impressão. Agora a tabela só
+          // flui com o resto da página.
+          <div className="rounded-lg border border-slate-100 dark:border-slate-700">
             <table className="w-full text-left text-sm">
-              {/* Cabeçalho fixo (sticky) — com uma lista de 28+ lojas rolando
-                  dentro do card, vale sempre poder ver o nome das colunas
-                  sem precisar voltar pro topo. */}
+              {/* Cabeçalho fixo (sticky) — gruda no topo da área de rolagem
+                  da PÁGINA (não mais só dentro de um box de 70vh — ver
+                  comentário acima), útil com uma lista de 28+ lojas. */}
               <thead className="sticky top-0 z-10 bg-white text-xs text-slate-500 shadow-sm dark:bg-slate-800 dark:text-slate-400">
                 <tr className="border-b border-slate-200 dark:border-slate-700">
                   <th className="py-2.5 pl-3 pr-3 font-semibold">Loja</th>
@@ -640,7 +671,10 @@ export default function DailyProcessReport() {
                           </div>
                         </td>
                         <td className="px-2 py-2.5 text-center">
-                          <Selo feito={loja.apontamentoFeito} />
+                          {/* Pedido do usuário: "Feito" renomeado pra "No
+                              Box" nessa coluna (ver comentário na outra
+                              tabela, modo sequência, acima). */}
+                          <Selo feito={loja.apontamentoFeito} rotuloFeito="No Box" />
                         </td>
                         <td className="px-2 py-2.5 text-center">
                           <Selo feito={loja.cargaNoBox} rotuloFeito="Em andamento" rotuloPendente="Vazio" />
