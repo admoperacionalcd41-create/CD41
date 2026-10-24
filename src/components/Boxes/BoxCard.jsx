@@ -127,6 +127,12 @@ export default function BoxCard({ box, lojasPorId, aoSelecionarLoja }) {
             const loja = lojasPorId[lojaId];
             if (!loja) return null;
             const status = getStatusLoja(loja.status);
+            // Pedido do usuário: carga já AGRUPADA mostra a quantidade de
+            // paletes direto no chip (antes só aparecia ao passar o mouse,
+            // no title) — mesma abreviação "pal." já usada em
+            // GroupingCard.jsx/GroupingHistory.jsx, pra não precisar abrir o
+            // modal de detalhes só pra ver quantos paletes tem ali.
+            const agrupada = loja.status === 'agrupada';
             return (
               <button
                 key={lojaId}
@@ -136,6 +142,9 @@ export default function BoxCard({ box, lojasPorId, aoSelecionarLoja }) {
               >
                 <span className={`h-2 w-2 flex-shrink-0 rounded-full ${status.corPonto}`} />
                 {loja.loja}
+                {agrupada && (
+                  <span className="text-slate-400 dark:text-slate-400">· {loja.paletesAgrupados} pal.</span>
+                )}
               </button>
             );
           })}
