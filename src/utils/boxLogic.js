@@ -35,7 +35,7 @@ const CONFIG_BOXES = [
   { numero: 6, nome: 'Box 6', totalVagas: 26 },
   { numero: 7, nome: 'Box 7', totalVagas: 26 },
   { numero: 8, nome: 'Box 8', totalVagas: 26 },
-  { numero: 9, nome: 'Box 9', totalVagas: 18 },
+  { numero: 9, nome: 'Box 9 (blocado)', totalVagas: 32 },
   { numero: 10, nome: 'Box 10', totalVagas: 18 },
   { numero: 11, nome: 'Box 11', totalVagas: 18 },
   { numero: 12, nome: 'Box 12', totalVagas: 18 },
