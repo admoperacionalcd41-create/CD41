@@ -131,19 +131,34 @@ export default function BoxCard({ box, lojasPorId, aoSelecionarLoja }) {
             // paletes direto no chip (antes só aparecia ao passar o mouse,
             // no title) — mesma abreviação "pal." já usada em
             // GroupingCard.jsx/GroupingHistory.jsx, pra não precisar abrir o
-            // modal de detalhes só pra ver quantos paletes tem ali.
+            // modal de detalhes só pra ver quantos paletes tem ali. Mesmo
+            // conceito pra carga em AGRUPAMENTO (em_agrupamento): mostra os
+            // agrupadores sinalizados (loja.colaboradores), em vez da
+            // quantidade de paletes — ainda não tem sentido aqui, já que só
+            // é reconfirmada ao concluir o agrupamento.
             const agrupada = loja.status === 'agrupada';
+            const agrupando = loja.status === 'em_agrupamento' && loja.colaboradores?.length > 0;
+            const tituloExtra = agrupada
+              ? ` — ${loja.paletesAgrupados} palete${loja.paletesAgrupados !== 1 ? 's' : ''}`
+              : agrupando
+              ? ` — Agrupadores: ${loja.colaboradores.join(', ')}`
+              : '';
             return (
               <button
                 key={lojaId}
                 onClick={() => aoSelecionarLoja && aoSelecionarLoja(loja)}
-                title={`Loja ${loja.loja} — ${loja.nomeLoja} — ${status.texto} — ${loja.paletesAgrupados} palete${loja.paletesAgrupados !== 1 ? 's' : ''}`}
-                className="flex items-center gap-1 rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-semibold leading-tight text-slate-600 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600"
+                title={`Loja ${loja.loja} — ${loja.nomeLoja} — ${status.texto}${tituloExtra}`}
+                className="flex min-w-0 items-center gap-1 rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-semibold leading-tight text-slate-600 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600"
               >
                 <span className={`h-2 w-2 flex-shrink-0 rounded-full ${status.corPonto}`} />
                 {loja.loja}
                 {agrupada && (
                   <span className="text-slate-400 dark:text-slate-400">· {loja.paletesAgrupados} pal.</span>
+                )}
+                {agrupando && (
+                  <span className="max-w-[160px] min-w-0 truncate text-slate-400 dark:text-slate-400">
+                    · {loja.colaboradores.join(', ')}
+                  </span>
                 )}
               </button>
             );
