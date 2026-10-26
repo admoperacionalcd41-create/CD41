@@ -104,19 +104,11 @@ export default function Header({ tituloAba, abaAtiva, onAbrirMenu }) {
 
         <div className="flex items-center gap-2">
           {abaAtiva !== 'cadastros' && (
+            // Pedido do usuário: tirado o "Todos" daqui — misturava Seca e
+            // Resfriada nos relatórios mesmo com um tipo "selecionado". Só
+            // resta a escolha entre os dois tipos (ver filtroTipoCarga, com
+            // "Seca" como padrão, em AppContext.jsx).
             <div className="flex overflow-hidden rounded-md border border-slate-200 text-xs dark:border-slate-600">
-              <button
-                type="button"
-                onClick={() => setFiltroTipoCarga('todos')}
-                title="Mostrar lojas de carga Seca e Resfriada"
-                className={`px-2.5 py-1.5 font-medium ${
-                  filtroTipoCarga === 'todos'
-                    ? 'bg-totvs-600 dark:bg-whatsapp-600 text-white'
-                    : 'bg-white text-slate-500 hover:bg-slate-50 dark:bg-slate-700 dark:text-slate-400 dark:hover:bg-slate-600'
-                }`}
-              >
-                Todos
-              </button>
               {TIPOS_CARGA.map((t) => (
                 <button
                   key={t.chave}

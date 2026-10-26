@@ -162,6 +162,14 @@ export function gerarDadosIniciais() {
     lojas[idxImportadaOntem] = {
       ...lojas[idxImportadaOntem],
       dataImportacao: new Date(Date.now() - 86400000).toISOString(),
+      // Força "Seca" aqui (índice 11 cairia em "Resfriada" pela regra
+      // normal de i % 6 === 5, só coincidência de índice) — esse cenário é
+      // sobre data de importação, não tipo de carga, e com o filtro do
+      // cabeçalho agora sempre em Seca OU Resfriada (nunca mais "Todos",
+      // padrão "Seca" — ver Header.jsx/AppContext.jsx), precisa continuar
+      // visível e contando no Volume Total sob o filtro padrão pra essa
+      // demonstração continuar fazendo sentido.
+      tipoCarga: 'seca',
     };
   }
 

@@ -422,6 +422,17 @@ export function boxTemCargaEmAndamento(box, lojasPorId) {
   );
 }
 
+// Pedido do usuário: "Box Frios" é um espaço compartilhado pra carga
+// Resfriada, não uma doca individual como os demais boxes — então pode
+// receber várias lojas em Geração de Carga ao mesmo tempo, mesmo com uma
+// carga anterior ainda em andamento (Conferência/Agrupando) lá dentro.
+// Usado em GroupingForm.jsx pra não aplicar a trava de
+// boxTemCargaEmAndamento (pensada pra uma doca de carga solta, onde só uma
+// carga por vez ocupa a zona crescente) a este box específico.
+export function boxPermiteVariasCargasEmGeracao(nome) {
+  return nome === 'Box Frios';
+}
+
 /**
  * Reempacota as vagas ocupadas de um box, fechando os "buracos" que sobram
  * quando uma loja no meio da fila termina e libera vagas: as lojas que

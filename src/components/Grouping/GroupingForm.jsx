@@ -7,6 +7,7 @@ import {
   getTotalVagas,
   getNomeBox,
   boxTemCargaEmAndamento,
+  boxPermiteVariasCargasEmGeracao,
 } from '../../utils/boxLogic';
 import { getTipoCarga, lojaPassaFiltroTipoCarga } from '../../utils/tipoCarga';
 import TipoCargaBadge from '../Shared/TipoCargaBadge.jsx';
@@ -29,6 +30,12 @@ export default function GroupingForm() {
   // boxTemCargaEmAndamento em boxLogic.js). Não afeta boxes que só têm
   // cargas já Agrupadas/Em carregamento (zona decrescente, do fim do box
   // pra trás) — essas não disputam o mesmo espaço de uma nova alocação.
+  //
+  // Pedido do usuário (ship seguinte): exceção pro "Box Frios" — é um
+  // espaço compartilhado pra carga Resfriada, não uma doca individual, então
+  // pode receber várias lojas em Geração de Carga ao mesmo tempo (ver
+  // boxPermiteVariasCargasEmGeracao em boxLogic.js) — essa trava não se
+  // aplica a ele.
   const lojasPorId = useMemo(() => {
     const mapa = {};
     state.lojas.forEach((l) => {
@@ -127,7 +134,8 @@ export default function GroupingForm() {
               const box = state.boxes.find((b) => b.numero === n);
               const disponiveis = getVagasDisponiveisCount(box);
               const insuficiente = qtdNum > 0 && disponiveis < qtdNum;
-              const emAndamento = boxTemCargaEmAndamento(box, lojasPorId);
+              const emAndamento =
+                !boxPermiteVariasCargasEmGeracao(getNomeBox(n)) && boxTemCargaEmAndamento(box, lojasPorId);
               const sufixo = insuficiente ? ' (insuficiente)' : emAndamento ? ' (já tem carga em geração)' : '';
               return (
                 <option key={n} value={n} disabled={insuficiente || emAndamento}>

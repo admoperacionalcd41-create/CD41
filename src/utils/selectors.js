@@ -307,7 +307,15 @@ export function getLinhasProcessoDoDia(state, filtroTipoCarga) {
 
   return Array.from(lojasConhecidas.entries())
     .map(([codigo, info]) => {
-      const cargas = cargasHojePorCodigo.get(codigo) || [];
+      // Pedido do usuário: com o filtro em "Seca" (ou "Resfriada"), a linha
+      // não pode mostrar as cargas do OUTRO tipo — antes, uma loja com uma
+      // carga Seca e outra Resfriada no mesmo dia aparecia com os dois
+      // selos, mesmo filtrando só por Seca. Filtra as cargas do dia pelo
+      // tipo selecionado ANTES de montar a linha, então tudo que deriva
+      // daqui (selos de tipo, apontamento, carregamento) já reflete só o
+      // tipo escolhido.
+      const cargasTodasHoje = cargasHojePorCodigo.get(codigo) || [];
+      const cargas = cargasTodasHoje.filter((c) => lojaPassaFiltroTipoCarga({ tipoCarga: c.tipoCarga }, filtroTipoCarga));
       const tiposCarga = cargas.length > 0 ? [...new Set(cargas.map((c) => c.tipoCarga))] : [info.tipoCarga];
       const apontamentoFeito = cargas.some((c) => c.apontada);
       const apontamentoContagem = cargas.filter((c) => c.apontada).length;

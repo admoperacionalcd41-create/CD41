@@ -1415,11 +1415,14 @@ function aplicarAcao(state, acao) {
 export function AppProvider({ children }) {
   const [state, setState, statusSincronizacao] = useSyncedAppState(CHAVE_STORAGE, () => gerarDadosIniciais());
 
-  // Filtro global de Tipo de Carga (Seca/Resfriada/Todos), selecionado no
+  // Filtro global de Tipo de Carga (Seca/Resfriada), selecionado no
   // cabeçalho e válido em todas as abas (exceto Cadastros, que não lista
   // lojas). Não é uma ação sobre os dados — é só um filtro de visualização —
   // então fica fora do reducer/localStorage, como estado de UI simples.
-  const [filtroTipoCarga, setFiltroTipoCarga] = useState('todos'); // 'todos' | 'seca' | 'resfriada'
+  // Pedido do usuário: removida a opção "Todos" (misturava as duas cargas
+  // nos relatórios) — agora é sempre um dos dois tipos, com "Seca" como
+  // padrão ao abrir o app.
+  const [filtroTipoCarga, setFiltroTipoCarga] = useState('seca'); // 'seca' | 'resfriada'
 
   // Modo sequência do relatório Processo do Dia (ver DailyProcessReport.jsx)
   // — mesmo motivo do filtroTipoCarga acima: é estado de UI (se a tela está
