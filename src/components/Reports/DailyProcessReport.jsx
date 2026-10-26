@@ -80,7 +80,7 @@ function CelulasSemana({ codigo, porCodigoSemana }) {
       {porDia.map((p) => (
         <td
           key={p.dataISO}
-          className="px-2 py-2.5 text-center"
+          className="px-2 py-1.5 text-center"
           title={
             p.status === 'sem_dado'
               ? 'Sem carga programada nesse dia'
@@ -105,7 +105,7 @@ function CelulasSemana({ codigo, porCodigoSemana }) {
           )}
         </td>
       ))}
-      <td className="py-2.5 pl-3 text-right font-semibold">
+      <td className="py-1.5 pl-3 pr-3 text-right font-semibold">
         {diasAvaliadosSemana > 0 ? (
           <span className={semanaCompleta ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}>
             {diasEntreguesSemana}/{diasAvaliadosSemana}
@@ -516,18 +516,18 @@ export default function DailyProcessReport() {
               <table className="w-full text-left text-sm">
                 <thead className="sticky top-0 z-10 bg-white text-xs text-slate-500 shadow-sm dark:bg-slate-800 dark:text-slate-400">
                   <tr className="border-b border-slate-200 dark:border-slate-700">
-                    <th className="w-16 py-2.5 pl-3 pr-1 font-semibold">Posição</th>
+                    <th className="w-16 py-1.5 pl-3 pr-1 font-semibold">Posição</th>
                     {/* Pedido do usuário: "Cargas em Andamento" antes da
                         coluna Loja. */}
-                    <th className="px-2 py-2.5 text-center font-semibold">
+                    <th className="px-2 py-1.5 text-center font-semibold">
                       Cargas em Andamento
                       <br />
                       <span className="text-[10px] font-normal normal-case text-slate-400 dark:text-slate-500">
                         (incluindo cargas de ontem)
                       </span>
                     </th>
-                    <th className="py-2.5 pr-3 font-semibold">Loja</th>
-                    <th className="px-2 py-2.5 text-center font-semibold">
+                    <th className="py-1.5 pr-3 font-semibold">Loja</th>
+                    <th className="px-2 py-1.5 text-center font-semibold">
                       Expedição de Hoje
                       <br />
                       <span className="text-[10px] font-normal normal-case text-slate-400 dark:text-slate-500">
@@ -536,7 +536,7 @@ export default function DailyProcessReport() {
                           : `${comApontamento}/${total}`}
                       </span>
                     </th>
-                    <th className="px-2 py-2.5 text-center font-semibold">
+                    <th className="px-2 py-1.5 text-center font-semibold">
                       Carregamento de Hoje
                       <br />
                       <span className="text-[10px] font-normal normal-case text-slate-400 dark:text-slate-500">
@@ -544,7 +544,7 @@ export default function DailyProcessReport() {
                       </span>
                     </th>
                     {diasSemanaAtual.map((dataISO) => (
-                      <th key={dataISO} className="px-2 py-2.5 text-center font-semibold">
+                      <th key={dataISO} className="px-2 py-1.5 text-center font-semibold">
                         {formatarDiaSemanaCurto(dataISO)}
                         <br />
                         <span className="text-[10px] font-normal normal-case text-slate-400 dark:text-slate-500">
@@ -552,7 +552,7 @@ export default function DailyProcessReport() {
                         </span>
                       </th>
                     ))}
-                    <th className="py-2.5 pl-3 text-right font-semibold">Semana</th>
+                    <th className="py-1.5 pl-3 pr-3 text-right font-semibold">Semana</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -565,7 +565,7 @@ export default function DailyProcessReport() {
                           : 'hover:bg-slate-50 dark:hover:bg-slate-700/30'
                       }`}
                     >
-                      <td className="py-2 pl-3 pr-1">
+                      <td className="py-1 pl-3 pr-1">
                         {/* key com o índice força o campo a remontar (e
                             mostrar o valor atualizado) depois de qualquer
                             reordenação — sem isso, um input não-controlado
@@ -583,10 +583,10 @@ export default function DailyProcessReport() {
                           className="w-14 rounded-md border border-slate-200 bg-white px-1.5 py-1 text-center text-xs font-bold text-slate-700 focus:border-totvs-400 focus:outline-none focus:ring-1 focus:ring-totvs-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:focus:border-whatsapp-500 dark:focus:ring-whatsapp-500"
                         />
                       </td>
-                      <td className="px-2 py-2.5 text-center">
+                      <td className="px-2 py-1.5 text-center">
                         <Selo feito={loja.cargaNoBox} rotuloFeito="Em andamento" rotuloPendente="Vazio" />
                       </td>
-                      <td className="py-2.5 pr-3">
+                      <td className="py-1.5 pr-3">
                         <div className="flex flex-wrap items-center gap-1.5">
                           <span className="font-mono font-semibold text-slate-700 dark:text-slate-200">{loja.codigo}</span>
                           <span className="text-slate-500 dark:text-slate-400">{loja.nomeLoja}</span>
@@ -600,14 +600,14 @@ export default function DailyProcessReport() {
                           )}
                         </div>
                       </td>
-                      <td className="px-2 py-2.5 text-center">
+                      <td className="px-2 py-1.5 text-center">
                         {/* Pedido do usuário: em vez de um "Feito"/"Pendente"
                             genérico, mostra o status real da loja no box
                             nesse momento (Em Execução, Conferência
                             Finalizada, Agrupando, Agrupada etc.). */}
                         <SeloStatusExpedicao status={loja.statusExpedicaoHoje} />
                       </td>
-                      <td className="px-2 py-2.5 text-center">
+                      <td className="px-2 py-1.5 text-center">
                         <Selo feito={loja.carregamentoFeito} />
                       </td>
                       <CelulasSemana codigo={loja.codigo} porCodigoSemana={porCodigoSemana} />
@@ -642,15 +642,15 @@ export default function DailyProcessReport() {
                   {/* Pedido do usuário: "Cargas em Andamento" antes da
                       coluna Loja (mesma ordem da outra tabela, modo
                       sequência, acima). */}
-                  <th className="px-2 py-2.5 text-center font-semibold">
+                  <th className="px-2 py-1.5 text-center font-semibold">
                     Cargas em Andamento
                     <br />
                     <span className="text-[10px] font-normal normal-case text-slate-400 dark:text-slate-500">
                       (incluindo cargas de ontem)
                     </span>
                   </th>
-                  <th className="py-2.5 pl-3 pr-3 font-semibold">Loja</th>
-                  <th className="px-2 py-2.5 text-center font-semibold">
+                  <th className="py-1.5 pl-3 pr-3 font-semibold">Loja</th>
+                  <th className="px-2 py-1.5 text-center font-semibold">
                     Expedição de Hoje
                     <br />
                     <span className="text-[10px] font-normal normal-case text-slate-400 dark:text-slate-500">
@@ -659,7 +659,7 @@ export default function DailyProcessReport() {
                         : `${comApontamento}/${total}`}
                     </span>
                   </th>
-                  <th className="px-2 py-2.5 text-center font-semibold">
+                  <th className="px-2 py-1.5 text-center font-semibold">
                     Carregamento de Hoje
                     <br />
                     <span className="text-[10px] font-normal normal-case text-slate-400 dark:text-slate-500">
@@ -667,7 +667,7 @@ export default function DailyProcessReport() {
                     </span>
                   </th>
                   {diasSemanaAtual.map((dataISO) => (
-                    <th key={dataISO} className="px-2 py-2.5 text-center font-semibold">
+                    <th key={dataISO} className="px-2 py-1.5 text-center font-semibold">
                       {formatarDiaSemanaCurto(dataISO)}
                       <br />
                       <span className="text-[10px] font-normal normal-case text-slate-400 dark:text-slate-500">
@@ -675,7 +675,7 @@ export default function DailyProcessReport() {
                       </span>
                     </th>
                   ))}
-                  <th className="py-2.5 pl-3 text-right font-semibold">Semana</th>
+                  <th className="py-1.5 pl-3 pr-3 text-right font-semibold">Semana</th>
                 </tr>
               </thead>
               {[
@@ -709,10 +709,10 @@ export default function DailyProcessReport() {
                           indice % 2 === 1 ? 'bg-slate-50/60 dark:bg-slate-900/20' : ''
                         }`}
                       >
-                        <td className="px-2 py-2.5 text-center">
+                        <td className="px-2 py-1.5 text-center">
                           <Selo feito={loja.cargaNoBox} rotuloFeito="Em andamento" rotuloPendente="Vazio" />
                         </td>
-                        <td className="py-2.5 pl-3 pr-3">
+                        <td className="py-1.5 pl-3 pr-3">
                           <div className="flex flex-wrap items-center gap-1.5">
                             <span className="font-mono font-semibold text-slate-700 dark:text-slate-200">{loja.codigo}</span>
                             <span className="text-slate-500 dark:text-slate-400">{loja.nomeLoja}</span>
@@ -731,12 +731,12 @@ export default function DailyProcessReport() {
                             )}
                           </div>
                         </td>
-                        <td className="px-2 py-2.5 text-center">
+                        <td className="px-2 py-1.5 text-center">
                           {/* Pedido do usuário: ver comentário na outra
                               tabela, modo sequência, acima. */}
                           <SeloStatusExpedicao status={loja.statusExpedicaoHoje} />
                         </td>
-                        <td className="px-2 py-2.5 text-center">
+                        <td className="px-2 py-1.5 text-center">
                           <Selo feito={loja.carregamentoFeito} />
                         </td>
                         <CelulasSemana codigo={loja.codigo} porCodigoSemana={porCodigoSemana} />
