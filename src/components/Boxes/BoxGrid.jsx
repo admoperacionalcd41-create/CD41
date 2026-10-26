@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { useApp } from '../../context/AppContext.jsx';
 import { boxEhEspecial } from '../../utils/boxLogic';
+import { getVersaoFormatada } from '../../utils/appVersion';
 import BoxCard from './BoxCard.jsx';
 import ResumoProcessoCard from './ResumoProcessoCard.jsx';
 import AndamentoEntregasCard from '../Dashboard/AndamentoEntregasCard.jsx';
@@ -87,6 +88,19 @@ export default function BoxGrid({ irPara, aoAbrirAgrupamento }) {
       <div className="min-h-[420px] flex-1">
         <AndamentoEntregasCard irPara={irPara} compacto />
       </div>
+
+      {/* Pedido do usuário: mostrar em algum lugar da tela qual versão do
+          app está rodando — útil pra confirmar se um deploy em produção já
+          pegou uma atualização recente, sem precisar adivinhar pelo
+          comportamento da tela (ver appVersion.js). Discreto de propósito
+          (canto, texto pequeno e apagado): é uma informação de apoio pra
+          diagnóstico, não algo que o operador precisa olhar no dia a dia. */}
+      <p
+        className="flex-shrink-0 text-right text-[10px] leading-none text-slate-300 dark:text-slate-600"
+        title="Versão do app (hash do commit · data/hora do build)"
+      >
+        {getVersaoFormatada()}
+      </p>
     </div>
   );
 }

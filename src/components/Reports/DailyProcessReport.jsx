@@ -444,7 +444,7 @@ export default function DailyProcessReport() {
         <div ref={capturaRef}>
           {/* Pedido do usuário: card único logo abaixo da barra de título/
               Sequenciar lojas, com o resumo do dia em % — Expedição de Hoje
-              (% concluída) e Carregamento de Hoje (% feito). Mesma base de
+              (% gerado) e Carregamento de Hoje (% feito). Mesma base de
               cálculo dos totalizadores que já aparecem no cabeçalho de cada
               coluna (ver pctExpedicao/pctCarregamento acima), só que em
               percentual em vez de "feito/total". */}
@@ -456,12 +456,27 @@ export default function DailyProcessReport() {
               <div className="rounded-lg bg-white p-4 text-center dark:bg-slate-800">
                 <p className="text-xs text-slate-400 dark:text-slate-500">Expedição de Hoje</p>
                 <p className="mt-1 text-3xl font-bold text-totvs-600 dark:text-whatsapp-400">{pctExpedicao}%</p>
-                <p className="text-[11px] text-slate-400 dark:text-slate-500">concluída</p>
+                <p className="text-[11px] text-slate-400 dark:text-slate-500">gerado</p>
+                {/* Pedido do usuário: além da porcentagem, mostrar o volume
+                    total / volume feito (mesma base do pctExpedicao acima —
+                    m³ quando o lote traz essa informação, senão contagem de
+                    lojas). */}
+                <p className="mt-1 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                  {volumeExpedicao.temVolume
+                    ? `${formatarNumeroBR(volumeExpedicao.volumeTotal)} / ${formatarNumeroBR(volumeExpedicao.volumeFeito)} m³`
+                    : `${total} / ${comApontamento} lojas`}
+                </p>
               </div>
               <div className="rounded-lg bg-white p-4 text-center dark:bg-slate-800">
                 <p className="text-xs text-slate-400 dark:text-slate-500">Carregamento de Hoje</p>
                 <p className="mt-1 text-3xl font-bold text-totvs-600 dark:text-whatsapp-400">{pctCarregamento}%</p>
                 <p className="text-[11px] text-slate-400 dark:text-slate-500">feito</p>
+                {/* Pedido do usuário: além da porcentagem, mostrar total /
+                    feito (mesma base do pctCarregamento acima — contagem de
+                    lojas). */}
+                <p className="mt-1 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                  {total} / {comCarregamento} lojas
+                </p>
               </div>
             </div>
           </div>
@@ -502,6 +517,15 @@ export default function DailyProcessReport() {
                 <thead className="sticky top-0 z-10 bg-white text-xs text-slate-500 shadow-sm dark:bg-slate-800 dark:text-slate-400">
                   <tr className="border-b border-slate-200 dark:border-slate-700">
                     <th className="w-16 py-2.5 pl-3 pr-1 font-semibold">Posição</th>
+                    {/* Pedido do usuário: "Cargas em Andamento" antes da
+                        coluna Loja. */}
+                    <th className="px-2 py-2.5 text-center font-semibold">
+                      Cargas em Andamento
+                      <br />
+                      <span className="text-[10px] font-normal normal-case text-slate-400 dark:text-slate-500">
+                        (incluindo cargas de ontem)
+                      </span>
+                    </th>
                     <th className="py-2.5 pr-3 font-semibold">Loja</th>
                     <th className="px-2 py-2.5 text-center font-semibold">
                       Expedição de Hoje
@@ -510,13 +534,6 @@ export default function DailyProcessReport() {
                         {volumeExpedicao.temVolume
                           ? `${formatarNumeroBR(volumeExpedicao.volumeFeito)}/${formatarNumeroBR(volumeExpedicao.volumeTotal)} m³`
                           : `${comApontamento}/${total}`}
-                      </span>
-                    </th>
-                    <th className="px-2 py-2.5 text-center font-semibold">
-                      Cargas em Andamento
-                      <br />
-                      <span className="text-[10px] font-normal normal-case text-slate-400 dark:text-slate-500">
-                        (incluindo cargas de ontem)
                       </span>
                     </th>
                     <th className="px-2 py-2.5 text-center font-semibold">
@@ -566,6 +583,9 @@ export default function DailyProcessReport() {
                           className="w-14 rounded-md border border-slate-200 bg-white px-1.5 py-1 text-center text-xs font-bold text-slate-700 focus:border-totvs-400 focus:outline-none focus:ring-1 focus:ring-totvs-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:focus:border-whatsapp-500 dark:focus:ring-whatsapp-500"
                         />
                       </td>
+                      <td className="px-2 py-2.5 text-center">
+                        <Selo feito={loja.cargaNoBox} rotuloFeito="Em andamento" rotuloPendente="Vazio" />
+                      </td>
                       <td className="py-2.5 pr-3">
                         <div className="flex flex-wrap items-center gap-1.5">
                           <span className="font-mono font-semibold text-slate-700 dark:text-slate-200">{loja.codigo}</span>
@@ -586,9 +606,6 @@ export default function DailyProcessReport() {
                             nesse momento (Em Execução, Conferência
                             Finalizada, Agrupando, Agrupada etc.). */}
                         <SeloStatusExpedicao status={loja.statusExpedicaoHoje} />
-                      </td>
-                      <td className="px-2 py-2.5 text-center">
-                        <Selo feito={loja.cargaNoBox} rotuloFeito="Em andamento" rotuloPendente="Vazio" />
                       </td>
                       <td className="px-2 py-2.5 text-center">
                         <Selo feito={loja.carregamentoFeito} />
@@ -622,6 +639,16 @@ export default function DailyProcessReport() {
                   comentário acima), útil com uma lista de 28+ lojas. */}
               <thead className="sticky top-0 z-10 bg-white text-xs text-slate-500 shadow-sm dark:bg-slate-800 dark:text-slate-400">
                 <tr className="border-b border-slate-200 dark:border-slate-700">
+                  {/* Pedido do usuário: "Cargas em Andamento" antes da
+                      coluna Loja (mesma ordem da outra tabela, modo
+                      sequência, acima). */}
+                  <th className="px-2 py-2.5 text-center font-semibold">
+                    Cargas em Andamento
+                    <br />
+                    <span className="text-[10px] font-normal normal-case text-slate-400 dark:text-slate-500">
+                      (incluindo cargas de ontem)
+                    </span>
+                  </th>
                   <th className="py-2.5 pl-3 pr-3 font-semibold">Loja</th>
                   <th className="px-2 py-2.5 text-center font-semibold">
                     Expedição de Hoje
@@ -630,13 +657,6 @@ export default function DailyProcessReport() {
                       {volumeExpedicao.temVolume
                         ? `${formatarNumeroBR(volumeExpedicao.volumeFeito)}/${formatarNumeroBR(volumeExpedicao.volumeTotal)} m³`
                         : `${comApontamento}/${total}`}
-                    </span>
-                  </th>
-                  <th className="px-2 py-2.5 text-center font-semibold">
-                    Cargas em Andamento
-                    <br />
-                    <span className="text-[10px] font-normal normal-case text-slate-400 dark:text-slate-500">
-                      (incluindo cargas de ontem)
                     </span>
                   </th>
                   <th className="px-2 py-2.5 text-center font-semibold">
@@ -689,6 +709,9 @@ export default function DailyProcessReport() {
                           indice % 2 === 1 ? 'bg-slate-50/60 dark:bg-slate-900/20' : ''
                         }`}
                       >
+                        <td className="px-2 py-2.5 text-center">
+                          <Selo feito={loja.cargaNoBox} rotuloFeito="Em andamento" rotuloPendente="Vazio" />
+                        </td>
                         <td className="py-2.5 pl-3 pr-3">
                           <div className="flex flex-wrap items-center gap-1.5">
                             <span className="font-mono font-semibold text-slate-700 dark:text-slate-200">{loja.codigo}</span>
@@ -712,9 +735,6 @@ export default function DailyProcessReport() {
                           {/* Pedido do usuário: ver comentário na outra
                               tabela, modo sequência, acima. */}
                           <SeloStatusExpedicao status={loja.statusExpedicaoHoje} />
-                        </td>
-                        <td className="px-2 py-2.5 text-center">
-                          <Selo feito={loja.cargaNoBox} rotuloFeito="Em andamento" rotuloPendente="Vazio" />
                         </td>
                         <td className="px-2 py-2.5 text-center">
                           <Selo feito={loja.carregamentoFeito} />

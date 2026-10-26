@@ -31,6 +31,15 @@
 // problema pro padrão de uso relatado (operadores mexendo em registros
 // diferentes), mas não é uma solução perfeita — uma colisão no MESMO
 // registro, no mesmíssimo instante, ainda tem que escolher um lado.
+//
+// Atualização (pedido do usuário, motoristas/operadores começando a usar o
+// sistema junto: carga de BOX não pode dar conflito): como um box é
+// ocupado/liberado por quase toda ação do sistema, "o MESMO registro"
+// acontecia com muito mais frequência na coleção `boxes` do que nas outras
+// — então essa coleção tem um tratamento extra (ver `mesclarBox` abaixo):
+// a colisão não escolhe um lado pro box inteiro, mescla vaga por vaga. Só
+// sobra a limitação de cima (escolhe um lado) quando as duas pessoas
+// ocupam/liberam a MESMÍSSIMA vaga no mesmíssimo instante — bem mais raro.
 
 // Coleções identificadas por uma chave própria em cada item.
 const CHAVE_COLECAO = {
@@ -76,7 +85,7 @@ function iguais(a, b) {
   }
 }
 
-function mesclarColecaoPorChave(chave, base, local, remoto) {
+function mesclarColecaoPorChave(chave, base, local, remoto, resolverColisao) {
   const baseMapa = paraMapa(base, chave);
   const localMapa = paraMapa(local, chave);
   const remotoMapa = paraMapa(remoto, chave);
@@ -110,12 +119,53 @@ function mesclarColecaoPorChave(chave, base, local, remoto) {
 
     if (localMudou && !remotoMudou) resultado.push(emLocal);
     else if (!localMudou && remotoMudou) resultado.push(emRemoto);
-    else if (localMudou && remotoMudou) resultado.push(emLocal); // colisão real — ver comentário acima
-    else resultado.push(emRemoto); // nenhum dos dois mudou
+    else if (localMudou && remotoMudou) {
+      // Colisão real: os dois lados mudaram esse registro desde a última
+      // base conhecida. Pra coleções simples isso fica com a local (ver
+      // comentário no topo do arquivo) — mas, quando o chamador passa um
+      // `resolverColisao` (ver `boxes` abaixo), usa ele em vez de descartar
+      // o lado remoto inteiro.
+      resultado.push(resolverColisao ? resolverColisao(emBase, emLocal, emRemoto) : emLocal);
+    } else resultado.push(emRemoto); // nenhum dos dois mudou
   });
 
   return resultado;
 }
+
+// ---------------------------------------------------------------------------
+// Pedido do usuário (quando os motoristas/operadores começarem a usar o
+// sistema ao mesmo tempo, a carga dos BOXES não pode entrar em conflito):
+// diferente de `lojas`/`protocolos` (cada registro pertence a uma única
+// operação), um BOX é um recurso COMPARTILHADO — quase toda ação do sistema
+// (apontamento, agrupamento, carregamento, cancelamento) ocupa ou libera
+// vagas de algum box. Isso faz dois operadores mexerem no MESMO número de
+// box (ex.: "Box 9") o tempo todo, mesmo quando cada um está ocupando vagas
+// DIFERENTES dele — e a regra geral de colisão acima ("fica com a local")
+// trataria o box inteiro como perdido pra quem não "venceu", apagando a
+// alocação de vaga de uma das duas pessoas sem aviso.
+//
+// Por isso, uma colisão num box não descarta o lado remoto inteiro: mescla
+// vaga por vaga (mesma lógica de 3 pontas, usando o número da vaga como
+// identidade — ver CHAVE_COLECAO.boxes acima). Assim, duas pessoas ocupando
+// vagas diferentes do mesmo box (o caso comum, e exatamente o cenário dos
+// motoristas usando o box ao mesmo tempo) nunca se apagam uma à outra — só
+// uma colisão na MESMÍSSIMA vaga, no mesmíssimo instante, ainda precisa
+// escolher um lado (fica com a local, mesmo critério de sempre).
+function mesclarBox(baseBox, localBox, remotoBox) {
+  if (!baseBox || !localBox || !remotoBox) return remotoBox || localBox || baseBox;
+  return {
+    ...remotoBox,
+    ...localBox,
+    vagas: mesclarColecaoPorChave('numero', baseBox.vagas, localBox.vagas, remotoBox.vagas).sort(
+      (a, b) => a.numero - b.numero
+    ),
+  };
+}
+
+// Resolvedores de colisão por coleção — só `boxes` precisa de um tratamento
+// diferente do padrão ("fica com a local"); as demais (lojas, protocolos
+// etc.) continuam com o comportamento padrão.
+const RESOLVEDOR_COLISAO_POR_COLECAO = { boxes: mesclarBox };
 
 function mesclarMapaObjeto(base, local, remoto) {
   const baseObj = base && typeof base === 'object' ? base : {};
@@ -182,7 +232,13 @@ export function mesclarEstadoSincronizado(base, local, remoto) {
   const resultado = { ...remoto };
 
   Object.entries(CHAVE_COLECAO).forEach(([campo, chave]) => {
-    resultado[campo] = mesclarColecaoPorChave(chave, base[campo], local[campo], remoto[campo]);
+    resultado[campo] = mesclarColecaoPorChave(
+      chave,
+      base[campo],
+      local[campo],
+      remoto[campo],
+      RESOLVEDOR_COLISAO_POR_COLECAO[campo]
+    );
   });
 
   COLECOES_SIMPLES.forEach((campo) => {

@@ -1,6 +1,29 @@
+import { execSync } from 'node:child_process';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+
+// Pedido do usuário: um jeito de confirmar, de dentro do próprio app, qual
+// versão está realmente publicada (ver test-box9-migracao-32-vagas.mjs — um
+// problema relatado em produção acabou sendo o deploy ainda não ter essa
+// atualização, e não dava pra saber isso só olhando a tela). O hash curto
+// do commit identifica exatamente qual código está rodando; a data/hora do
+// build mostra quando essa versão foi gerada. `git` sempre está disponível
+// no ambiente de build do Vercel (ele clona o repositório pra buildar), mas
+// cai num texto genérico em vez de quebrar o build se não estiver (ex.: zip
+// extraído sem pasta .git).
+function obterVersaoDoApp() {
+  try {
+    const hash = execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] })
+      .toString()
+      .trim();
+    return hash || 'sem-git';
+  } catch {
+    return 'sem-git';
+  }
+}
+const VERSAO_APP = obterVersaoDoApp();
+const DATA_BUILD_APP = new Date().toISOString();
 
 // Instalável como app (ícone na tela inicial, abre em tela cheia) mantendo
 // o mesmo link/site de sempre — sem loja de apps, sem gerar um pacote à
@@ -55,6 +78,8 @@ export default defineConfig({
   define: {
     __SUPABASE_URL__: JSON.stringify(process.env.VITE_SUPABASE_URL || ''),
     __SUPABASE_ANON_KEY__: JSON.stringify(process.env.VITE_SUPABASE_ANON_KEY || ''),
+    __APP_VERSION__: JSON.stringify(VERSAO_APP),
+    __APP_BUILD_DATE__: JSON.stringify(DATA_BUILD_APP),
   },
   build: {
     rollupOptions: {

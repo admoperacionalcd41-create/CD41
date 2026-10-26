@@ -1,16 +1,9 @@
-import React, { useMemo, useState } from 'react';
-import { ClipboardList, Scale, MessageCircle } from 'lucide-react';
+import React, { useMemo } from 'react';
+import { ClipboardList, Scale } from 'lucide-react';
 import { useApp } from '../../context/AppContext.jsx';
-import {
-  getLinhasProcessoDoDia,
-  getLojasSemApontamentoHoje,
-  calcularPesoVolume,
-  getResumoStatusDoDia,
-} from '../../utils/selectors';
+import { getLinhasProcessoDoDia, getLojasSemApontamentoHoje, calcularPesoVolume } from '../../utils/selectors';
 import { lojaPassaFiltroTipoCarga } from '../../utils/tipoCarga';
 import { STATUS_LOJA } from '../../utils/statusStyles';
-import { montarMensagemStatusDoDia } from '../../utils/notificacoes';
-import StatusOperacaoModal from '../Shared/StatusOperacaoModal.jsx';
 
 // Legenda das cores usadas nos números das vagas dentro de cada box (ver
 // BoxCard.jsx, que colore a vaga pelo status da loja que a ocupa — mesmo
@@ -55,30 +48,9 @@ export default function ResumoProcessoCard({ irPara }) {
 
   const completo = total > 0 && comApontamento === total;
 
-  // Mensagem de "Status da operação" pro botão de WhatsApp abaixo (ver
-  // getResumoStatusDoDia em selectors.js e montarMensagemStatusDoDia em
-  // notificacoes.js) — pedido do usuário: mandar pro WhatsApp o que foi
-  // gerado, entregue e o % de volume concluído x pendente, direto da tela
-  // em que ele já trabalha o dia inteiro (Box / Frota é a aba inicial do
-  // app — o Dashboard que tinha esses mesmos números fica oculto do menu).
-  // Respeita o mesmo filtro global de Tipo de Carga usado no resto da tela
-  // (ver `lojaPassaFiltroTipoCarga` logo abaixo).
-  const resumoStatusDoDia = useMemo(() => {
-    const stateFiltrado = { ...state, lojas: state.lojas.filter((l) => lojaPassaFiltroTipoCarga(l, filtroTipoCarga)) };
-    return getResumoStatusDoDia(stateFiltrado);
-  }, [state, filtroTipoCarga]);
-  const mensagensStatusDoDia = useMemo(
-    () => ({
-      enxuta: montarMensagemStatusDoDia(resumoStatusDoDia, { detalhado: false }),
-      detalhada: montarMensagemStatusDoDia(resumoStatusDoDia, { detalhado: true }),
-    }),
-    [resumoStatusDoDia]
-  );
-  const [mostrarStatusModal, setMostrarStatusModal] = useState(false);
-
   return (
     <div className="flex flex-shrink-0 flex-col gap-1.5 rounded-lg border border-slate-200 bg-white px-4 py-2.5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
           // "Processo do Dia" é a primeira sub-aba de Relatórios (ver
@@ -116,15 +88,6 @@ export default function ResumoProcessoCard({ irPara }) {
             )}
           </span>
         </button>
-
-        <button
-          type="button"
-          onClick={() => setMostrarStatusModal(true)}
-          title="Montar mensagem de status da operação para enviar no WhatsApp"
-          className="flex flex-shrink-0 items-center gap-1.5 rounded-md bg-emerald-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-emerald-700"
-        >
-          <MessageCircle size={13} /> Status por WhatsApp
-        </button>
       </div>
 
       {/* Legenda de cores das vagas, lado a lado numa linha só (pedido do
@@ -138,14 +101,6 @@ export default function ResumoProcessoCard({ irPara }) {
           </span>
         ))}
       </div>
-
-      {mostrarStatusModal && (
-        <StatusOperacaoModal
-          mensagemEnxuta={mensagensStatusDoDia.enxuta}
-          mensagemDetalhada={mensagensStatusDoDia.detalhada}
-          aoFechar={() => setMostrarStatusModal(false)}
-        />
-      )}
     </div>
   );
 }
