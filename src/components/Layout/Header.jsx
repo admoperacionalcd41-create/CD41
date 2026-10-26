@@ -5,6 +5,7 @@ import { useDarkMode } from '../../hooks/useDarkMode.js';
 import { useFullscreen } from '../../hooks/useFullscreen.js';
 import { TIPOS_CARGA } from '../../utils/tipoCarga';
 import ObservacoesLojaModal from '../Shared/ObservacoesLojaModal.jsx';
+import { getVersaoFormatada } from '../../utils/appVersion';
 
 const CONFIRMACOES = {
   restaurar: {
@@ -86,6 +87,18 @@ export default function Header({ tituloAba, abaAtiva, onAbrirMenu }) {
                 continua existindo e sendo usado normalmente no resto do
                 app — só esse texto no cabeçalho que não aparece mais. */}
             <h1 className="text-lg font-bold text-slate-800 dark:text-slate-100">{tituloAba}</h1>
+            {/* Pedido do usuário: versão do app visível no canto superior
+                esquerdo da tela — pra confirmar se um deploy em produção já
+                pegou uma atualização recente, sem precisar adivinhar pelo
+                comportamento da tela (ver appVersion.js). Fica aqui, logo
+                embaixo do título, em vez de um badge flutuante (`fixed`),
+                pra não arriscar cobrir o botão "Abrir menu" ao lado. */}
+            <p
+              className="text-[10px] font-medium leading-none text-slate-300 dark:text-slate-600"
+              title="Versão do app (hash do commit · data/hora do build)"
+            >
+              {getVersaoFormatada()}
+            </p>
           </div>
         </div>
 

@@ -84,51 +84,71 @@ export function criarBoxesIniciais() {
 }
 
 /**
- * Reconcilia os boxes salvos (ex.: em localStorage, de uma sessão anterior)
- * com `CONFIG_BOXES` atual. Necessário porque o estado da aplicação é
- * persistido no navegador — se `CONFIG_BOXES` mudar (um box for renomeado,
- * tiver a capacidade alterada, ou um novo box for adicionado), uma sessão já
- * salva continuaria com o formato antigo (sem `nome`, contagem de boxes
- * desatualizada, etc.) até esta função rodar. Preserva as vagas já ocupadas
- * de cada box sempre que possível.
+ * Reconcilia os boxes salvos (ex.: em localStorage, de uma sessão anterior,
+ * ou vindo do Supabase) com `CONFIG_BOXES` atual. Necessário porque o estado
+ * da aplicação é persistido — se `CONFIG_BOXES` mudar (um box for
+ * renomeado, tiver a capacidade alterada, ou um novo box for adicionado),
+ * uma sessão já salva continuaria com o formato antigo (sem `nome`,
+ * contagem de boxes desatualizada, etc.) até esta função rodar. Preserva as
+ * vagas já ocupadas de cada box sempre que possível.
+ *
+ * Bug relatado em produção (Box 9 só mostrando as vagas 11 a 32, 1 a 10
+ * nunca aparecendo): a versão anterior decidia como reconciliar só pelo
+ * COMPRIMENTO do array de vagas existente (`vagasExistentes.length` contra
+ * `totalVagas`), e ao "crescer" completava vagas novas numeradas a partir
+ * desse comprimento — assumindo, sem checar, que o array existente já era
+ * uma sequência contígua 1..N. Se por qualquer motivo o array existente não
+ * fosse contíguo (por exemplo citado vagas 11..32 só, 22 itens — um
+ * comprimento menor que 32 ainda dispara o "cresceu"), a vaga completava
+ * numerando 23..32 de novo (duplicando) e as vagas 1..10 nunca eram
+ * recriadas, porque nada na função olhava quais NÚMEROS de vaga realmente
+ * faltavam.
+ *
+ * Esta versão reconstrói pelo NÚMERO da vaga, não pela posição/comprimento
+ * do array: para cada vaga de 1 a totalVagas, usa a existente (com sua
+ * ocupação) se houver uma com aquele número, senão cria uma livre nova —
+ * sempre contíguo e sem duplicar, qualquer que seja o formato da entrada.
+ * Vagas ocupadas que sobrarem fora do alcance 1..totalVagas (um box que
+ * encolheu, ou um array corrompido com números fora da faixa) são
+ * realocadas pra alguma vaga livre dentro do alcance, pra não perder
+ * paletes já alocados.
  */
 export function sincronizarBoxes(boxesAtuais) {
   const porNumero = new Map((boxesAtuais || []).map((b) => [b.numero, b]));
 
   return CONFIG_BOXES.map(({ numero, nome, totalVagas }) => {
     const existente = porNumero.get(numero);
+    const vagasExistentes = Array.isArray(existente?.vagas) ? existente.vagas : [];
 
-    if (!existente) {
-      return {
-        numero,
-        nome,
-        totalVagas,
-        vagas: Array.from({ length: totalVagas }, (_, i) => ({ numero: i + 1, ocupada: false, lojaId: null })),
-      };
+    // Mapa por NÚMERO da vaga (a identidade real dela), não pela posição no
+    // array — é isso que corrige o bug acima.
+    const porNumeroVaga = new Map();
+    vagasExistentes.forEach((v) => {
+      if (v && v.numero != null && !porNumeroVaga.has(v.numero)) porNumeroVaga.set(v.numero, v);
+    });
+
+    const vagas = [];
+    for (let n = 1; n <= totalVagas; n += 1) {
+      const v = porNumeroVaga.get(n);
+      vagas.push(v ? { numero: n, ocupada: !!v.ocupada, lojaId: v.ocupada ? v.lojaId : null } : { numero: n, ocupada: false, lojaId: null });
+      porNumeroVaga.delete(n);
     }
 
-    const vagasExistentes = existente.vagas || [];
-    let vagas;
-
-    if (vagasExistentes.length === totalVagas) {
-      vagas = vagasExistentes;
-    } else if (vagasExistentes.length < totalVagas) {
-      // Box cresceu (ex.: BLOCADO 1 de 26 para 36 vagas): mantém as vagas
-      // existentes (com sua ocupação) e completa com vagas livres novas.
-      const extras = Array.from({ length: totalVagas - vagasExistentes.length }, (_, i) => ({
-        numero: vagasExistentes.length + i + 1,
-        ocupada: false,
-        lojaId: null,
-      }));
-      vagas = [...vagasExistentes, ...extras];
-    } else {
-      // Box encolheu: preserva todas as vagas ocupadas (para não perder
-      // paletes já alocados), descartando apenas vagas livres excedentes.
-      const ocupadas = vagasExistentes.filter((v) => v.ocupada);
-      const livres = vagasExistentes
-        .filter((v) => !v.ocupada)
-        .slice(0, Math.max(0, totalVagas - ocupadas.length));
-      vagas = [...ocupadas, ...livres].sort((a, b) => a.numero - b.numero);
+    // Sobrou alguma vaga OCUPADA com número fora de 1..totalVagas (box que
+    // encolheu, ou número corrompido/fora da faixa)? Realoca pra uma vaga
+    // livre dentro do alcance em vez de simplesmente descartar — mesmo
+    // espírito de preservar paletes já alocados que a versão anterior já
+    // tinha pro caso de "Box encolheu".
+    for (const v of porNumeroVaga.values()) {
+      if (!v.ocupada) continue;
+      const alvo = vagas.find((d) => !d.ocupada);
+      if (alvo) {
+        alvo.ocupada = true;
+        alvo.lojaId = v.lojaId;
+      }
+      // Sem vaga livre sobrando pra realocar: a ocupação se perde — mesmo
+      // limite de antes (um box nunca pode ter mais ocupadas que o próprio
+      // totalVagas).
     }
 
     return { numero, nome, totalVagas, vagas };

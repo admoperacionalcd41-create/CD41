@@ -355,17 +355,27 @@ export function getLinhasProcessoDoDia(state, filtroTipoCarga) {
 /**
  * Volume cúbico (m³) das cargas de hoje, pro cabeçalho da coluna Expedição
  * de Hoje do relatório Processo do Dia (pedido do usuário): soma o volume
- * de TODAS as cargas do dia operacional atual (`volumeTotal`) e, separado,
- * só das que já tiveram a expedição feita hoje de verdade (`volumeFeito` —
- * mesma regra de "apontada" usada em getLinhasProcessoDoDia: status !=
- * pendente e dataApontamento é hoje). É por CARGA, não por código de loja
- * (uma loja com 2 cargas hoje, uma apontada e outra não, soma só o volume
- * da que foi apontada em volumeFeito, mas as duas em volumeTotal).
- * `temVolume` decide se o cabeçalho deve mostrar esse dado (alguns lotes
- * importados não trazem volume/cubagem).
+ * de TODAS as cargas IMPORTADAS hoje (`volumeTotal`) e, separado, só das
+ * que já tiveram a expedição feita hoje de verdade (`volumeFeito` — mesma
+ * regra de "apontada" usada em getLinhasProcessoDoDia: status != pendente e
+ * dataApontamento é hoje). É por CARGA, não por código de loja (uma loja
+ * com 2 cargas hoje, uma apontada e outra não, soma só o volume da que foi
+ * apontada em volumeFeito, mas as duas em volumeTotal). `temVolume` decide
+ * se o cabeçalho deve mostrar esse dado (alguns lotes importados não
+ * trazem volume/cubagem).
+ *
+ * Pedido do usuário: Volume Total precisa validar SOMENTE as cargas
+ * importadas hoje de verdade (dataImportacao no calendário real, via
+ * eHoje) — por isso usa esse filtro direto em `state.lojas`, em vez de
+ * `getLojasDoDia` (que filtra pelo dia OPERACIONAL — diaReferencia — e por
+ * isso pode misturar cargas importadas num dia anterior, ainda dentro do
+ * mesmo ciclo operacional porque ninguém clicou em "avançar dia"). Mesmo
+ * critério já usado em getLojasSemApontamentoHoje, mais abaixo.
  */
 export function getVolumeExpedicaoHoje(state, filtroTipoCarga) {
-  const cargasHoje = getLojasDoDia(state).filter((l) => lojaPassaFiltroTipoCarga(l, filtroTipoCarga));
+  const cargasHoje = state.lojas
+    .filter((l) => eHoje(l.dataImportacao))
+    .filter((l) => lojaPassaFiltroTipoCarga(l, filtroTipoCarga));
   const volumeTotal = cargasHoje.reduce((soma, l) => soma + (l.volume ?? 0), 0);
   const volumeFeito = cargasHoje
     .filter((l) => l.status !== 'pendente' && eHoje(l.dataApontamento))

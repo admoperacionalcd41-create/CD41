@@ -47,6 +47,16 @@ function novaLoja({
   usuarioGeracao = '',
   dataGeracaoISO = null,
   tipoCarga = 'seca',
+  // Pedido do usuário: Volume Total (Expedição de Hoje, Relatórios) passou
+  // a validar só as cargas IMPORTADAS hoje de verdade (dataImportacao no
+  // calendário real — ver getVolumeExpedicaoHoje em selectors.js), não o
+  // dia operacional (diaReferencia). Antes, dataImportacao aqui era SEMPRE
+  // "agora" (momento em que a demo é gerada), mesmo pras lojas de saldo do
+  // dia anterior (diaReferencia = ontem) — o que não refletia uma
+  // importação real de ontem e mascararia esse filtro na demonstração.
+  // Default continua "agora" (lojas de hoje), só as de saldo passam a data
+  // de ontem explicitamente, abaixo.
+  dataImportacaoISO = new Date().toISOString(),
 }) {
   return {
     id: gerarId('loja'),
@@ -73,7 +83,7 @@ function novaLoja({
     vagasOcupadas: [],
     colaboradores: [],
     protocolos: [],
-    dataImportacao: new Date().toISOString(),
+    dataImportacao: dataImportacaoISO,
     dataApontamento: null,
     dataConferencia: null,
     dataInicioAgrupamento: null,
@@ -126,10 +136,34 @@ export function gerarDadosIniciais() {
       volume: Number((paletesEstimados * 1.75).toFixed(2)),
       usuarioGeracao: USUARIOS_SISTEMA[i % USUARIOS_SISTEMA.length],
       dataGeracaoISO: new Date(Date.now() - 86400000 - i * 6 * 60 * 1000).toISOString(),
+      // Importada de verdade ontem (ver comentário em novaLoja acima) — é
+      // exatamente o cenário que o novo filtro de Volume Total precisa
+      // EXCLUIR do "importado hoje", mesmo essa loja ainda estando no ciclo
+      // operacional atual (diaReferencia = ontem, saldo ainda em aberto).
+      dataImportacaoISO: new Date(Date.now() - 86400000 - i * 6 * 60 * 1000).toISOString(),
     });
   });
 
   let lojas = [...saldoAnterior, ...lojasHoje];
+
+  // Pedido do usuário: Volume Total (Expedição de Hoje) precisa validar só
+  // as cargas IMPORTADAS hoje de verdade — não o dia operacional
+  // (diaReferencia), que só avança quando alguém aciona "avançar dia" e por
+  // isso pode ficar "parado" por mais de um dia real, misturando cargas de
+  // ontem que entraram enquanto o ciclo operacional não avançava. Loja 0411
+  // simula exatamente esse cenário pra demonstração: diaReferencia = hoje
+  // (está no ciclo operacional atual, conta normalmente em tudo que usa
+  // getLojasDoDia), mas foi IMPORTADA de verdade ontem (dataImportacao) —
+  // então precisa ENTRAR nas contagens de "hoje" de getLojasDoDia, mas
+  // FICAR DE FORA do Volume Total (getVolumeExpedicaoHoje, em
+  // selectors.js), que é o ponto que esse pedido corrige.
+  const idxImportadaOntem = lojas.findIndex((l) => l.loja === '0411');
+  if (idxImportadaOntem !== -1) {
+    lojas[idxImportadaOntem] = {
+      ...lojas[idxImportadaOntem],
+      dataImportacao: new Date(Date.now() - 86400000).toISOString(),
+    };
+  }
 
   function indexPorLoja(codigoLoja) {
     return lojas.findIndex((l) => l.loja === codigoLoja);
