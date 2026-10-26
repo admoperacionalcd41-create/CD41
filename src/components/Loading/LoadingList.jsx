@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { PlayCircle, FileSignature, FileCheck, Truck, Printer, Tag, Ban, AlertTriangle, Info, MapPin, Clock } from 'lucide-react';
+import { PlayCircle, FileSignature, FileCheck, Truck, Printer, Tag, Ban, AlertTriangle, Info, MapPin, Clock, MessageCircle } from 'lucide-react';
 import { useApp } from '../../context/AppContext.jsx';
 import { getLojasProntasParaCarregar, getLojasEmCarregamento } from '../../utils/selectors';
 import {
@@ -14,10 +14,12 @@ import { getStatusLoja } from '../../utils/statusStyles';
 import { getNomeBox } from '../../utils/boxLogic';
 import { imprimirProtocolo } from '../../utils/imprimirProtocolo';
 import { imprimirEtiquetaCarregamento } from '../../utils/imprimirEtiquetaCarregamento';
+import { montarMensagemProtocolo } from '../../utils/notificacoes';
+import NotifyWhatsappModal from '../Shared/NotifyWhatsappModal.jsx';
 import TipoCargaBadge from '../Shared/TipoCargaBadge.jsx';
 import { lojaPassaFiltroTipoCarga } from '../../utils/tipoCarga';
 
-export default function LoadingList({ aoAbrirProtocolo }) {
+export default function LoadingList({ aoAbrirProtocolo, irPara }) {
   const { state, actions, filtroTipoCarga } = useApp();
   // ids das lojas marcadas em "Em Carregamento" para sair juntas no mesmo
   // veículo (ver botão "Registrar Protocolo em Lote" abaixo da lista).
@@ -38,6 +40,13 @@ export default function LoadingList({ aoAbrirProtocolo }) {
   // acima e ao botão "Etiquetas" já existente em LabelGenerator.jsx para
   // carga agrupada.
   const [statusImpressaoEtiqueta, setStatusImpressaoEtiqueta] = useState(null);
+  // Mensagem pronta pra reabrir a tela de "Notificar equipe" (mesmo modal
+  // que já aparece sozinho ao registrar o protocolo — ver LoadingPage.jsx)
+  // a partir do botão "WhatsApp" em Últimos Protocolos Registrados — pedido
+  // do usuário: poder reenviar a notificação de um carregamento já
+  // registrado (ex.: equipe não recebeu, trocou de celular, etc.), sem
+  // precisar cancelar e registrar tudo de novo só pra isso.
+  const [mensagemNotificarManual, setMensagemNotificarManual] = useState(null);
   // Entrega das notas fiscais ao motorista (ver coluna "Entrega NFs" na
   // tabela abaixo) — mesmo padrão de horário manual usado em Motoristas
   // para chegada/saída na loja, só que local a este arquivo (o registro
@@ -182,6 +191,45 @@ export default function LoadingList({ aoAbrirProtocolo }) {
         ];
     const sucesso = imprimirEtiquetaCarregamento(itens);
     setStatusImpressaoEtiqueta(sucesso ? 'ok' : 'erro');
+  }
+
+  // Botão "WhatsApp" — reconstrói a mesma mensagem de "Carregamento
+  // liberado" que já é montada ao registrar o protocolo (ver
+  // montarMensagemProtocolo em notificacoes.js) e reabre a tela de
+  // Notificar equipe, dessa vez sob pedido explícito (não precisa ter
+  // acabado de registrar). Para um protocolo em lote (viagemId), reúne
+  // TODAS as lojas daquela viagem na mensagem, igual ao botão Etiqueta.
+  function aoEnviarWhatsapp(protocolo) {
+    const lojaBase = state.lojas.find((l) => l.id === protocolo.lojaId);
+    if (!lojaBase) return;
+    const protocolosDaViagem = protocolo.viagemId
+      ? state.protocolos.filter((p) => p.viagemId === protocolo.viagemId)
+      : [protocolo];
+    const itens = protocolosDaViagem
+      .map((p) => {
+        const l = state.lojas.find((x) => x.id === p.lojaId);
+        return l
+          ? {
+              loja: l.loja,
+              nomeLoja: l.nomeLoja,
+              carga: l.carga,
+              paletesEnviados: p.paletesEnviados,
+              statusEnvio: p.statusEnvio,
+              lotesRestantesDescricao: p.lotesRestantesDescricao,
+              posicaoEntrega: p.posicaoEntrega,
+            }
+          : null;
+      })
+      .filter(Boolean);
+    if (itens.length === 0) return;
+    setMensagemNotificarManual(
+      montarMensagemProtocolo({
+        placa: protocolo.placa,
+        motorista: protocolo.motorista,
+        diaEntregaReferencia: protocolo.diaEntregaReferencia,
+        itens,
+      })
+    );
   }
 
   function aoCancelar(protocoloId) {
@@ -404,7 +452,14 @@ export default function LoadingList({ aoAbrirProtocolo }) {
               <tbody>
                 {ultimosProtocolos.map((p) => {
                   const loja = state.lojas.find((l) => l.id === p.lojaId);
-                  const podeCancelar = p.boxNumero != null && !!p.vagasLiberadas;
+                  // Pedido do usuário: cancelar um protocolo de um carro já
+                  // carregado continua permitido mesmo sem o registro exato
+                  // das vagas liberadas (protocolo antigo demais pra ter
+                  // esse campo) — nesse caso o cancelamento usa as vagas
+                  // vazias atuais do box em vez de bloquear (ver
+                  // CANCELAR_PROTOCOLO em AppContext.jsx). Só fica
+                  // realmente impossível quando nem o box é conhecido.
+                  const podeCancelar = p.boxNumero != null;
                   return (
                     <tr key={p.id} className="border-b border-slate-50 last:border-0 dark:border-slate-700/60">
                       <td className="py-2 pr-3 font-semibold text-slate-700 dark:text-slate-200">
@@ -586,6 +641,14 @@ export default function LoadingList({ aoAbrirProtocolo }) {
                             </button>
                             <button
                               type="button"
+                              onClick={() => aoEnviarWhatsapp(p)}
+                              title="Enviar/reenviar a notificação deste carregamento pelo WhatsApp"
+                              className="flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
+                            >
+                              <MessageCircle size={12} /> WhatsApp
+                            </button>
+                            <button
+                              type="button"
                               onClick={() => podeCancelar && setConfirmandoCancelamento(p.id)}
                               disabled={!podeCancelar}
                               title={
@@ -608,6 +671,15 @@ export default function LoadingList({ aoAbrirProtocolo }) {
           </div>
         )}
       </div>
+
+      {mensagemNotificarManual && (
+        <NotifyWhatsappModal
+          titulo="Reenviar notificação do carregamento"
+          mensagem={mensagemNotificarManual}
+          aoFechar={() => setMensagemNotificarManual(null)}
+          irPara={irPara}
+        />
+      )}
     </div>
   );
 }

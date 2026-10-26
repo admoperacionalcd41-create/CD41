@@ -14,7 +14,7 @@ export default function LoadingPage({ irPara }) {
 
   return (
     <div>
-      <LoadingList aoAbrirProtocolo={setLojasProtocolo} />
+      <LoadingList aoAbrirProtocolo={setLojasProtocolo} irPara={irPara} />
       {lojasProtocolo && (
         <LoadingProtocolForm
           lojas={lojasProtocolo}

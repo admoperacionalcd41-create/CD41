@@ -697,7 +697,7 @@ function aplicarAcaoInterna(state, acao) {
       if (!protocolo) {
         return { ...state, ultimoErro: 'Protocolo não encontrado.' };
       }
-      if (protocolo.boxNumero == null || !protocolo.vagasLiberadas) {
+      if (protocolo.boxNumero == null) {
         return { ...state, ultimoErro: 'Este protocolo é antigo demais e não pode ser cancelado automaticamente.' };
       }
 
@@ -711,17 +711,46 @@ function aplicarAcaoInterna(state, acao) {
         return { ...state, ultimoErro: 'O box deste protocolo não foi encontrado.' };
       }
 
-      const vagasIndisponiveis = vagasIndisponiveisParaReocupar(box, protocolo.vagasLiberadas);
-      if (vagasIndisponiveis.length > 0) {
-        return {
-          ...state,
-          ultimoErro: `Não é possível cancelar: ${vagasIndisponiveis.length} vaga(s) do ${getNomeBox(
-            protocolo.boxNumero
-          )} já foram reutilizadas por outro carregamento.`,
-        };
-      }
+      // Pedido do usuário: mesmo um carro já CARREGADO (vagas liberadas,
+      // box já aparecendo como disponível) precisa poder ter o protocolo
+      // cancelado, devolvendo a carga pras vagas vazias do box. O caminho
+      // normal (abaixo) reocupa exatamente as mesmas vagas que foram
+      // liberadas naquele carregamento — preferível, pois mantém a loja
+      // nas vagas que ela já tinha. Mas um protocolo registrado antes do
+      // campo `vagasLiberadas` existir (versão anterior do app) não tem
+      // como saber quais eram essas vagas — antes isso bloqueava o
+      // cancelamento por completo; agora, nesse caso, ocupa a quantidade
+      // de paletes enviados a partir das vagas livres ATUAIS do box (ordem
+      // crescente, mesma regra do apontamento), já que fisicamente é a
+      // mesma coisa: a carga volta a ocupar vagas vazias daquele box.
+      const temVagasOriginais = Array.isArray(protocolo.vagasLiberadas) && protocolo.vagasLiberadas.length > 0;
 
-      const novoBox = reocuparVagas(box, protocolo.vagasLiberadas, loja.id);
+      let novoBox;
+      let vagasReocupadas;
+
+      if (temVagasOriginais) {
+        const vagasIndisponiveis = vagasIndisponiveisParaReocupar(box, protocolo.vagasLiberadas);
+        if (vagasIndisponiveis.length > 0) {
+          return {
+            ...state,
+            ultimoErro: `Não é possível cancelar: ${vagasIndisponiveis.length} vaga(s) do ${getNomeBox(
+              protocolo.boxNumero
+            )} já foram reutilizadas por outro carregamento.`,
+          };
+        }
+        novoBox = reocuparVagas(box, protocolo.vagasLiberadas, loja.id);
+        vagasReocupadas = protocolo.vagasLiberadas;
+      } else {
+        const resultado = alocarVagasCrescente(box, protocolo.paletesEnviados, loja.id);
+        if (!resultado.sucesso) {
+          return {
+            ...state,
+            ultimoErro: `Não é possível cancelar: ${getNomeBox(protocolo.boxNumero)} não tem vagas vazias suficientes pra devolver a carga (necessário: ${protocolo.paletesEnviados}).`,
+          };
+        }
+        novoBox = resultado.box;
+        vagasReocupadas = resultado.vagasAlocadas;
+      }
 
       const novaLojaState =
         protocolo.statusEnvio === 'completo'
@@ -735,7 +764,7 @@ function aplicarAcaoInterna(state, acao) {
               ...loja,
               status: 'carregando',
               paletesAgrupados: loja.paletesAgrupados + protocolo.paletesEnviados,
-              vagasOcupadas: [...loja.vagasOcupadas, ...protocolo.vagasLiberadas].sort((a, b) => a - b),
+              vagasOcupadas: [...loja.vagasOcupadas, ...vagasReocupadas].sort((a, b) => a - b),
               protocolos: loja.protocolos.filter((p) => p.id !== protocoloId),
             };
 
