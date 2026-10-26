@@ -713,31 +713,31 @@ function aplicarAcaoInterna(state, acao) {
 
       // Pedido do usuário: mesmo um carro já CARREGADO (vagas liberadas,
       // box já aparecendo como disponível) precisa poder ter o protocolo
-      // cancelado, devolvendo a carga pras vagas vazias do box. O caminho
-      // normal (abaixo) reocupa exatamente as mesmas vagas que foram
-      // liberadas naquele carregamento — preferível, pois mantém a loja
-      // nas vagas que ela já tinha. Mas um protocolo registrado antes do
-      // campo `vagasLiberadas` existir (versão anterior do app) não tem
-      // como saber quais eram essas vagas — antes isso bloqueava o
-      // cancelamento por completo; agora, nesse caso, ocupa a quantidade
-      // de paletes enviados a partir das vagas livres ATUAIS do box (ordem
-      // crescente, mesma regra do apontamento), já que fisicamente é a
-      // mesma coisa: a carga volta a ocupar vagas vazias daquele box.
+      // cancelado, devolvendo a carga pras vagas vazias do box — mesmo
+      // que não fique na mesma ordem/posição de antes. O caminho
+      // preferido (abaixo) reocupa exatamente as mesmas vagas que foram
+      // liberadas naquele carregamento, quando ainda estão todas livres.
+      // Dois casos caem no fallback, que ocupa a quantidade de paletes
+      // enviados a partir de QUAISQUER vagas livres atuais do box (ordem
+      // crescente, mesma regra do apontamento): (1) protocolo registrado
+      // antes do campo `vagasLiberadas` existir (versão anterior do app),
+      // sem como saber quais eram as vagas exatas; (2) alguma(s) daquelas
+      // vagas originais já foram reutilizadas por outro carregamento nesse
+      // meio-tempo — antes isso bloqueava o cancelamento por completo
+      // ("já foram reutilizadas por outro carregamento"), mesmo havendo
+      // vagas vazias de sobra no box pra devolver a mesma quantidade. Só
+      // continua bloqueado quando nem o fallback encontra vagas vazias
+      // suficientes.
       const temVagasOriginais = Array.isArray(protocolo.vagasLiberadas) && protocolo.vagasLiberadas.length > 0;
+      const vagasIndisponiveis = temVagasOriginais
+        ? vagasIndisponiveisParaReocupar(box, protocolo.vagasLiberadas)
+        : [];
+      const podeReocuparVagasExatas = temVagasOriginais && vagasIndisponiveis.length === 0;
 
       let novoBox;
       let vagasReocupadas;
 
-      if (temVagasOriginais) {
-        const vagasIndisponiveis = vagasIndisponiveisParaReocupar(box, protocolo.vagasLiberadas);
-        if (vagasIndisponiveis.length > 0) {
-          return {
-            ...state,
-            ultimoErro: `Não é possível cancelar: ${vagasIndisponiveis.length} vaga(s) do ${getNomeBox(
-              protocolo.boxNumero
-            )} já foram reutilizadas por outro carregamento.`,
-          };
-        }
+      if (podeReocuparVagasExatas) {
         novoBox = reocuparVagas(box, protocolo.vagasLiberadas, loja.id);
         vagasReocupadas = protocolo.vagasLiberadas;
       } else {
