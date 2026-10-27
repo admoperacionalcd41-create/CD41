@@ -304,9 +304,27 @@ export function getLinhasProcessoDoDia(state, filtroTipoCarga) {
   // andamento") — por isso guarda também o boxNumero aqui, não só um Set de
   // códigos. Um mesmo código normalmente só tem uma carga ativa num box por
   // vez; se por algum motivo houver mais de uma, fica o último encontrado.
+  //
+  // Pedido do usuário (ship seguinte, revisão): isso ORIGINALMENTE ignorava
+  // o filtro de tipo de carga de propósito (mostrava qualquer ocupação
+  // física do box, de qualquer tipo/dia) — mas na prática isso confundia:
+  // com o Box Frios agora aceitando várias lojas Resfriada em geração ao
+  // mesmo tempo (ver boxPermiteVariasCargasEmGeracao), ficou comum sobrar
+  // uma carga Resfriada antiga de outro dia ainda parada lá, e ela aparecia
+  // na coluna de lojas filtradas por SECA, como se a carga Seca de hoje
+  // estivesse no Box Frios (não estava — era uma carga Resfriada antiga,
+  // de código igual mas tipo diferente). Agora filtra por
+  // `lojaPassaFiltroTipoCarga` também aqui, igual às outras colunas: só
+  // conta como "em andamento" uma ocupação de box cujo TIPO bate com o
+  // filtro atual.
   const boxAtualPorCodigo = new Map();
   state.lojas.forEach((l) => {
-    if (l.boxNumero != null && l.status !== 'pendente' && l.status !== 'finalizada') {
+    if (
+      l.boxNumero != null &&
+      l.status !== 'pendente' &&
+      l.status !== 'finalizada' &&
+      lojaPassaFiltroTipoCarga(l, filtroTipoCarga)
+    ) {
       boxAtualPorCodigo.set(l.loja, l.boxNumero);
     }
   });
