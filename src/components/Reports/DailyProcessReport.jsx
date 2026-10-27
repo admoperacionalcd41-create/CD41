@@ -4,7 +4,7 @@ import { useApp } from '../../context/AppContext.jsx';
 import { getLinhasProcessoDoDia, getEntregaCodigoLojaNaData, getVolumeExpedicaoHoje } from '../../utils/selectors';
 import { getDiasUteisSemana, formatarDiaSemanaCurto, hojeISO } from '../../utils/dateHelpers';
 import { getStatusLoja } from '../../utils/statusStyles';
-import TipoCargaBadge from '../Shared/TipoCargaBadge.jsx';
+import { getNomeBox } from '../../utils/boxLogic';
 
 const ROTULO_TIPO = {
   seca: 'Carga Seca',
@@ -19,17 +19,22 @@ function formatarNumeroBR(valor) {
   return valor.toLocaleString('pt-BR', { maximumFractionDigits: 1 });
 }
 
-// Selo de status (Expedição de Hoje / Cargas em Andamento / Carregamento
-// de Hoje) dentro da tabela — pedido do usuário: validar só pela LOJA
-// (feito/pendente), sem mostrar nada de carga (antes, uma loja com mais de
-// uma carga no dia mostrava a contagem "(2/3)" e o status de cada carga
-// separadamente). `rotuloFeito`/`rotuloPendente` permitem reaproveitar o
-// mesmo selo com um texto diferente na coluna "Cargas em Andamento" (ver
-// abaixo). Os nomes internos (apontamentoFeito, "Geração de Carga" em
-// selectors.js) continuam os mesmos por baixo — só o TERMO exibido pro
-// usuário mudou pra "Expedição de Hoje"/"Carregamento de Hoje" (pedido do
-// usuário), mesma lógica já usada em ResumoProcessoCard.jsx pra não mexer
-// em dado já persistido.
+// Selo de status (Cargas em Andamento / Carregamento de Hoje) dentro da
+// tabela — pedido do usuário: validar só pela LOJA (feito/pendente), sem
+// mostrar nada de carga (antes, uma loja com mais de uma carga no dia
+// mostrava a contagem "(2/3)" e o status de cada carga separadamente).
+// `rotuloFeito`/`rotuloPendente` permitem reaproveitar o mesmo selo com um
+// texto diferente em cada coluna. Os nomes internos (apontamentoFeito,
+// "Geração de Carga" em selectors.js) continuam os mesmos por baixo — só o
+// TERMO exibido pro usuário mudou pra "Expedição de Hoje"/"Carregamento de
+// Hoje" (pedido do usuário), mesma lógica já usada em
+// ResumoProcessoCard.jsx pra não mexer em dado já persistido.
+//
+// Pedido do usuário (ship seguinte): na coluna "Cargas em Andamento",
+// `rotuloFeito` passou a ser o NOME do box em que a loja está (via
+// getNomeBox(loja.boxAtual) — selectors.js), em vez do texto fixo "Em
+// andamento" — mostra em qual box procurar a carga, não só que ela está em
+// algum lugar.
 function Selo({ feito, rotuloFeito = 'Feito', rotuloPendente = 'Pendente' }) {
   return (
     <span
@@ -45,23 +50,25 @@ function Selo({ feito, rotuloFeito = 'Feito', rotuloPendente = 'Pendente' }) {
   );
 }
 
-// Selo da coluna Expedição de Hoje (pedido do usuário): em vez do booleano
-// genérico "No Box"/"Pendente" do <Selo> acima, mostra o status REAL da
-// loja no momento (ex.: "Em Execução", "Conferência Finalizada",
-// "Agrupando", "Agrupada") — mesmo texto/cor já usados em todo o app pra
-// esse status (ver STATUS_LOJA em statusStyles.js e o mesmo padrão de selo
-// em GroupingHistory.jsx/AndamentoEntregasCard.jsx). `statusExpedicaoHoje`
-// (selectors.js) já resolve pra 'pendente' quando a loja ainda não teve
-// nenhuma carga apontada hoje.
+// Selo da coluna Expedição de Hoje: mostra o status REAL da loja no momento
+// (ex.: "Em Execução", "Conferência Finalizada", "Agrupando", "Agrupada") —
+// mesmo texto/cor já usados em todo o app pra esse status (ver STATUS_LOJA
+// em statusStyles.js). `statusExpedicaoHoje` (selectors.js) já resolve pra
+// 'pendente' quando a loja ainda não teve nenhuma carga apontada hoje.
+//
+// Pedido do usuário (ship seguinte): "tire esses círculos, deixe o mais
+// simples possível" — essa coluna tinha muita informação visual (uma
+// etiqueta arredondada colorida por linha, igual um badge). Simplificado pra
+// só o texto, na cor do status (sem fundo/contorno/formato de pílula) —
+// pega só as classes `text-*`/`dark:text-*` de STATUS_LOJA, descartando
+// bg-*/border/rounded.
 function SeloStatusExpedicao({ status }) {
   const info = getStatusLoja(status);
-  return (
-    <span
-      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${info.corBadge}`}
-    >
-      {info.texto}
-    </span>
-  );
+  const corTexto = info.corBadge
+    .split(' ')
+    .filter((classe) => classe.startsWith('text-') || classe.startsWith('dark:text-'))
+    .join(' ');
+  return <span className={`text-[11px] font-semibold ${corTexto}`}>{info.texto}</span>;
 }
 
 // Pedido do usuário: depois da coluna Carregamento de Hoje, as mesmas
@@ -584,15 +591,16 @@ export default function DailyProcessReport() {
                         />
                       </td>
                       <td className="px-2 py-1.5 text-center">
-                        <Selo feito={loja.cargaNoBox} rotuloFeito="Em andamento" rotuloPendente="Vazio" />
+                        <Selo
+                          feito={loja.cargaNoBox}
+                          rotuloFeito={getNomeBox(loja.boxAtual)}
+                          rotuloPendente="Vazio"
+                        />
                       </td>
                       <td className="py-1.5 pr-3">
                         <div className="flex flex-wrap items-center gap-1.5">
                           <span className="font-mono font-semibold text-slate-700 dark:text-slate-200">{loja.codigo}</span>
                           <span className="text-slate-500 dark:text-slate-400">{loja.nomeLoja}</span>
-                          {loja.tiposCarga.map((tipo) => (
-                            <TipoCargaBadge key={tipo} tipo={tipo} />
-                          ))}
                           {loja.cargas.length === 0 && (
                             <span className="text-xs font-medium text-amber-600 dark:text-amber-400">
                               Sem carga hoje
@@ -710,15 +718,16 @@ export default function DailyProcessReport() {
                         }`}
                       >
                         <td className="px-2 py-1.5 text-center">
-                          <Selo feito={loja.cargaNoBox} rotuloFeito="Em andamento" rotuloPendente="Vazio" />
+                          <Selo
+                            feito={loja.cargaNoBox}
+                            rotuloFeito={getNomeBox(loja.boxAtual)}
+                            rotuloPendente="Vazio"
+                          />
                         </td>
                         <td className="py-1.5 pl-3 pr-3">
                           <div className="flex flex-wrap items-center gap-1.5">
                             <span className="font-mono font-semibold text-slate-700 dark:text-slate-200">{loja.codigo}</span>
                             <span className="text-slate-500 dark:text-slate-400">{loja.nomeLoja}</span>
-                            {loja.tiposCarga.map((tipo) => (
-                              <TipoCargaBadge key={tipo} tipo={tipo} />
-                            ))}
                             {/* Um aviso de "sem carga hoje" ainda é
                                 informação da LOJA (não de uma carga
                                 específica), então continua aqui — só a

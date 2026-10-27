@@ -298,10 +298,16 @@ export function getLinhasProcessoDoDia(state, filtroTipoCarga) {
   // `getLojasDoDia`. Status 'pendente' ainda não tem box; 'finalizada' já
   // liberou a vaga (ver liberarTodasVagas em boxLogic.js) — os dois ficam
   // de fora, o resto dos status sempre tem um box ocupado.
-  const cargaNoBoxPorCodigo = new Set();
+  //
+  // Pedido do usuário (ship seguinte): a coluna "Cargas em Andamento" passou
+  // a mostrar QUAL box a loja está ocupando (em vez do texto genérico "Em
+  // andamento") — por isso guarda também o boxNumero aqui, não só um Set de
+  // códigos. Um mesmo código normalmente só tem uma carga ativa num box por
+  // vez; se por algum motivo houver mais de uma, fica o último encontrado.
+  const boxAtualPorCodigo = new Map();
   state.lojas.forEach((l) => {
     if (l.boxNumero != null && l.status !== 'pendente' && l.status !== 'finalizada') {
-      cargaNoBoxPorCodigo.add(l.loja);
+      boxAtualPorCodigo.set(l.loja, l.boxNumero);
     }
   });
 
@@ -319,7 +325,8 @@ export function getLinhasProcessoDoDia(state, filtroTipoCarga) {
       const tiposCarga = cargas.length > 0 ? [...new Set(cargas.map((c) => c.tipoCarga))] : [info.tipoCarga];
       const apontamentoFeito = cargas.some((c) => c.apontada);
       const apontamentoContagem = cargas.filter((c) => c.apontada).length;
-      const cargaNoBox = cargaNoBoxPorCodigo.has(codigo);
+      const boxAtual = boxAtualPorCodigo.get(codigo) ?? null;
+      const cargaNoBox = boxAtual != null;
       const carregamentoFeito = cargas.some((c) => c.situacaoChave === 'completo' || c.situacaoChave === 'parcial');
       const carregamentoContagem = cargas.filter(
         (c) => c.situacaoChave === 'completo' || c.situacaoChave === 'parcial'
@@ -347,6 +354,7 @@ export function getLinhasProcessoDoDia(state, filtroTipoCarga) {
         apontamentoFeito,
         apontamentoContagem,
         cargaNoBox,
+        boxAtual,
         carregamentoFeito,
         carregamentoContagem,
         completo,
