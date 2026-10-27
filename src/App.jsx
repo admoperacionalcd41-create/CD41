@@ -142,7 +142,12 @@ function AppLogado({ grupo }) {
           qualquer tamanho de tela), então o indicador de conexão que antes
           morava no rodapé da sidebar fixa do desktop precisa de uma versão
           flutuante própria, sempre visível no canto inferior esquerdo. */}
-      <div className="fixed bottom-3 left-3 z-30 rounded-full border border-slate-200 bg-white px-3 py-1.5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+      {/* rounded-full -> rounded-2xl e max-width: o indicador ganhou um
+          aviso extra (ver AvisoPatches em ConnectionStatus.jsx) que pode
+          ocupar várias linhas — o formato de pílula (rounded-full) só
+          funcionava pra uma linha só, e sem limite de largura a caixa de
+          aviso podia esbarrar na borda da tela em telas estreitas. */}
+      <div className="fixed bottom-3 left-3 z-30 max-w-[min(22rem,calc(100vw-1.5rem))] rounded-2xl border border-slate-200 bg-white px-3 py-1.5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
         <ConnectionStatus />
       </div>
     </div>

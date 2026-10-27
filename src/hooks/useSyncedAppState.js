@@ -138,6 +138,22 @@ function useEstadoSincronizado(estadoLocal, setEstadoLocal) {
   const tentativasFalhasRef = useRef(0);
   const retryTimeoutRef = useRef(null);
 
+  // Pedido do usuário ("ainda tá sobrepondo atualização de outros
+  // usuários"): a gravação por patches (ver app_state_aplicar_patches em
+  // supabase/schema.sql) está falhando na prática, e cada falha cai pro
+  // caminho antigo (gravarDocumentoInteiro) — que FUNCIONA (a ação não se
+  // perde), mas é exatamente esse caminho antigo que sobrescreve o
+  // documento inteiro e causa a sobreposição entre usuários que o usuário
+  // está vendo. Até agora, o erro exato de por que a função nova falha só
+  // ia pro console do navegador (que o usuário não consegue/não quer
+  // abrir) — isso tornava o diagnóstico impossível sem pedir prints do
+  // painel do Supabase, um processo lento e sujeito a erro (já aconteceu
+  // de vir print do projeto errado). Agora o erro fica guardado aqui e
+  // exposto no próprio indicador de sincronização (ver ConnectionStatus.jsx)
+  // — com um botão de copiar —, pra o usuário conseguir mandar o texto
+  // exato direto na conversa, sem precisar do painel do Supabase.
+  const [avisoPatches, setAvisoPatches] = useState(null);
+
   useEffect(
     () => () => {
       if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current);
@@ -288,11 +304,27 @@ function useEstadoSincronizado(estadoLocal, setEstadoLocal) {
             // eslint-disable-next-line no-console
             console.warn(
               'Gravação por patches falhou, usando gravação do documento inteiro como contingência:',
-              error.message
+              error.message,
+              error
             );
+            // Guarda o erro EXATO (mensagem, código, detalhes, hint — os
+            // mesmos campos que apareceriam no painel do Supabase) pra
+            // mostrar no indicador de sincronização, já que é isso que
+            // falta pra descobrir por que app_state_aplicar_patches não
+            // está funcionando em produção.
+            setAvisoPatches({
+              mensagem: error.message || 'erro desconhecido',
+              codigo: error.code || null,
+              detalhes: error.details || null,
+              hint: error.hint || null,
+              em: new Date().toLocaleString('pt-BR'),
+            });
             gravarDocumentoInteiro();
             return;
           }
+          // RPC deu certo — se havia um aviso de falha anterior, ele não
+          // se aplica mais (a gravação por patches voltou a funcionar).
+          setAvisoPatches(null);
           // A função devolve o documento já aplicado no servidor — usa ele
           // como nova base (em vez de dadosNormalizados) porque reflete
           // com exatidão o que está lá agora, incluindo qualquer patch de
@@ -427,5 +459,9 @@ function useEstadoSincronizado(estadoLocal, setEstadoLocal) {
     [setEstadoLocal, gravarNoSupabase]
   );
 
-  return [estadoLocal, setEstadoSincronizado, { ...statusSincronizacao, tentarNovamente: tentarSincronizarNovamente }];
+  return [
+    estadoLocal,
+    setEstadoSincronizado,
+    { ...statusSincronizacao, avisoPatches, tentarNovamente: tentarSincronizarNovamente },
+  ];
 }

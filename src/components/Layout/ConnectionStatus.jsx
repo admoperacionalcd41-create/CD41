@@ -1,8 +1,60 @@
-import React from 'react';
-import { RefreshCw } from 'lucide-react';
+import React, { useState } from 'react';
+import { RefreshCw, AlertTriangle, Copy, Check } from 'lucide-react';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 import { useApp } from '../../context/AppContext.jsx';
 import { SUPABASE_CONFIGURADO } from '../../lib/supabaseClient';
+
+// Pedido do usuário ("ainda tá sobrepondo atualização de outros
+// usuários"): a gravação otimizada (que evita sobreposição entre
+// usuários — ver app_state_aplicar_patches em supabase/schema.sql) está
+// falhando na prática, e cada falha cai pro caminho antigo (grava o
+// documento inteiro), que é o que causa a sobreposição relatada. Faltava
+// um jeito de ver o erro EXATO sem pedir print do painel do Supabase
+// (processo lento, já rendeu print do projeto errado uma vez). Este
+// aviso mostra o erro reportado pelo próprio Supabase, com um botão de
+// copiar, direto onde o usuário já olha pra saber se está "Sincronizado".
+function AvisoPatches({ aviso }) {
+  const [copiado, setCopiado] = useState(false);
+
+  const textoCompleto = [
+    `Gravação otimizada falhou às ${aviso.em}`,
+    aviso.codigo ? `Código: ${aviso.codigo}` : null,
+    `Mensagem: ${aviso.mensagem}`,
+    aviso.detalhes ? `Detalhes: ${aviso.detalhes}` : null,
+    aviso.hint ? `Dica: ${aviso.hint}` : null,
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  const copiar = async () => {
+    try {
+      await navigator.clipboard.writeText(textoCompleto);
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2000);
+    } catch {
+      // Sem permissão de clipboard (raro) — o texto já está visível na
+      // tela, o usuário pode selecionar manualmente.
+    }
+  };
+
+  return (
+    <div className="mt-1 flex items-start gap-1.5 rounded border border-amber-300 bg-amber-50 px-2 py-1 text-[11px] text-amber-800 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
+      <AlertTriangle size={12} className="mt-0.5 flex-shrink-0" />
+      <div className="flex-1">
+        <p className="font-semibold">Gravação otimizada indisponível (dados ainda estão sendo salvos, mas sem a proteção contra sobreposição entre usuários)</p>
+        <p className="mt-0.5 break-words font-mono">{aviso.mensagem}{aviso.codigo ? ` (código ${aviso.codigo})` : ''}</p>
+        <p className="mt-0.5 opacity-75">às {aviso.em} — envie este texto pro suporte:</p>
+      </div>
+      <button
+        type="button"
+        onClick={copiar}
+        className="flex flex-shrink-0 items-center gap-0.5 rounded px-1 py-0.5 font-semibold underline decoration-dotted underline-offset-2 hover:bg-amber-100 dark:hover:bg-amber-900/40"
+      >
+        {copiado ? <Check size={11} /> : <Copy size={11} />} {copiado ? 'copiado!' : 'copiar'}
+      </button>
+    </div>
+  );
+}
 
 // Indicador de status mostrado no canto inferior esquerdo da tela.
 //
@@ -53,46 +105,64 @@ export default function ConnectionStatus() {
     );
   }
 
+  // Pedido do usuário: a gravação otimizada pode estar falhando por baixo
+  // dos panos (cai pro caminho antigo, que SALVA mas sobrepõe outros
+  // usuários — ver avisoPatches em useSyncedAppState.js) mesmo quando o
+  // indicador abaixo mostra "Salvando..." ou "Sincronizado" (porque, do
+  // ponto de vista de "a ação foi perdida ou não", ela realmente não foi).
+  // Por isso o aviso aparece JUNTO de qualquer um dos badges abaixo, não
+  // substituindo nenhum deles.
+  const aviso = statusSincronizacao.avisoPatches ? <AvisoPatches aviso={statusSincronizacao.avisoPatches} /> : null;
+
   if (statusSincronizacao.status === 'salvando') {
     return (
-      <div className="flex items-center gap-1.5" title="Salvando as últimas alterações...">
-        <span className="relative flex h-2 w-2 flex-shrink-0">
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
-          <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-500" />
-        </span>
-        <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">Salvando...</span>
+      <div>
+        <div className="flex items-center gap-1.5" title="Salvando as últimas alterações...">
+          <span className="relative flex h-2 w-2 flex-shrink-0">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-500" />
+          </span>
+          <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">Salvando...</span>
+        </div>
+        {aviso}
       </div>
     );
   }
 
   if (statusSincronizacao.status === 'erro') {
     return (
-      <div
-        className="flex items-center gap-1.5"
-        title={`${statusSincronizacao.mensagem || 'Não foi possível salvar.'} (tentativa ${statusSincronizacao.tentativas}) — tentando de novo automaticamente, ou clique para tentar agora.`}
-      >
-        <span className="relative flex h-2 w-2 flex-shrink-0">
-          <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
-        </span>
-        <span className="text-xs font-semibold text-red-600 dark:text-red-400">Falha ao salvar</span>
-        <button
-          type="button"
-          onClick={statusSincronizacao.tentarNovamente}
-          className="flex items-center gap-0.5 rounded px-1 py-0.5 text-[11px] font-semibold text-red-700 underline decoration-dotted underline-offset-2 hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-950/40"
+      <div>
+        <div
+          className="flex items-center gap-1.5"
+          title={`${statusSincronizacao.mensagem || 'Não foi possível salvar.'} (tentativa ${statusSincronizacao.tentativas}) — tentando de novo automaticamente, ou clique para tentar agora.`}
         >
-          <RefreshCw size={10} /> tentar agora
-        </button>
+          <span className="relative flex h-2 w-2 flex-shrink-0">
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
+          </span>
+          <span className="text-xs font-semibold text-red-600 dark:text-red-400">Falha ao salvar</span>
+          <button
+            type="button"
+            onClick={statusSincronizacao.tentarNovamente}
+            className="flex items-center gap-0.5 rounded px-1 py-0.5 text-[11px] font-semibold text-red-700 underline decoration-dotted underline-offset-2 hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-950/40"
+          >
+            <RefreshCw size={10} /> tentar agora
+          </button>
+        </div>
+        {aviso}
       </div>
     );
   }
 
   return (
-    <div className="flex items-center gap-1.5" title="Tudo salvo — última alteração sincronizada com o servidor.">
-      <span className="relative flex h-2 w-2 flex-shrink-0">
-        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-        <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
-      </span>
-      <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">Sincronizado</span>
+    <div>
+      <div className="flex items-center gap-1.5" title="Tudo salvo — última alteração sincronizada com o servidor.">
+        <span className="relative flex h-2 w-2 flex-shrink-0">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+          <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+        </span>
+        <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">Sincronizado</span>
+      </div>
+      {aviso}
     </div>
   );
 }
