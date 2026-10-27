@@ -42,7 +42,14 @@
 // ocupam/liberam a MESMÍSSIMA vaga no mesmíssimo instante — bem mais raro.
 
 // Coleções identificadas por uma chave própria em cada item.
-const CHAVE_COLECAO = {
+//
+// Exportado (junto com as constantes abaixo) pra ser reaproveitado por
+// calcularPatchesEstado.js — a gravação no Supabase agora manda só o PEDAÇO
+// que mudou (ver useSyncedAppState.js), e precisa saber exatamente as
+// mesmas coleções/campos que esta mesclagem conhece, pra não haver
+// divergência entre "o que é mesclado na recepção" e "o que é calculado como
+// patch na gravação".
+export const CHAVE_COLECAO = {
   lojas: 'id',
   protocolos: 'id',
   boxes: 'numero',
@@ -52,13 +59,13 @@ const CHAVE_COLECAO = {
 };
 
 // Coleções de strings simples (nomes cadastrados), sem identidade própria.
-const COLECOES_SIMPLES = ['colaboradoresCadastrados', 'motoristasCadastrados'];
+export const COLECOES_SIMPLES = ['colaboradoresCadastrados', 'motoristasCadastrados'];
 
 // Mapas objeto { chave: valor } sem identidade por item (não são arrays) —
 // hoje só observacoesLoja ({ código da loja: texto }, ver AppContext.jsx).
 // Mesma lógica de 3 pontas de mesclarColecaoPorChave, mas usando as
 // próprias chaves do objeto em vez de um campo `chave` dentro de cada item.
-const MAPAS_OBJETO = ['observacoesLoja'];
+export const MAPAS_OBJETO = ['observacoesLoja'];
 
 // Campos escalares onde uma edição local concorrente deve prevalecer sobre
 // o remoto (mesmo critério das coleções: a ação local mais recente, ainda
@@ -66,7 +73,16 @@ const MAPAS_OBJETO = ['observacoesLoja'];
 // entra aqui (não em COLECOES_SIMPLES) porque é um array onde a ORDEM é o
 // próprio conteúdo que importa — uma mesclagem por Set (como as coleções
 // simples fazem) preservaria os itens mas destruiria a ordem arrastada.
-const CAMPOS_ESCALARES = ['diaAtual', 'valorPaletesAgrupamento', 'sequenciaLojas'];
+export const CAMPOS_ESCALARES = ['diaAtual', 'valorPaletesAgrupamento', 'sequenciaLojas'];
+
+export function iguais(a, b) {
+  if (a === b) return true;
+  try {
+    return JSON.stringify(a) === JSON.stringify(b);
+  } catch {
+    return false;
+  }
+}
 
 function paraMapa(colecao, chave) {
   const mapa = new Map();
@@ -74,15 +90,6 @@ function paraMapa(colecao, chave) {
     if (item && item[chave] != null) mapa.set(item[chave], item);
   });
   return mapa;
-}
-
-function iguais(a, b) {
-  if (a === b) return true;
-  try {
-    return JSON.stringify(a) === JSON.stringify(b);
-  } catch {
-    return false;
-  }
 }
 
 function mesclarColecaoPorChave(chave, base, local, remoto, resolverColisao) {

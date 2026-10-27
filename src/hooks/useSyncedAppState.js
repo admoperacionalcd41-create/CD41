@@ -5,6 +5,7 @@ import { useLocalStorage } from './useLocalStorage';
 import { sincronizarBoxes, criarBoxesIniciais } from '../utils/boxLogic';
 import { hojeISO } from '../utils/dateHelpers';
 import { mesclarEstadoSincronizado } from '../utils/mesclarEstadoSincronizado';
+import { calcularPatchesEstado } from '../utils/calcularPatchesEstado';
 
 // Id fixo da única linha compartilhada da tabela `app_state` — o estado
 // inteiro do sistema (lojas, boxes, motoristas, carregamentos etc.) vive
@@ -108,12 +109,13 @@ function useEstadoSincronizado(estadoLocal, setEstadoLocal) {
   const ultimoTimestampAplicadoRef = useRef(null);
   const timeoutGravacaoRef = useRef(null);
   const idUsuarioRef = useRef(idUsuario);
-  // Último estado que sabemos que o SERVIDOR tinha — atualizado sempre que
-  // aplicamos algo vindo do Supabase (carga inicial, Realtime) ou depois de
-  // uma gravação nossa dar certo. É a "base" usada por
-  // mesclarEstadoSincronizado pra saber o que mudou de cada lado desde a
-  // última vez que os dois bateram (ver comentário ali e no
-  // ATRASO_GRAVACAO_MS acima).
+  // Último estado que sabemos que já está refletido no servidor (carga
+  // inicial, algo recebido via Realtime, ou gravação nossa que deu certo).
+  // Além de ser a "base" da mesclagem de 3 pontas acima, é também a base
+  // usada por calcularPatchesEstado (ver gravarNoSupabase) pra saber
+  // exatamente O QUE mudou localmente desde então — é esse diff, não o
+  // documento inteiro, que vai pro servidor a cada gravação (ver pedido do
+  // usuário sobre colisão com várias pessoas usando ao mesmo tempo).
   const baseServidorRef = useRef(null);
 
   // Pedido do usuário: antes, se a gravação no Supabase falhasse (ex.: sinal
@@ -151,61 +153,135 @@ function useEstadoSincronizado(estadoLocal, setEstadoLocal) {
     idUsuarioRef.current = idUsuario;
   }, [idUsuario]);
 
-  const gravarNoSupabase = useCallback((dados) => {
-    const agora = new Date().toISOString();
-    ultimoTimestampAplicadoRef.current = agora;
-    const dadosNormalizados = normalizarEstadoRecebido(dados);
-    setStatusSincronizacao((s) => ({ status: 'salvando', mensagem: null, tentativas: s.tentativas }));
-    supabase
-      .from('app_state')
-      .upsert(
-        {
-          id: ID_ESTADO_COMPARTILHADO,
-          dados: dadosNormalizados,
-          atualizado_em: agora,
-          atualizado_por: idUsuarioRef.current,
-        },
-        { onConflict: 'id' }
-      )
-      .then(({ error }) => {
-        if (error) {
-          // eslint-disable-next-line no-console
-          console.warn('Não foi possível sincronizar o estado com o Supabase:', error.message);
-          tentativasFalhasRef.current += 1;
-          const tentativaAtual = tentativasFalhasRef.current;
-          setStatusSincronizacao({ status: 'erro', mensagem: error.message, tentativas: tentativaAtual });
+  // Pedido do usuário ("com 3 usuários já tá dando problema, imagina com 15
+  // motoristas"): a versão anterior desta função (gravação condicional por
+  // timestamp + mesclagem só quando colidia) reduzia a chance de uma ação
+  // apagar a outra, mas toda gravação ainda mandava o documento JSON
+  // INTEIRO — com várias pessoas gravando ações diferentes quase ao mesmo
+  // tempo, cada gravação tinha chance de colidir com a de outra, e cada
+  // colisão custava uma viagem extra ao banco. Quanto mais gente, mais
+  // colisões, mais lentidão — o problema piorava com a escala, não só a
+  // frequência de erros.
+  //
+  // Agora a gravação manda só os PEDAÇOS que mudaram desde a última vez que
+  // sincronizamos (calcularPatchesEstado, usando baseServidorRef como
+  // ponto de partida), numa chamada pra app_state_aplicar_patches (ver
+  // supabase/schema.sql) — uma função SQL que aplica a lista inteira numa
+  // única transação, travando a linha só pelo tempo de aplicar os patches
+  // (bem rápido). Isso elimina a colisão pro caso comum (duas pessoas
+  // mexendo em registros DIFERENTES — cada motorista cuida da própria
+  // carga): o servidor nunca mais vê um "documento inteiro" que possa
+  // sobrescrever o pedaço que outra pessoa acabou de mudar, porque a
+  // gravação NUNCA manda o resto do documento, só o que de fato mudou aqui.
+  // Não há mais "conflito" nem "tentar de novo" — a função sempre aplica
+  // com sucesso (a trava de linha só faz concorrências esperarem a vez,
+  // nunca falharem).
+  const gravarNoSupabase = useCallback(
+    (dados) => {
+      const agora = new Date().toISOString();
+      ultimoTimestampAplicadoRef.current = agora;
+      const dadosNormalizados = normalizarEstadoRecebido(dados);
+      setStatusSincronizacao((s) => ({ status: 'salvando', mensagem: null, tentativas: s.tentativas }));
 
-          // Tenta de novo automaticamente — sem isso, uma ação feita bem
-          // nesse momento (ex.: finalizar um carregamento) ficaria só na
-          // tela de quem fez, nunca chegando no servidor nem aparecendo pra
-          // mais ninguém, até a pessoa mexer em algo de novo (o que agenda
-          // uma nova gravação) ou recarregar a página (perdendo a ação).
-          // Espera crescente a cada falha seguida (5s, 10s, 20s, 40s, até um
-          // teto de 60s) pra não bater no Supabase sem parar se a conexão
-          // continuar ruim por um tempo.
-          if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current);
-          const espera = Math.min(5000 * 2 ** Math.min(tentativaAtual - 1, 4), 60000);
-          retryTimeoutRef.current = setTimeout(() => {
-            retryTimeoutRef.current = null;
-            // Retenta com o estado MAIS RECENTE (estadoRef.current), não o
-            // que falhou — se a pessoa continuou trabalhando enquanto a
-            // gravação falhava, é a versão atual que precisa ser salva.
-            gravarNoSupabase(estadoRef.current);
-          }, espera);
-          return;
-        }
-        // Gravação confirmada: isso é, a partir de agora, o que o servidor
-        // tem — vira a nova base pra próxima mesclagem (ver
-        // mesclarEstadoSincronizado.js).
+      const agendarNovaTentativaPorFalha = (mensagemErro) => {
+        tentativasFalhasRef.current += 1;
+        const tentativaAtual = tentativasFalhasRef.current;
+        setStatusSincronizacao({ status: 'erro', mensagem: mensagemErro, tentativas: tentativaAtual });
+
+        // Tenta de novo automaticamente — sem isso, uma ação feita bem
+        // nesse momento (ex.: finalizar um carregamento) ficaria só na
+        // tela de quem fez, nunca chegando no servidor nem aparecendo pra
+        // mais ninguém, até a pessoa mexer em algo de novo (o que agenda
+        // uma nova gravação) ou recarregar a página (perdendo a ação).
+        // Espera crescente a cada falha seguida (5s, 10s, 20s, 40s, até um
+        // teto de 60s) pra não bater no Supabase sem parar se a conexão
+        // continuar ruim por um tempo.
+        if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current);
+        const espera = Math.min(5000 * 2 ** Math.min(tentativaAtual - 1, 4), 60000);
+        retryTimeoutRef.current = setTimeout(() => {
+          retryTimeoutRef.current = null;
+          // Retenta com o estado MAIS RECENTE (estadoRef.current), não o
+          // que falhou — se a pessoa continuou trabalhando enquanto a
+          // gravação falhava, é a versão atual que precisa ser salva.
+          gravarNoSupabase(estadoRef.current);
+        }, espera);
+      };
+
+      const sucesso = (basePosGravacao) => {
         tentativasFalhasRef.current = 0;
         if (retryTimeoutRef.current) {
           clearTimeout(retryTimeoutRef.current);
           retryTimeoutRef.current = null;
         }
-        baseServidorRef.current = dadosNormalizados;
+        baseServidorRef.current = basePosGravacao;
         setStatusSincronizacao({ status: 'sincronizado', mensagem: null, tentativas: 0 });
-      });
-  }, []);
+      };
+
+      const patches = calcularPatchesEstado(baseServidorRef.current, dadosNormalizados);
+
+      if (patches === null) {
+        // Ainda não sabemos nenhum estado anterior da linha (primeira
+        // gravação desta sessão, ou linha recém-criada) — não há base pra
+        // calcular um diff, então grava o documento inteiro de uma vez,
+        // criando a linha se ainda não existir.
+        supabase
+          .from('app_state')
+          .upsert(
+            {
+              id: ID_ESTADO_COMPARTILHADO,
+              dados: dadosNormalizados,
+              atualizado_em: agora,
+              atualizado_por: idUsuarioRef.current,
+            },
+            { onConflict: 'id' }
+          )
+          .then(({ error }) => {
+            if (error) {
+              // eslint-disable-next-line no-console
+              console.warn('Não foi possível sincronizar o estado com o Supabase:', error.message);
+              agendarNovaTentativaPorFalha(error.message);
+              return;
+            }
+            sucesso(dadosNormalizados);
+          });
+        return;
+      }
+
+      if (patches.length === 0) {
+        // Nada mudou de fato desde a última gravação (ex.: um
+        // reagendamento que não altera nada) — não há o que mandar pro
+        // servidor.
+        sucesso(dadosNormalizados);
+        return;
+      }
+
+      supabase
+        .rpc('app_state_aplicar_patches', {
+          p_patches: patches,
+          p_usuario: idUsuarioRef.current,
+          p_atualizado_em: agora,
+        })
+        .then(({ data, error }) => {
+          if (error) {
+            // eslint-disable-next-line no-console
+            console.warn('Não foi possível sincronizar o estado com o Supabase:', error.message);
+            agendarNovaTentativaPorFalha(error.message);
+            return;
+          }
+          // A função devolve o documento já aplicado no servidor — usa ele
+          // como nova base (em vez de dadosNormalizados) porque reflete
+          // com exatidão o que está lá agora, incluindo qualquer patch de
+          // OUTRA pessoa que a trava de linha tenha serializado bem antes
+          // do nosso (ver comentário da função acima). Se por algum motivo
+          // a resposta não vier no formato esperado, cai pra
+          // dadosNormalizados mesmo assim — não é crítico (o Realtime traz
+          // a versão certa em seguida).
+          const dadosServidor = Array.isArray(data) ? data[0]?.dados : data?.dados;
+          sucesso(dadosServidor ? normalizarEstadoRecebido(dadosServidor) : dadosNormalizados);
+        });
+    },
+    []
+  );
 
   // Botão "Tentar agora" (ver ConnectionStatus.jsx) — pula a espera da
   // próxima tentativa automática e grava já, com o estado atual.
