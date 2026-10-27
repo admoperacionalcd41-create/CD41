@@ -93,7 +93,22 @@ create table if not exists public.app_state (
   id text primary key default 'estado-v1',
   dados jsonb not null default '{}'::jsonb,
   atualizado_em timestamptz not null default now(),
-  atualizado_por uuid references auth.users (id)
+  atualizado_por uuid references auth.users (id),
+  -- Pedido do usuário ("ainda tá sobrepondo, mesmo sem erro nenhum
+  -- aparecer"): até aqui, o app decidia o que era eco da própria gravação
+  -- (pra ignorar) comparando TIMESTAMPS gerados no APARELHO de cada
+  -- usuário (`new Date().toISOString()`) — com 15 motoristas em celulares
+  -- diferentes, relógios poucos segundos fora de sincronia entre si fazem
+  -- esse filtro descartar silenciosamente a atualização genuína de outra
+  -- pessoa (sem nenhum erro — do ponto de vista do banco, as duas
+  -- gravações foram válidas), e a próxima gravação desse usuário manda de
+  -- volta sua cópia local desatualizada daquele registro, sobrescrevendo a
+  -- mudança que nunca chegou a ser aplicada. `versao` substitui essa
+  -- comparação por um contador inteiro que só o SERVIDOR incrementa (+1 a
+  -- cada gravação, de patches ou documento inteiro — ver as duas funções
+  -- abaixo) — nunca depende do relógio de aparelho nenhum, então essa
+  -- classe de bug deixa de existir (não só fica mais rara).
+  versao bigint not null default 0
 );
 
 alter table public.app_state enable row level security;
@@ -169,23 +184,24 @@ alter publication supabase_realtime add table public.app_state;
 --   remover_simples   { campo, valor }
 --     -- remove `valor` de dados[campo].
 --
--- p_atualizado_em: o timestamp vem do CLIENTE (gerado antes da chamada de
--- rede), não de now() aqui dentro — o filtro de eco do Realtime no cliente
--- (ultimoTimestampAplicadoRef, ver useSyncedAppState.js) depende de
--- conhecer esse valor ANTES da viagem de rede, pra reconhecer e ignorar a
--- própria gravação quando ela volta pelo canal em tempo real.
+-- versao: quem decide o que é eco da própria gravação (ou atualização
+-- atrasada/fora de ordem) é o cliente comparando essa coluna — um contador
+-- que SÓ esta função (e app_state_gravar_completo, ver mais abaixo)
+-- incrementa, nunca um timestamp gerado no aparelho (ver comentário na
+-- tabela app_state acima, seção 2 — essa troca é o que resolve a
+-- sobreposição que persistia mesmo sem nenhum erro aparecer).
 --
 -- security invoker (padrão — fica explícito aqui): a função roda com o
 -- mesmo papel de quem chama (o usuário autenticado via RLS), exatamente
 -- como as leituras/gravações diretas que o app já fazia antes — nenhum
 -- privilégio novo é concedido além do que as políticas da tabela (acima)
 -- já permitem.
+drop function if exists public.app_state_aplicar_patches(jsonb, uuid, timestamptz);
 create or replace function public.app_state_aplicar_patches(
   p_patches jsonb,
-  p_usuario uuid default null,
-  p_atualizado_em timestamptz default null
+  p_usuario uuid default null
 )
-returns table (atualizado_em timestamptz, dados jsonb)
+returns table (versao bigint, atualizado_em timestamptz, dados jsonb)
 language plpgsql
 security invoker
 set search_path = public
@@ -208,7 +224,8 @@ declare
   v_idx_vaga int;
   v_mapa jsonb;
   v_simples jsonb;
-  v_agora timestamptz := coalesce(p_atualizado_em, now());
+  v_versao bigint;
+  v_agora timestamptz;
 begin
   -- Trava a linha (uma só, sempre 'estado-v1') até o fim da transação —
   -- ver comentário no topo desta seção.
@@ -313,14 +330,57 @@ begin
   end loop;
 
   update public.app_state
-    set dados = v_dados, atualizado_em = v_agora, atualizado_por = p_usuario
-    where id = 'estado-v1';
+    set dados = v_dados, atualizado_em = now(), atualizado_por = p_usuario, versao = app_state.versao + 1
+    where id = 'estado-v1'
+    returning app_state.versao, app_state.atualizado_em into v_versao, v_agora;
 
-  return query select v_agora, v_dados;
+  return query select v_versao, v_agora, v_dados;
 end;
 $$;
 
 -- Só usuários logados podem chamar essa função — mesmo critério das
 -- políticas de RLS da tabela acima (nada de acesso anônimo).
-revoke all on function public.app_state_aplicar_patches(jsonb, uuid, timestamptz) from public;
-grant execute on function public.app_state_aplicar_patches(jsonb, uuid, timestamptz) to authenticated;
+revoke all on function public.app_state_aplicar_patches(jsonb, uuid) from public;
+grant execute on function public.app_state_aplicar_patches(jsonb, uuid) to authenticated;
+
+
+-- =========================================================================
+-- 4) app_state_gravar_completo — grava o documento INTEIRO de uma vez
+--    (primeira gravação, antes de existir uma base pra calcular patches;
+--    ou contingência se a gravação por patches falhar — ver
+--    src/hooks/useSyncedAppState.js)
+-- =========================================================================
+-- Faz o mesmo que um `upsert` direto na tabela faria, mas incrementando
+-- `versao` atomicamente no servidor junto — por isso é uma função em vez
+-- de um upsert simples do cliente: sem isso, esse caminho de gravação
+-- ficaria de fora do contador e voltaria a depender do relógio do
+-- aparelho pra decidir o que é eco (ver comentário na tabela app_state,
+-- seção 2).
+create or replace function public.app_state_gravar_completo(
+  p_dados jsonb,
+  p_usuario uuid default null
+)
+returns table (versao bigint, atualizado_em timestamptz, dados jsonb)
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  v_versao bigint;
+  v_agora timestamptz;
+begin
+  insert into public.app_state (id, dados, atualizado_em, atualizado_por, versao)
+    values ('estado-v1', p_dados, now(), p_usuario, 1)
+  on conflict (id) do update
+    set dados = excluded.dados,
+        atualizado_em = now(),
+        atualizado_por = excluded.atualizado_por,
+        versao = app_state.versao + 1
+  returning app_state.versao, app_state.atualizado_em into v_versao, v_agora;
+
+  return query select v_versao, v_agora, p_dados;
+end;
+$$;
+
+revoke all on function public.app_state_gravar_completo(jsonb, uuid) from public;
+grant execute on function public.app_state_gravar_completo(jsonb, uuid) to authenticated;
