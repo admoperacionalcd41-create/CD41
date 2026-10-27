@@ -217,13 +217,17 @@ function useEstadoSincronizado(estadoLocal, setEstadoLocal) {
         setStatusSincronizacao({ status: 'sincronizado', mensagem: null, tentativas: 0 });
       };
 
-      const patches = calcularPatchesEstado(baseServidorRef.current, dadosNormalizados);
-
-      if (patches === null) {
-        // Ainda não sabemos nenhum estado anterior da linha (primeira
-        // gravação desta sessão, ou linha recém-criada) — não há base pra
-        // calcular um diff, então grava o documento inteiro de uma vez,
-        // criando a linha se ainda não existir.
+      // Grava o documento INTEIRO de uma vez (mecanismo mais simples, usado
+      // antes da gravação por patches) — usado tanto na primeira gravação
+      // desta sessão (ainda sem base pra calcular um diff) quanto como
+      // CONTINGÊNCIA se a gravação por patches falhar (ver comentário na
+      // chamada a app_state_aplicar_patches abaixo): a prioridade nº 1 é
+      // nunca perder a ação de ninguém — se por qualquer motivo a função
+      // nova não puder ser chamada (ex.: ainda não propagada na API do
+      // Supabase, uma mudança de permissão, etc.), cai de volta pra este
+      // caminho mais simples, que já era usado em produção antes de hoje e
+      // continua funcionando mesmo sem a função SQL nova.
+      const gravarDocumentoInteiro = () => {
         supabase
           .from('app_state')
           .upsert(
@@ -244,6 +248,15 @@ function useEstadoSincronizado(estadoLocal, setEstadoLocal) {
             }
             sucesso(dadosNormalizados);
           });
+      };
+
+      const patches = calcularPatchesEstado(baseServidorRef.current, dadosNormalizados);
+
+      if (patches === null) {
+        // Ainda não sabemos nenhum estado anterior da linha (primeira
+        // gravação desta sessão, ou linha recém-criada) — não há base pra
+        // calcular um diff.
+        gravarDocumentoInteiro();
         return;
       }
 
@@ -263,9 +276,21 @@ function useEstadoSincronizado(estadoLocal, setEstadoLocal) {
         })
         .then(({ data, error }) => {
           if (error) {
+            // A gravação por patches falhou — em vez de só tentar de novo a
+            // MESMA chamada (que repetiria o mesmo erro se for algo
+            // persistente, deixando a ação de alguém sem chegar no servidor
+            // mesmo depois de recarregar a página — exatamente o problema
+            // original que essa sincronização existe pra evitar), cai pro
+            // caminho mais simples (documento inteiro) NA HORA. Garante que
+            // a ação do usuário chega no servidor de um jeito ou de outro;
+            // só perde, temporariamente, o reforço contra colisão desta
+            // gravação específica.
             // eslint-disable-next-line no-console
-            console.warn('Não foi possível sincronizar o estado com o Supabase:', error.message);
-            agendarNovaTentativaPorFalha(error.message);
+            console.warn(
+              'Gravação por patches falhou, usando gravação do documento inteiro como contingência:',
+              error.message
+            );
+            gravarDocumentoInteiro();
             return;
           }
           // A função devolve o documento já aplicado no servidor — usa ele
