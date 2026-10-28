@@ -162,7 +162,11 @@ alter publication supabase_realtime add table public.app_state;
 --     -- cria ou substitui (pelo valor de item[chave]) um item dentro de
 --     -- dados[colecao] (coleções: lojas, protocolos, placasCadastradas,
 --     -- contatosNotificacao, localizacaoLojas — ver CHAVE_COLECAO em
---     -- mesclarEstadoSincronizado.js).
+--     -- mesclarEstadoSincronizado.js). Usado só pra item NOVO.
+--   mesclar_item    { colecao, chave, valorChave, campos, removidos? }
+--     -- num item que já existe, aplica só `campos` (item || campos) e
+--     -- remove as chaves de `removidos` — os outros campos ficam como
+--     -- estão no banco. Item inexistente: ignora (respeita exclusão).
 --   remover_item    { colecao, chave, valorChave }
 --     -- remove de dados[colecao] o item cujo campo `chave` é `valorChave`.
 --   upsert_vaga     { numeroBox, vaga }
@@ -255,6 +259,29 @@ begin
         v_colecao_atual := jsonb_set(v_colecao_atual, array[v_indice::text], v_item);
       end if;
       v_dados := jsonb_set(v_dados, array[v_colecao], v_colecao_atual);
+
+    when 'mesclar_item' then
+      -- Só os CAMPOS que mudaram num item que já existe (ver
+      -- calcularPatchesEstado.js): `item || campos`, sem tocar nos outros
+      -- campos — duas pessoas mudando campos diferentes da mesma loja ao
+      -- mesmo tempo não se apagam mais. Se o item não existe mais (outra
+      -- pessoa excluiu), respeita a exclusão e não recria um item parcial.
+      v_colecao := v_patch->>'colecao';
+      v_chave := v_patch->>'chave';
+      v_valor_chave := v_patch->>'valorChave';
+      v_colecao_atual := coalesce(v_dados->v_colecao, '[]'::jsonb);
+      select (i - 1) into v_indice
+        from jsonb_array_elements(v_colecao_atual) with ordinality as t(elem, i)
+        where elem->>v_chave = v_valor_chave
+        limit 1;
+      if v_indice is not null then
+        v_item := (v_colecao_atual->v_indice) || coalesce(v_patch->'campos', '{}'::jsonb);
+        if jsonb_typeof(v_patch->'removidos') = 'array' then
+          v_item := v_item - array(select jsonb_array_elements_text(v_patch->'removidos'));
+        end if;
+        v_colecao_atual := jsonb_set(v_colecao_atual, array[v_indice::text], v_item);
+        v_dados := jsonb_set(v_dados, array[v_colecao], v_colecao_atual);
+      end if;
 
     when 'remover_item' then
       v_colecao := v_patch->>'colecao';

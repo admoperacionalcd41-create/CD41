@@ -56,15 +56,56 @@ function paraMapa(colecao, chave) {
   return mapa;
 }
 
-function calcularPatchesColecao(colecao, chave, base, atual) {
+// Pedido do usuário ("estamos perdendo muita atualização"): antes, um item
+// que mudou (ex.: uma loja) ia pro servidor INTEIRO (upsert_item) — se duas
+// pessoas mexiam em campos DIFERENTES da mesma loja quase ao mesmo tempo
+// (ex.: o faturamento registrando a NF e o box mudando o status da mesma
+// loja), a gravação que chegasse por último no banco sobrescrevia a loja
+// inteira com a cópia dela, apagando o campo que a outra pessoa tinha
+// acabado de mudar. Reproduzido na simulação com vários usuários contra o
+// Postgres real (ver test-sincronizacao-multiusuario). Agora, pra um item
+// que já existia, manda só os CAMPOS que mudaram (op `mesclar_item` — o
+// servidor aplica `item || campos`, sem tocar nos outros campos); o item
+// inteiro só vai quando ele é novo (não há o que mesclar).
+//
+// `granularidadeCampo: false` volta pro comportamento antigo (item inteiro)
+// — usado só como contingência automática se o banco ainda não tiver a
+// op `mesclar_item` (migração não rodada), ver motorSincronizacao.js.
+function diferencaDeCampos(emBase, item) {
+  const campos = {};
+  const removidos = [];
+  Object.keys(item).forEach((campo) => {
+    if (item[campo] === undefined) {
+      if (emBase[campo] !== undefined) removidos.push(campo);
+    } else if (!iguais(emBase[campo], item[campo])) {
+      campos[campo] = item[campo];
+    }
+  });
+  Object.keys(emBase).forEach((campo) => {
+    if (!(campo in item) && emBase[campo] !== undefined) removidos.push(campo);
+  });
+  return { campos, removidos };
+}
+
+function calcularPatchesColecao(colecao, chave, base, atual, granularidadeCampo) {
   const baseMapa = paraMapa(base, chave);
   const atualMapa = paraMapa(atual, chave);
   const patches = [];
 
   atualMapa.forEach((item, id) => {
     const emBase = baseMapa.get(id);
-    if (!emBase || !iguais(emBase, item)) {
+    if (!emBase) {
       patches.push({ op: 'upsert_item', colecao, chave, valorChave: String(id), item });
+    } else if (!iguais(emBase, item)) {
+      if (!granularidadeCampo) {
+        patches.push({ op: 'upsert_item', colecao, chave, valorChave: String(id), item });
+        return;
+      }
+      const { campos, removidos } = diferencaDeCampos(emBase, item);
+      if (Object.keys(campos).length === 0 && removidos.length === 0) return;
+      const patch = { op: 'mesclar_item', colecao, chave, valorChave: String(id), campos };
+      if (removidos.length > 0) patch.removidos = removidos;
+      patches.push(patch);
     }
   });
 
@@ -148,13 +189,13 @@ function calcularPatchesMapaObjeto(campo, base, atual) {
  * gravação que não muda nada de fato) — quem chama deve pular a viagem ao
  * banco nesse caso.
  */
-export function calcularPatchesEstado(base, atual) {
+export function calcularPatchesEstado(base, atual, { granularidadeCampo = true } = {}) {
   if (!base || !atual) return null; // sem base conhecida: quem chama deve cair pro fallback (gravação completa)
 
   const patches = [];
 
   Object.entries(CHAVE_COLECAO_SEM_BOXES).forEach(([colecao, chave]) => {
-    patches.push(...calcularPatchesColecao(colecao, chave, base[colecao], atual[colecao]));
+    patches.push(...calcularPatchesColecao(colecao, chave, base[colecao], atual[colecao], granularidadeCampo));
   });
 
   patches.push(...calcularPatchesBoxes(base.boxes, atual.boxes));

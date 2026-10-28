@@ -128,11 +128,10 @@ function mesclarColecaoPorChave(chave, base, local, remoto, resolverColisao) {
     else if (!localMudou && remotoMudou) resultado.push(emRemoto);
     else if (localMudou && remotoMudou) {
       // Colisão real: os dois lados mudaram esse registro desde a última
-      // base conhecida. Pra coleções simples isso fica com a local (ver
-      // comentário no topo do arquivo) — mas, quando o chamador passa um
-      // `resolverColisao` (ver `boxes` abaixo), usa ele em vez de descartar
-      // o lado remoto inteiro.
-      resultado.push(resolverColisao ? resolverColisao(emBase, emLocal, emRemoto) : emLocal);
+      // base conhecida — mescla campo por campo (ver mesclarItemPorCampo
+      // abaixo), ou com o resolvedor específico da coleção (boxes: vaga
+      // por vaga), em vez de descartar o lado remoto inteiro.
+      resultado.push((resolverColisao || mesclarItemPorCampo)(emBase, emLocal, emRemoto));
     } else resultado.push(emRemoto); // nenhum dos dois mudou
   });
 
@@ -161,17 +160,47 @@ function mesclarColecaoPorChave(chave, base, local, remoto, resolverColisao) {
 function mesclarBox(baseBox, localBox, remotoBox) {
   if (!baseBox || !localBox || !remotoBox) return remotoBox || localBox || baseBox;
   return {
-    ...remotoBox,
-    ...localBox,
+    ...mesclarItemPorCampo(baseBox, localBox, remotoBox),
     vagas: mesclarColecaoPorChave('numero', baseBox.vagas, localBox.vagas, remotoBox.vagas).sort(
       (a, b) => a.numero - b.numero
     ),
   };
 }
 
-// Resolvedores de colisão por coleção — só `boxes` precisa de um tratamento
-// diferente do padrão ("fica com a local"); as demais (lojas, protocolos
-// etc.) continuam com o comportamento padrão.
+// Pedido do usuário ("estamos perdendo muita atualização"): a colisão num
+// item que NÃO é box (loja, protocolo...) ficava com a versão local INTEIRA
+// e jogava fora a remota inteira — mas na operação real as três frentes
+// (faturamento registrando NF/protocolo, box mudando status, motorista
+// registrando entrega) mexem em CAMPOS diferentes dos MESMOS registros o
+// tempo todo, então "o mesmo registro ao mesmo tempo" não era raro como o
+// comentário do topo supunha. Agora a colisão mescla campo por campo (mesma
+// lógica de 3 pontas): só uma colisão no MESMÍSSIMO campo, no mesmo
+// instante, ainda escolhe um lado (fica com a local).
+function mesclarItemPorCampo(base, local, remoto) {
+  if (!local || !remoto) return remoto || local || base;
+  // Sem base = o item foi CRIADO nesta tela e a gravação dele já voltou do
+  // servidor, enquanto a tela seguia mudando campos dele (ex.: criou um
+  // protocolo e já registrou a entrega) — mescla campo a campo contra uma
+  // base vazia, em vez de ficar só com o remoto (que perderia esses campos).
+  const baseItem = base || {};
+  const resultado = {};
+  new Set([...Object.keys(baseItem), ...Object.keys(local), ...Object.keys(remoto)]).forEach((campo) => {
+    const emBase = baseItem[campo];
+    const emLocal = local[campo];
+    const emRemoto = remoto[campo];
+    const localMudou = !iguais(emLocal, emBase);
+    // A local mudou (sozinha, ou colisão real no MESMO campo): fica a local;
+    // senão fica a remota (mudou ou não). `undefined` = campo removido
+    // daquele lado.
+    const valor = localMudou ? emLocal : emRemoto;
+    if (valor !== undefined) resultado[campo] = valor;
+  });
+  return resultado;
+}
+
+// Resolvedores de colisão por coleção — `boxes` mescla vaga por vaga (ver
+// mesclarBox); todas as outras mesclam campo por campo (mesclarItemPorCampo,
+// usado como padrão em mesclarColecaoPorChave).
 const RESOLVEDOR_COLISAO_POR_COLECAO = { boxes: mesclarBox };
 
 function mesclarMapaObjeto(base, local, remoto) {
