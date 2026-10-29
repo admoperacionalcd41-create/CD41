@@ -361,6 +361,19 @@ begin
     where id = 'estado-v1'
     returning app_state.versao, app_state.atualizado_em into v_versao, v_agora;
 
+  -- Diário de mudanças (ver seção 5): é ESTE registro, pequeno, que o
+  -- Realtime entrega aos outros aparelhos — não mais o documento inteiro.
+  -- Patches muito grandes (ex.: importação em massa) não vão no diário:
+  -- marcados como `completo`, os aparelhos relêem o documento.
+  insert into public.app_state_log (versao, patches, completo)
+    values (
+      v_versao,
+      case when octet_length(p_patches::text) > 200000 then null else p_patches end,
+      octet_length(p_patches::text) > 200000
+    )
+  on conflict on constraint app_state_log_pkey do update set patches = excluded.patches, completo = excluded.completo;
+  delete from public.app_state_log where app_state_log.versao < v_versao - 1000;
+
   return query select v_versao, v_agora, v_dados;
 end;
 $$;
@@ -405,9 +418,92 @@ begin
         versao = app_state.versao + 1
   returning app_state.versao, app_state.atualizado_em into v_versao, v_agora;
 
+  -- Diário de mudanças (seção 5): documento inteiro gravado = os outros
+  -- aparelhos precisam reler o documento (patches nulos + completo).
+  insert into public.app_state_log (versao, patches, completo)
+    values (v_versao, null, true)
+  on conflict on constraint app_state_log_pkey do update set patches = null, completo = true;
+  delete from public.app_state_log where app_state_log.versao < v_versao - 1000;
+
   return query select v_versao, v_agora, p_dados;
 end;
 $$;
 
 revoke all on function public.app_state_gravar_completo(jsonb, uuid) from public;
 grant execute on function public.app_state_gravar_completo(jsonb, uuid) to authenticated;
+
+
+-- =========================================================================
+-- 5) app_state_log — diário de mudanças (Realtime leve, pouco egress)
+-- =========================================================================
+-- Pedido do usuário ("atingindo o limite do Supabase, como manter grátis?"):
+-- o Realtime entregava o documento inteiro (~300 kB) a CADA usuário
+-- conectado a cada ação, e a gravação devolvia o documento inteiro de
+-- novo a quem gravou. Resultado: ~41 GB de egress num mês contra 5 GB do
+-- plano gratuito. Agora cada gravação deixa aqui só a lista de patches (o
+-- mesmo diff que o app já mandava, alguns kB), e é esta tabela que o
+-- Realtime publica. Cada aparelho aplica esses patches sobre o último
+-- estado que conhece; se perder alguma versão, lê o diário (ou, em último
+-- caso, o documento) pra se atualizar. Guarda só as últimas ~1000 versões.
+--
+-- `completo = true` (patches nulos): documento inteiro gravado, ou patches
+-- grandes demais — o aparelho relê o documento.
+create table if not exists public.app_state_log (
+  versao bigint primary key,
+  patches jsonb,
+  completo boolean not null default false,
+  criado_em timestamptz not null default now()
+);
+
+alter table public.app_state_log enable row level security;
+
+drop policy if exists "Usuário logado lê o diário" on public.app_state_log;
+create policy "Usuário logado lê o diário"
+  on public.app_state_log for select
+  using (auth.role() = 'authenticated');
+
+drop policy if exists "Usuário logado grava no diário" on public.app_state_log;
+create policy "Usuário logado grava no diário"
+  on public.app_state_log for insert
+  with check (auth.role() = 'authenticated');
+
+drop policy if exists "Usuário logado limpa o diário" on public.app_state_log;
+create policy "Usuário logado limpa o diário"
+  on public.app_state_log for delete
+  using (auth.role() = 'authenticated');
+
+do $$
+begin
+  if exists (select 1 from pg_publication where pubname = 'supabase_realtime')
+     and not exists (
+       select 1 from pg_publication_tables
+       where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'app_state_log'
+     ) then
+    alter publication supabase_realtime add table public.app_state_log;
+  end if;
+end $$;
+
+-- Versão "leve" da gravação por patches: faz o mesmo, mas devolve só o
+-- número da versão (alguns bytes) em vez do documento inteiro. A versão
+-- antiga continua existindo, pra aparelhos com o app antigo aberto. (A
+-- gravação do documento inteiro é rara e segue devolvendo o documento.)
+create or replace function public.app_state_aplicar_patches_leve(
+  p_patches jsonb,
+  p_usuario uuid default null
+)
+returns bigint
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  v_versao bigint;
+begin
+  select r.versao into v_versao from public.app_state_aplicar_patches(p_patches, p_usuario) r;
+  return v_versao;
+end;
+$$;
+
+revoke all on function public.app_state_aplicar_patches_leve(jsonb, uuid) from public;
+grant execute on function public.app_state_aplicar_patches_leve(jsonb, uuid) to authenticated;
+

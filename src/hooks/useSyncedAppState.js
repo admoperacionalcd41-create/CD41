@@ -128,6 +128,11 @@ function useEstadoSincronizado(estadoLocal, setEstadoLocal) {
   // usuários simulados contra o Postgres real (test-sincronizacao-
   // multiusuario). Este hook só liga o motor à tela e ao Supabase.
   const motorRef = useRef(null);
+  // Sincronização leve (ver motorSincronizacao.js, tópicos 6 e 7): usada
+  // quando o banco já tem a tabela app_state_log e as funções "_leve"
+  // (supabase/migracao-sincronizacao-leve.sql). Decidido ao iniciar a
+  // sessão; sem a migração, o app segue no modo antigo (documento inteiro).
+  const modoLeveRef = useRef(Promise.resolve(false));
   if (motorRef.current === null) {
     motorRef.current = criarMotorSincronizacao({
       estadoInicial: estadoLocal,
@@ -138,11 +143,35 @@ function useEstadoSincronizado(estadoLocal, setEstadoLocal) {
       aoAvisoPatches: setAvisoPatches,
       transporte: {
         aplicarPatches: (patches) =>
-          supabase.rpc('app_state_aplicar_patches', { p_patches: patches, p_usuario: idUsuarioRef.current }),
+          modoLeveRef.current.then((leve) =>
+            supabase.rpc(leve ? 'app_state_aplicar_patches_leve' : 'app_state_aplicar_patches', {
+              p_patches: patches,
+              p_usuario: idUsuarioRef.current,
+            })
+          ),
         gravarCompleto: (dados) =>
           supabase.rpc('app_state_gravar_completo', { p_dados: dados, p_usuario: idUsuarioRef.current }),
         lerEstado: () =>
           supabase.from('app_state').select('dados, versao').eq('id', ID_ESTADO_COMPARTILHADO).maybeSingle(),
+        // Só o número da versão (alguns bytes) e as linhas novas do diário
+        // (alguns kB): é como o aparelho se atualiza sem baixar o documento.
+        lerVersao: () =>
+          modoLeveRef.current.then(async (leve) => {
+            if (!leve) return { data: null, error: { message: 'modo antigo' } };
+            const { data, error } = await supabase
+              .from('app_state')
+              .select('versao')
+              .eq('id', ID_ESTADO_COMPARTILHADO)
+              .maybeSingle();
+            return { data: data ? Number(data.versao) : null, error };
+          }),
+        lerLogDesde: (versao) =>
+          supabase
+            .from('app_state_log')
+            .select('versao, patches, completo')
+            .gt('versao', versao)
+            .order('versao', { ascending: true })
+            .limit(300),
       },
     });
   }
@@ -154,7 +183,15 @@ function useEstadoSincronizado(estadoLocal, setEstadoLocal) {
   useEffect(() => {
     if (!idUsuario) return undefined;
     let ativo = true;
+    let inscrito = false;
     motor.reiniciar();
+
+    // Descobre se o banco já tem o diário (migração rodada). Falha = modo
+    // antigo (documento inteiro), como antes.
+    const modoLeve = Promise.resolve(supabase.from('app_state_log').select('versao').limit(1))
+      .then(({ error }) => !error)
+      .catch(() => false);
+    modoLeveRef.current = modoLeve;
 
     const carregar = () =>
       supabase
@@ -178,44 +215,86 @@ function useEstadoSincronizado(estadoLocal, setEstadoLocal) {
       // data null = primeira vez que o sistema roda com Supabase: o motor
       // publica o estado atual como ponto de partida compartilhado.
       motor.carregarInicial(data ? { versao: data.versao, dados: data.dados } : null);
+      // Mudanças ocorridas entre a leitura e a inscrição no Realtime.
+      if (inscrito) reler();
     });
 
     // Reler o servidor quando o canal em tempo real (re)conecta, o app
     // volta ao primeiro plano ou a internet volta: eventos perdidos nesse
     // meio tempo (celular dormindo, sinal fraco) deixariam a tela
     // desatualizada até a próxima mudança de alguém.
-    const reler = () => {
+    //
+    // No modo leve isso custa alguns bytes (confere só o número da versão e
+    // busca só o que mudou); no modo antigo relê o documento inteiro.
+    function reler() {
       if (!motor.carregado()) return;
-      carregar().then(({ data }) => {
-        if (ativo && data) motor.receberRemoto({ versao: data.versao, dados: data.dados });
+      modoLeve.then((leve) => {
+        if (!ativo) return;
+        if (leve) {
+          motor.atualizarDoServidor();
+          return;
+        }
+        carregar().then(({ data }) => {
+          if (ativo && data) motor.receberRemoto({ versao: data.versao, dados: data.dados });
+        });
       });
-    };
+    }
     const aoVoltarAoPrimeiroPlano = () => {
       if (document.visibilityState === 'visible') reler();
     };
     document.addEventListener('visibilitychange', aoVoltarAoPrimeiroPlano);
     window.addEventListener('online', reler);
 
-    const canal = supabase
-      .channel('app_state_sync')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'app_state', filter: `id=eq.${ID_ESTADO_COMPARTILHADO}` },
-        (payload) => {
-          const novo = payload.new;
-          if (!novo || !novo.dados) return;
-          // O motor ignora o que já conhece (por `versao`, contador que só
-          // o servidor incrementa — nunca o relógio do aparelho) e mescla
-          // o resto com o que a tela ainda não confirmou.
-          motor.receberRemoto({ versao: novo.versao, dados: novo.dados });
+    // Escuta o diário (modo leve: só os patches de cada gravação) ou, no modo
+    // antigo, a linha inteira do documento.
+    const canal = supabase.channel('app_state_sync');
+    modoLeve.then((leve) => {
+      if (!ativo) return;
+      if (leve) {
+        canal.on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'app_state_log' },
+          (payload) => {
+            const novo = payload.new;
+            if (!novo) return;
+            // O motor aplica só a versão seguinte à que já tem (ou se
+            // atualiza sozinho se faltar alguma) — nunca depende do relógio
+            // do aparelho.
+            motor.receberLog({ versao: novo.versao, patches: novo.patches, completo: novo.completo });
+          }
+        );
+      } else {
+        canal.on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'app_state', filter: `id=eq.${ID_ESTADO_COMPARTILHADO}` },
+          (payload) => {
+            const novo = payload.new;
+            if (!novo || !novo.dados) return;
+            // O motor ignora o que já conhece (por `versao`, contador que só
+            // o servidor incrementa — nunca o relógio do aparelho) e mescla
+            // o resto com o que a tela ainda não confirmou.
+            motor.receberRemoto({ versao: novo.versao, dados: novo.dados });
+          }
+        );
+      }
+      canal.subscribe((statusCanal) => {
+        if (statusCanal === 'SUBSCRIBED') {
+          inscrito = true;
+          reler();
         }
-      )
-      .subscribe((statusCanal) => {
-        if (statusCanal === 'SUBSCRIBED') reler();
       });
+    });
+
+    // Rede de segurança: com o app aberto, confere de tempos em tempos se o
+    // servidor tem versão mais nova (alguns bytes) — cobre um Realtime que
+    // caiu sem avisar.
+    const conferencia = setInterval(() => {
+      if (document.visibilityState === 'visible') reler();
+    }, 120000);
 
     return () => {
       ativo = false;
+      clearInterval(conferencia);
       document.removeEventListener('visibilitychange', aoVoltarAoPrimeiroPlano);
       window.removeEventListener('online', reler);
       supabase.removeChannel(canal);

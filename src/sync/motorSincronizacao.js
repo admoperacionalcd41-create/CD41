@@ -45,9 +45,31 @@
 //    servidor, mescla e tenta de novo (resolve, por ex., um box que mudou
 //    de numeração); só se falhar de novo é que grava o documento inteiro
 //    (último recurso, pra nunca perder a ação).
+//
+// Sincronização LEVE (pedido do usuário: "atingindo o limite do Supabase"):
+// antes, cada ação fazia o Supabase mandar o documento inteiro (~300 kB) pra
+// cada aparelho conectado, e de volta pra quem gravou — ~41 GB/mês contra os
+// 5 GB do plano gratuito. Agora:
+//
+// 6) A gravação devolve só o número da versão. O que chega aos outros
+//    aparelhos (e a nós mesmos, como "eco") é a lista de patches daquela
+//    versão (tabela app_state_log), aplicada sobre a `base`. Só se aplica a
+//    versão SEGUINTE à que já temos (ultimaVersao + 1): se faltar alguma
+//    (evento perdido), a gente se atualiza pelo diário ou, em último caso,
+//    relê o documento (atualizarDoServidor).
+//
+// 7) Depois de gravar, esperamos o eco da nossa versão antes de gravar de
+//    novo: só então a `base` já contém a nossa mudança (sem isso, o diff
+//    base→tela ainda veria a mudança como pendente e a mandaria outra vez).
+//    Se o eco não chegar em poucos segundos, o motor busca no servidor.
 // ---------------------------------------------------------------------------
 import { mesclarEstadoSincronizado } from '../utils/mesclarEstadoSincronizado';
 import { calcularPatchesEstado } from '../utils/calcularPatchesEstado';
+import { aplicarPatchesEstado } from '../utils/aplicarPatchesEstado';
+
+// Quanto esperar o "eco" da nossa própria gravação (ver esperarEco) antes de
+// se atualizar por conta própria.
+const ESPERA_ECO_MS = 4000;
 
 const identidade = (d) => d;
 const extrairLinha = (data) => (Array.isArray(data) ? data[0] : data) || {};
@@ -89,6 +111,13 @@ export function criarMotorSincronizacao({
   // se o motor foi reiniciado no meio (troca de usuário/logout), a resposta
   // velha é ignorada.
   let geracao = 0;
+
+  // Sincronização leve (ver tópicos 6 e 7 no topo).
+  let aguardandoEco = null; // versão da nossa gravação cujo eco ainda não chegou
+  let timerEco = null;
+  let atualizando = false;
+  let repetirAtualizacao = false;
+  let precisaReler = false; // evento recebido antes da carga inicial terminar
 
   let statusAtual = { status: 'sincronizado', mensagem: null, tentativas: 0 };
   const status = (novo) => {
@@ -146,7 +175,45 @@ export function criarMotorSincronizacao({
     const mesclado = baseDaMescla ? mesclarEstadoSincronizado(baseDaMescla, local, remoto) : remoto;
     base = remoto;
     definirLocal(mesclado);
+    // O eco da nossa gravação chegou (ou o servidor já passou dela): a `base`
+    // agora contém a nossa mudança — pode gravar de novo.
+    if (aguardandoEco != null && ultimaVersao != null && ultimaVersao >= aguardandoEco) liberarEco();
     return true;
+  };
+
+  function liberarEco() {
+    aguardandoEco = null;
+    if (timerEco) clearTimeout(timerEco);
+    timerEco = null;
+    gravando = false;
+  }
+
+  // Depois de absorver uma atualização do servidor: se a gravação estava
+  // parada esperando o eco (ou há algo novo pra gravar), segue o fluxo.
+  const aposAbsorver = () => {
+    if (gravando) return;
+    if (temAlteracaoPendente()) agendarGravacao();
+    else atualizarStatusOcioso();
+  };
+
+  const esperarEco = (versaoEscrita, minhaGeracao) => {
+    if (ultimaVersao != null && ultimaVersao >= versaoEscrita) {
+      aoTerminarGravacao(); // o eco chegou antes da resposta
+      return;
+    }
+    aguardandoEco = versaoEscrita;
+    if (timerEco) clearTimeout(timerEco);
+    timerEco = setTimeout(() => {
+      timerEco = null;
+      if (minhaGeracao !== geracao || aguardandoEco == null) return;
+      atualizarDoServidor().then(() => {
+        if (minhaGeracao !== geracao || aguardandoEco == null) return;
+        // Nem assim ficou em dia (rede?): não trava a gravação. No pior
+        // caso a mesma mudança é enviada de novo (os patches são idempotentes).
+        liberarEco();
+        aoTerminarGravacao();
+      });
+    }, ESPERA_ECO_MS);
   };
 
   const aoTerminarGravacao = () => {
@@ -249,6 +316,14 @@ export function criarMotorSincronizacao({
       errosPatchSeguidos = 0;
       aoAvisoPatches(null);
       const linha = extrairLinha(data);
+      if (!linha.dados) {
+        // Resposta leve: só o número da versão (ver tópico 6 no topo).
+        const versaoEscrita = typeof data === 'number' ? data : Number(linha.versao);
+        if (Number.isFinite(versaoEscrita)) {
+          esperarEco(versaoEscrita, minhaGeracao);
+          return;
+        }
+      }
       // Defeito 1 (ver topo): a resposta traz as mudanças de outras pessoas
       // já aplicadas no banco — mescla na tela, não só na base. A base da
       // mescla é a `base` ATUAL (não o que enviamos): a tela é sempre
@@ -259,6 +334,71 @@ export function criarMotorSincronizacao({
       if (linha.dados) absorverServidor(linha.versao, linha.dados, base);
       aoTerminarGravacao();
     });
+  }
+
+  // Aplica no `base` uma lista contígua de versões do diário. Devolve true se
+  // aplicou tudo; false se faltou algo / veio versão "completa" (aí quem
+  // chama relê o documento).
+  function aplicarVersoesDoDiario(linhas) {
+    let esperado = ultimaVersao + 1;
+    for (const linha of linhas) {
+      const v = Number(linha.versao);
+      if (v < esperado) continue; // já absorvida
+      if (v !== esperado || linha.completo || !Array.isArray(linha.patches)) return false;
+      let dados;
+      try {
+        dados = aplicarPatchesEstado(base, linha.patches);
+      } catch (e) {
+        return false;
+      }
+      absorverServidor(v, dados, base);
+      esperado = v + 1;
+    }
+    return true;
+  }
+
+  // Se atualiza com o servidor gastando o mínimo: confere só o número da
+  // versão (alguns bytes); se houver novidade, busca só as linhas novas do
+  // diário (alguns kB); só relê o documento inteiro se o diário não bastar.
+  async function passoAtualizar(minhaGeracao) {
+    if (transporte.lerVersao && transporte.lerLogDesde && ultimaVersao != null) {
+      const { data: versaoServidor, error } = await transporte.lerVersao();
+      if (minhaGeracao !== geracao) return;
+      if (!error && versaoServidor != null) {
+        if (Number(versaoServidor) <= ultimaVersao) return; // nada novo
+        const { data: linhas, error: erroLog } = await transporte.lerLogDesde(ultimaVersao);
+        if (minhaGeracao !== geracao) return;
+        if (!erroLog && Array.isArray(linhas) && linhas.length > 0) {
+          const ordenadas = [...linhas].sort((a, b) => Number(a.versao) - Number(b.versao));
+          if (aplicarVersoesDoDiario(ordenadas) && ultimaVersao >= Number(versaoServidor)) return;
+        }
+      }
+    }
+    const { data, error } = await transporte.lerEstado();
+    if (minhaGeracao !== geracao) return;
+    if (error || !data) return;
+    absorverServidor(data.versao, data.dados, base);
+  }
+
+  async function atualizarDoServidor() {
+    if (!carregado) return;
+    if (atualizando) {
+      repetirAtualizacao = true;
+      return;
+    }
+    atualizando = true;
+    const minhaGeracao = geracao;
+    try {
+      do {
+        repetirAtualizacao = false;
+        // eslint-disable-next-line no-await-in-loop
+        await passoAtualizar(minhaGeracao);
+        if (minhaGeracao !== geracao) return;
+      } while (repetirAtualizacao);
+    } finally {
+      if (minhaGeracao === geracao) atualizando = false;
+    }
+    aposAbsorver();
   }
 
   function carregarInicial(linha) {
@@ -278,6 +418,10 @@ export function criarMotorSincronizacao({
     definirLocal(estado);
     if (temAlteracaoPendente()) agendarGravacao();
     else atualizarStatusOcioso();
+    if (precisaReler) {
+      precisaReler = false;
+      atualizarDoServidor();
+    }
   }
 
   function receberRemoto(linha) {
@@ -288,6 +432,35 @@ export function criarMotorSincronizacao({
     }
     absorverServidor(linha.versao, linha.dados, base);
     if (!gravando && temAlteracaoPendente()) agendarGravacao();
+    else aposAbsorver();
+  }
+
+  /**
+   * Mudança publicada no diário (Realtime leve): { versao, patches, completo }.
+   * Só aplica a versão seguinte à que já temos; qualquer buraco, versão
+   * "completa" ou patch que não aplique → se atualiza pelo servidor.
+   */
+  function receberLog(linha) {
+    if (!linha) return;
+    if (!carregado) {
+      precisaReler = true; // a carga inicial pode ter lido antes desta versão
+      return;
+    }
+    const versao = Number(linha.versao);
+    if (ultimaVersao != null && versao <= ultimaVersao) return; // eco / já absorvida
+    if (ultimaVersao == null || versao !== ultimaVersao + 1 || linha.completo || !Array.isArray(linha.patches)) {
+      atualizarDoServidor();
+      return;
+    }
+    let dados;
+    try {
+      dados = aplicarPatchesEstado(base, linha.patches);
+    } catch (e) {
+      atualizarDoServidor();
+      return;
+    }
+    absorverServidor(versao, dados, base);
+    aposAbsorver();
   }
 
   function reiniciar() {
@@ -300,6 +473,12 @@ export function criarMotorSincronizacao({
     carregado = false;
     base = null;
     ultimaVersao = null;
+    aguardandoEco = null;
+    if (timerEco) clearTimeout(timerEco);
+    timerEco = null;
+    atualizando = false;
+    repetirAtualizacao = false;
+    precisaReler = false;
     filaAntesDaCarga = [];
     tentativas = 0;
     errosPatchSeguidos = 0;
@@ -327,6 +506,12 @@ export function criarMotorSincronizacao({
 
     /** Atualização recebida (Realtime ou releitura): sempre mescla. */
     receberRemoto,
+
+    /** Mudança do diário (Realtime leve): aplica patches ou se atualiza. */
+    receberLog,
+
+    /** Confere o servidor (volta ao app, reconexão): barato se nada mudou. */
+    atualizarDoServidor,
 
     tentarNovamente() {
       tentativas = 0;
