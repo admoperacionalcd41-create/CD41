@@ -16,15 +16,31 @@ export function montarMensagemAgrupamento(loja) {
   ].join('\n');
 }
 
-// Ao registrar um protocolo de carregamento (veículo liberado) — placa e
-// motorista do veículo, e a lista de lojas/cargas que saíram nele (uma ou
-// várias, no caso de protocolo em lote), com a quantidade de paletes
-// enviada de cada uma e se saiu completo ou com saldo.
+// Ao registrar um protocolo de carregamento (veículo liberado) — tipo da
+// carga (Seca/Resfriada), dia da entrega, motorista e placa do veículo, e a
+// lista de lojas/cargas que saíram nele (uma ou várias, no caso de protocolo
+// em lote), com a quantidade de paletes enviada de cada uma e se saiu
+// completo ou com saldo.
 //
-// Formato pedido pelo usuário — duas linhas por loja, em vez de uma única
-// linha longa:
-//   LOJA40 (BEZERROS) CARGA: 97895
-//   11 pal — LOTE(s) 10, 11 ficou(aram)
+// Formato pedido pelo usuário (cada loja agrupada sob a sua posição de
+// entrega, na ordem em que o motorista vai entregar):
+//   Carregamento liberado: Seca
+//   Entrega: 29/10/2026
+//   Motorista: Antonio
+//   Placa: PDG-7863
+//
+//   [1ª entrega]
+//   LOJA15 (ARCOVERDE) 11 paletes
+//   CARGA: 103994
+//
+//   [2ª entrega]
+//   LOJA33 (AECOVERDE) 4 paletes
+//   CARGA: 103454
+//
+// Protocolo de uma loja só não tem posição de entrega (não há ordem a
+// combinar), então sai sem o título "[Nª entrega]". Quando parte dos
+// paletes ficou no box (envio com saldo), a linha da loja ganha o sufixo
+// "— LOTE(s) 10, 11 ficou(aram)".
 //
 // `diaEntregaReferencia` (opcional, YYYY-MM-DD) vem do mesmo ajuste feito
 // na hora de finalizar o carregamento (ver LoadingProtocolForm.jsx e
@@ -32,12 +48,26 @@ export function montarMensagemAgrupamento(loja) {
 // sai (ou só chega na loja) em outro dia. Pedido do usuário: mostrar
 // também essa data na mensagem pra equipe, não só nos relatórios — sem
 // informar nada, assume hoje (comportamento normal, sem ajuste).
+const ROTULO_TIPO_CARGA = { seca: 'Seca', resfriada: 'Resfriada' };
+
+function textoPaletes(qtd) {
+  return `${qtd} ${Number(qtd) === 1 ? 'palete' : 'paletes'}`;
+}
+
 export function montarMensagemProtocolo({ placa, motorista, diaEntregaReferencia, itens }) {
   // Protocolo em lote (2+ lojas) traz a posição de entrega prevista de cada
   // uma (ver LoadingProtocolForm -> SequenciaCarregamentoCaminhao) — mostra
   // isso na mensagem pra equipe já saber a ordem de entrega combinada.
   const temSequencia = itens.length > 1 && itens.every((item) => item.posicaoEntrega != null);
-  const linhasLojas = itens.flatMap((item) => {
+  const itensOrdenados = temSequencia
+    ? [...itens].sort((a, b) => a.posicaoEntrega - b.posicaoEntrega)
+    : itens;
+
+  // Tipo da carga do veículo: um protocolo nunca mistura seca com resfriada
+  // (ver filtroTipoCarga), mas se algum dia misturar, lista os dois.
+  const tipos = [...new Set(itens.map((item) => ROTULO_TIPO_CARGA[item.tipoCarga || 'seca'] || 'Seca'))];
+
+  const blocosLojas = itensOrdenados.map((item) => {
     // Paletes (números das etiquetas, com a composição de lotes quando
     // houver — ex.: "2 (lotes 2 + 5)") que o operador marcou como tendo
     // ficado no box — só existe em envio parcial (ver LoadingProtocolForm).
@@ -45,17 +75,22 @@ export function montarMensagemProtocolo({ placa, motorista, diaEntregaReferencia
       item.statusEnvio === 'saldo' && item.lotesRestantesDescricao && item.lotesRestantesDescricao.length > 0
         ? ` — LOTE(s) ${item.lotesRestantesDescricao.join(', ')} ficou(aram)`
         : '';
-    const sequencia = temSequencia ? ` [${item.posicaoEntrega}ª entrega]` : '';
-    return [`${item.loja} (${item.nomeLoja}) CARGA: ${item.carga}`, `${item.paletesEnviados} pal${lotes}${sequencia}`];
+    const linhas = [
+      `${item.loja} (${item.nomeLoja}) ${textoPaletes(item.paletesEnviados)}${lotes}`,
+      `CARGA: ${item.carga}`,
+    ];
+    return temSequencia ? [`[${item.posicaoEntrega}ª entrega]`, ...linhas].join('\n') : linhas.join('\n');
   });
 
   return [
-    'Carregamento liberado:',
-    `Placa: ${placa}`,
-    `Motorista: ${motorista}`,
-    `Entrega: ${formatarData(diaEntregaReferencia || hojeISO())}`,
-    ...linhasLojas,
-  ].join('\n');
+    [
+      `Carregamento liberado: ${tipos.join(' / ')}`,
+      `Entrega: ${formatarData(diaEntregaReferencia || hojeISO())}`,
+      `Motorista: ${motorista}`,
+      `Placa: ${placa}`,
+    ].join('\n'),
+    ...blocosLojas,
+  ].join('\n\n');
 }
 
 function pluralLoja(qtd) {

@@ -218,6 +218,7 @@ export default function LoadingProtocolForm({ lojas, aoFechar, aoRegistrar }) {
                 carga: l.carga,
                 loja: l.loja,
                 nomeLoja: l.nomeLoja,
+                tipoCarga: l.tipoCarga,
                 paletesEnviados: quantidades[l.id],
                 statusEnvio: statusPorLoja[l.id],
                 lotesRestantesDescricao:
@@ -268,6 +269,7 @@ export default function LoadingProtocolForm({ lojas, aoFechar, aoRegistrar }) {
               carga: loja.carga,
               loja: loja.loja,
               nomeLoja: loja.nomeLoja,
+              tipoCarga: loja.tipoCarga,
               paletesEnviados: quantidade,
               statusEnvio,
               lotesRestantesDescricao: statusEnvio === 'saldo' ? loteRestante.map((n) => descricaoPalete(loja, n)) : [],

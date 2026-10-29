@@ -317,7 +317,14 @@ export function getLinhasProcessoDoDia(state, filtroTipoCarga) {
   // `lojaPassaFiltroTipoCarga` também aqui, igual às outras colunas: só
   // conta como "em andamento" uma ocupação de box cujo TIPO bate com o
   // filtro atual.
+  //
+  // Pedido do usuário: a carga já AGRUPADA (ou em carregamento, que já passou
+  // pelo agrupamento) também mostra a quantidade de paletes nessa coluna —
+  // mesmo critério do chip do box (ver BoxCard.jsx): `paletesAgrupados` só
+  // vale a partir de 'agrupada'; antes disso (apontada/em agrupamento) a
+  // quantidade ainda não foi confirmada, então não aparece.
   const boxAtualPorCodigo = new Map();
+  const paletesNoBoxPorCodigo = new Map();
   state.lojas.forEach((l) => {
     if (
       l.boxNumero != null &&
@@ -326,6 +333,11 @@ export function getLinhasProcessoDoDia(state, filtroTipoCarga) {
       lojaPassaFiltroTipoCarga(l, filtroTipoCarga)
     ) {
       boxAtualPorCodigo.set(l.loja, l.boxNumero);
+      if ((l.status === 'agrupada' || l.status === 'carregando') && l.paletesAgrupados > 0) {
+        paletesNoBoxPorCodigo.set(l.loja, l.paletesAgrupados);
+      } else {
+        paletesNoBoxPorCodigo.delete(l.loja);
+      }
     }
   });
 
@@ -344,6 +356,7 @@ export function getLinhasProcessoDoDia(state, filtroTipoCarga) {
       const apontamentoFeito = cargas.some((c) => c.apontada);
       const apontamentoContagem = cargas.filter((c) => c.apontada).length;
       const boxAtual = boxAtualPorCodigo.get(codigo) ?? null;
+      const paletesNoBox = paletesNoBoxPorCodigo.get(codigo) ?? null;
       const cargaNoBox = boxAtual != null;
       const carregamentoFeito = cargas.some((c) => c.situacaoChave === 'completo' || c.situacaoChave === 'parcial');
       const carregamentoContagem = cargas.filter(
@@ -373,6 +386,7 @@ export function getLinhasProcessoDoDia(state, filtroTipoCarga) {
         apontamentoContagem,
         cargaNoBox,
         boxAtual,
+        paletesNoBox,
         carregamentoFeito,
         carregamentoContagem,
         completo,

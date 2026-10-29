@@ -213,6 +213,7 @@ export default function LoadingList({ aoAbrirProtocolo, irPara }) {
               loja: l.loja,
               nomeLoja: l.nomeLoja,
               carga: l.carga,
+              tipoCarga: l.tipoCarga,
               paletesEnviados: p.paletesEnviados,
               statusEnvio: p.statusEnvio,
               lotesRestantesDescricao: p.lotesRestantesDescricao,

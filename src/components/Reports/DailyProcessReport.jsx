@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { ListChecks, CheckCircle2, XCircle, ArrowUpDown, Camera, Loader2 } from 'lucide-react';
+import { ListChecks, CheckCircle2, XCircle, Camera, Loader2 } from 'lucide-react';
 import { useApp } from '../../context/AppContext.jsx';
 import { getLinhasProcessoDoDia, getEntregaCodigoLojaNaData, getVolumeExpedicaoHoje } from '../../utils/selectors';
 import { getDiasUteisSemana, formatarDiaSemanaCurto, hojeISO } from '../../utils/dateHelpers';
@@ -35,6 +35,13 @@ function formatarNumeroBR(valor) {
 // getNomeBox(loja.boxAtual) — selectors.js), em vez do texto fixo "Em
 // andamento" — mostra em qual box procurar a carga, não só que ela está em
 // algum lugar.
+// Rótulo da coluna "Cargas em Andamento": nome do box e, quando a carga já
+// foi agrupada, a quantidade de paletes (ex.: "Box 9 (blocado) · 12 pal.").
+function rotuloCargaNoBox(loja) {
+  const nome = getNomeBox(loja.boxAtual);
+  return loja.paletesNoBox ? `${nome} · ${loja.paletesNoBox} pal.` : nome;
+}
+
 function Selo({ feito, rotuloFeito = 'Feito', rotuloPendente = 'Pendente' }) {
   return (
     <span
@@ -126,13 +133,13 @@ function CelulasSemana({ codigo, porCodigoSemana }) {
 }
 
 export default function DailyProcessReport() {
-  const {
-    state,
-    actions,
-    filtroTipoCarga,
-    modoSequenciaProcessoDia: modoSequencia,
-    setModoSequenciaProcessoDia: setModoSequencia,
-  } = useApp();
+  const { state, actions, filtroTipoCarga } = useApp();
+  // Pedido do usuário: o "Sequenciar lojas" deixou de ser um modo que se
+  // liga e desliga — a lista fica SEMPRE sequenciada (campo de posição em
+  // cada loja), sem botão pra desligar e sem a visão separada em
+  // pendente/completo. O ramo da visão padrão abaixo ficou sem uso (só
+  // alcançável se isto voltar a ser `false`).
+  const modoSequencia = true;
   const rotuloTipo = ROTULO_TIPO[filtroTipoCarga] || ROTULO_TIPO.todos;
 
   // Pedido do usuário: "opção pra permitir o sequenciamento das lojas" —
@@ -424,28 +431,6 @@ export default function DailyProcessReport() {
             </div>
           </div>
 
-          {/* Pedido do usuário: opção pra sequenciar as lojas — modo à
-              parte, opcional; não substitui a separação padrão
-              pendente/completo, que continua sendo a visão default. Era por
-              arrastar e soltar, trocado por campo de número a pedido do
-              usuário (arrastar ficou lento com a lista grande). */}
-          <button
-            type="button"
-            onClick={() => setModoSequencia((v) => !v)}
-            title={
-              modoSequencia
-                ? 'Voltar pra visão padrão (pendente / completo)'
-                : 'Organizar a ordem das lojas digitando a posição de cada uma'
-            }
-            className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-semibold transition-colors ${
-              modoSequencia
-                ? 'border-totvs-300 bg-totvs-50 text-totvs-700 dark:border-whatsapp-600 dark:bg-whatsapp-500/10 dark:text-whatsapp-300'
-                : 'border-slate-200 text-slate-500 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-400 dark:hover:bg-slate-700/40'
-            }`}
-          >
-            <ArrowUpDown size={14} />
-            {modoSequencia ? 'Modo sequência (ativo)' : 'Sequenciar lojas'}
-          </button>
         </div>
 
         <div ref={capturaRef}>
@@ -461,27 +446,27 @@ export default function DailyProcessReport() {
             </h3>
             <div className="grid grid-cols-2 gap-3">
               <div className="rounded-lg bg-white p-4 text-center dark:bg-slate-800">
-                <p className="text-xs text-slate-400 dark:text-slate-500">Expedição de Hoje</p>
-                <p className="mt-1 text-3xl font-bold text-totvs-600 dark:text-whatsapp-400">{pctExpedicao}%</p>
-                <p className="text-[11px] text-slate-400 dark:text-slate-500">gerado</p>
+                <p className="text-base font-semibold text-slate-500 dark:text-slate-400">Expedição de Hoje</p>
+                <p className="mt-1 text-6xl font-extrabold leading-none text-totvs-600 dark:text-whatsapp-400 sm:text-7xl">{pctExpedicao}%</p>
+                <p className="mt-1 text-base text-slate-500 dark:text-slate-400">gerado</p>
                 {/* Pedido do usuário: além da porcentagem, mostrar o volume
                     total / volume feito (mesma base do pctExpedicao acima —
                     m³ quando o lote traz essa informação, senão contagem de
                     lojas). */}
-                <p className="mt-1 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                <p className="mt-2 text-2xl font-bold text-slate-700 dark:text-slate-200">
                   {volumeExpedicao.temVolume
                     ? `${formatarNumeroBR(volumeExpedicao.volumeTotal)} / ${formatarNumeroBR(volumeExpedicao.volumeFeito)} m³`
                     : `${total} / ${comApontamento} lojas`}
                 </p>
               </div>
               <div className="rounded-lg bg-white p-4 text-center dark:bg-slate-800">
-                <p className="text-xs text-slate-400 dark:text-slate-500">Carregamento de Hoje</p>
-                <p className="mt-1 text-3xl font-bold text-totvs-600 dark:text-whatsapp-400">{pctCarregamento}%</p>
-                <p className="text-[11px] text-slate-400 dark:text-slate-500">feito</p>
+                <p className="text-base font-semibold text-slate-500 dark:text-slate-400">Carregamento de Hoje</p>
+                <p className="mt-1 text-6xl font-extrabold leading-none text-totvs-600 dark:text-whatsapp-400 sm:text-7xl">{pctCarregamento}%</p>
+                <p className="mt-1 text-base text-slate-500 dark:text-slate-400">feito</p>
                 {/* Pedido do usuário: além da porcentagem, mostrar total /
                     feito (mesma base do pctCarregamento acima — contagem de
                     lojas). */}
-                <p className="mt-1 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                <p className="mt-2 text-2xl font-bold text-slate-700 dark:text-slate-200">
                   {total} / {comCarregamento} lojas
                 </p>
               </div>
@@ -593,7 +578,7 @@ export default function DailyProcessReport() {
                       <td className="px-2 py-1.5 text-center">
                         <Selo
                           feito={loja.cargaNoBox}
-                          rotuloFeito={getNomeBox(loja.boxAtual)}
+                          rotuloFeito={rotuloCargaNoBox(loja)}
                           rotuloPendente="Vazio"
                         />
                       </td>
@@ -720,7 +705,7 @@ export default function DailyProcessReport() {
                         <td className="px-2 py-1.5 text-center">
                           <Selo
                             feito={loja.cargaNoBox}
-                            rotuloFeito={getNomeBox(loja.boxAtual)}
+                            rotuloFeito={rotuloCargaNoBox(loja)}
                             rotuloPendente="Vazio"
                           />
                         </td>
