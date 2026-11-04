@@ -109,8 +109,15 @@ export default function DailyGoalReport() {
     return codigos
       .map(({ codigo, nomeLoja }) => {
         const porDia = dias.map((d) => {
-          if (d.futuro) return { dataISO: d.dataISO, status: 'futuro' };
           const { temAtividade, entregue, paletes, parcial } = getEntregaCodigoLojaNaData(state, codigo, d.dataISO, tipo);
+          // Carregamento já registrado pra um dia que ainda não chegou
+          // (entrega prevista) aparece na coluna do dia de entrega — ver
+          // diaEntregaReferencia em selectors.js.
+          if (d.futuro) {
+            return entregue
+              ? { dataISO: d.dataISO, status: 'entregue', paletes, parcial, prevista: true }
+              : { dataISO: d.dataISO, status: 'futuro' };
+          }
           if (!temAtividade) return { dataISO: d.dataISO, status: 'sem_dado' };
           if (entregue) return { dataISO: d.dataISO, status: 'entregue', paletes, parcial };
           return { dataISO: d.dataISO, status: 'faltou' };
@@ -249,19 +256,28 @@ export default function DailyGoalReport() {
                 {formatarDiaSemanaCurto(d.dataISO)}
               </p>
               <p className="text-[10px] text-slate-400 dark:text-slate-500">{formatarData(d.dataISO)}</p>
-              <p className={`mt-1.5 text-2xl font-black ${d.futuro ? 'text-slate-300 dark:text-slate-600' : cor.texto}`}>
+              <p
+                className={`mt-1.5 text-2xl font-black ${
+                  d.futuro ? (d.entregues > 0 ? 'text-sky-600 dark:text-sky-400' : 'text-slate-300 dark:text-slate-600') : cor.texto
+                }`}
+              >
                 {d.entregues}
                 <span className="text-xs font-semibold text-slate-300 dark:text-slate-600">/{META_DIARIA}</span>
               </p>
               <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-700">
                 <div
-                  className={`h-full rounded-full ${d.futuro ? 'bg-slate-200 dark:bg-slate-600' : cor.barra}`}
-                  style={{ width: `${d.futuro ? 0 : d.pct}%` }}
+                  className={`h-full rounded-full ${
+                    d.futuro ? (d.entregues > 0 ? 'bg-sky-400' : 'bg-slate-200 dark:bg-slate-600') : cor.barra
+                  }`}
+                  style={{ width: `${d.futuro && d.entregues === 0 ? 0 : d.pct}%` }}
                 />
               </div>
               <div className="mt-1.5 flex h-3.5 items-center justify-center">
                 {!d.futuro && d.entregues >= META_DIARIA && (
                   <CheckCircle2 size={14} className="text-emerald-500" />
+                )}
+                {d.futuro && d.entregues > 0 && (
+                  <span className="text-[10px] font-semibold text-sky-600 dark:text-sky-400">já carregado (previsto)</span>
                 )}
               </div>
             </div>
@@ -342,16 +358,22 @@ export default function DailyGoalReport() {
                           p.status === 'sem_dado'
                             ? 'Sem carga programada nesse dia'
                             : p.status === 'entregue'
-                              ? `${p.paletes} palete${p.paletes !== 1 ? 's' : ''} entregues${
-                                  p.parcial ? ' — envio parcial, ficou saldo' : ''
-                                }`
+                              ? p.prevista
+                                ? `${p.paletes} palete${p.paletes !== 1 ? 's' : ''} já carregados — entrega prevista pra esse dia`
+                                : `${p.paletes} palete${p.paletes !== 1 ? 's' : ''} entregues${
+                                    p.parcial ? ' — envio parcial, ficou saldo' : ''
+                                  }`
                               : undefined
                         }
                       >
                         {p.status === 'entregue' && (
                           <span
                             className={`font-bold ${
-                              p.parcial ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'
+                              p.prevista
+                                ? 'text-sky-600 dark:text-sky-400'
+                                : p.parcial
+                                  ? 'text-amber-600 dark:text-amber-400'
+                                  : 'text-emerald-600 dark:text-emerald-400'
                             }`}
                           >
                             {p.paletes}

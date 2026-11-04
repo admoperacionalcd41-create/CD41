@@ -99,14 +99,20 @@ function CelulasSemana({ codigo, porCodigoSemana }) {
             p.status === 'sem_dado'
               ? 'Sem carga programada nesse dia'
               : p.status === 'entregue'
-                ? `${p.paletes} palete${p.paletes !== 1 ? 's' : ''} entregues${p.parcial ? ' — envio parcial, ficou saldo' : ''}`
+                ? p.prevista
+                  ? `${p.paletes} palete${p.paletes !== 1 ? 's' : ''} já carregados — entrega prevista pra esse dia${p.parcial ? ' (envio parcial, ficou saldo)' : ''}`
+                  : `${p.paletes} palete${p.paletes !== 1 ? 's' : ''} entregues${p.parcial ? ' — envio parcial, ficou saldo' : ''}`
                 : undefined
           }
         >
           {p.status === 'entregue' && (
             <span
               className={`font-bold ${
-                p.parcial ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'
+                p.prevista
+                  ? 'text-sky-600 dark:text-sky-400'
+                  : p.parcial
+                    ? 'text-amber-600 dark:text-amber-400'
+                    : 'text-emerald-600 dark:text-emerald-400'
               }`}
             >
               {p.paletes}
@@ -280,8 +286,17 @@ export default function DailyProcessReport() {
     linhas.forEach((l) => {
       const porDia = diasSemanaAtual.map((dataISO) => {
         const futuro = dataISO > hoje;
-        if (futuro) return { dataISO, status: 'futuro' };
         const { temAtividade, entregue, paletes, parcial } = getEntregaCodigoLojaNaData(state, l.codigo, dataISO, tipo);
+        // Pedido do usuário: carregamento feito hoje pra entrega amanhã (ou
+        // outro dia da semana ainda por vir) precisa aparecer na coluna do
+        // DIA DE ENTREGA — antes, qualquer dia futuro virava "—" mesmo com
+        // o carregamento já registrado pra ele. `prevista` só muda a cor e a
+        // dica da célula (ainda não é o dia da entrega).
+        if (futuro) {
+          return entregue
+            ? { dataISO, status: 'entregue', paletes, parcial, prevista: true }
+            : { dataISO, status: 'futuro' };
+        }
         if (!temAtividade) return { dataISO, status: 'sem_dado' };
         if (entregue) return { dataISO, status: 'entregue', paletes, parcial };
         return { dataISO, status: 'faltou' };

@@ -12,7 +12,7 @@ import {
 } from '../../utils/selectors';
 import SummaryCard from './SummaryCard.jsx';
 import AndamentoEntregasCard from './AndamentoEntregasCard.jsx';
-import { getResumoBox, getStatusBox, boxEhEspecial } from '../../utils/boxLogic';
+import { getResumoBox, getStatusBox, boxEhEspecial, boxVisivelNoFiltro } from '../../utils/boxLogic';
 import { lojaPassaFiltroTipoCarga } from '../../utils/tipoCarga';
 
 const ORDEM_STATUS_BOX = [
@@ -54,7 +54,7 @@ export default function Dashboard({ irPara }) {
 
   const ocupacaoBoxes = useMemo(
     () =>
-      state.boxes.map((box) => {
+      state.boxes.filter((box) => boxVisivelNoFiltro(box, filtroTipoCarga)).map((box) => {
         const resumoBox = getResumoBox(box, lojasPorId);
         const lojas = resumoBox.lojasIds
           .map((id) => lojasPorId[id])

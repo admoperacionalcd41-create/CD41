@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, ArrowRightLeft } from 'lucide-react';
 import { useApp } from '../../context/AppContext.jsx';
-import { getNomeBox, getVagasDisponiveisCount } from '../../utils/boxLogic';
+import { getNomeBox, getVagasDisponiveisCount, boxVisivelNoFiltro } from '../../utils/boxLogic';
 import TipoCargaBadge from './TipoCargaBadge.jsx';
 
 // Modal genérico de movimentação de box, reutilizado nas telas de Boxes e
@@ -9,14 +9,14 @@ import TipoCargaBadge from './TipoCargaBadge.jsx';
 // quantidade de vagas livres, desabilitando os que não comportam a
 // quantidade de paletes atual da loja.
 export default function MoveBoxModal({ loja, aoFechar }) {
-  const { state, actions } = useApp();
+  const { state, actions, filtroTipoCarga } = useApp();
   const [boxDestino, setBoxDestino] = useState('');
   const [erroLocal, setErroLocal] = useState('');
 
   const quantidade = loja.paletesAgrupados;
 
   const opcoes = state.boxes
-    .filter((b) => b.numero !== loja.boxNumero)
+    .filter((b) => b.numero !== loja.boxNumero && boxVisivelNoFiltro(b, filtroTipoCarga))
     .map((b) => ({ numero: b.numero, nome: b.nome, disponiveis: getVagasDisponiveisCount(b) }));
 
   function aoConfirmar() {

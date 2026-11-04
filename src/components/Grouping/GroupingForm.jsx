@@ -8,6 +8,7 @@ import {
   getNomeBox,
   boxTemCargaEmAndamento,
   boxPermiteVariasCargasEmGeracao,
+  boxVisivelNoFiltro,
 } from '../../utils/boxLogic';
 import { getTipoCarga, lojaPassaFiltroTipoCarga } from '../../utils/tipoCarga';
 import TipoCargaBadge from '../Shared/TipoCargaBadge.jsx';
@@ -130,7 +131,7 @@ export default function GroupingForm() {
             className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-totvs-500 dark:focus:border-whatsapp-500 focus:outline-none focus:ring-1 focus:ring-totvs-500 dark:focus:ring-whatsapp-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
           >
             <option value="">Selecione...</option>
-            {BOX_NUMBERS.map((n) => {
+            {BOX_NUMBERS.filter((n) => boxVisivelNoFiltro(n, filtroTipoCarga)).map((n) => {
               const box = state.boxes.find((b) => b.numero === n);
               const disponiveis = getVagasDisponiveisCount(box);
               const insuficiente = qtdNum > 0 && disponiveis < qtdNum;

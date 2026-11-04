@@ -27,7 +27,7 @@
 // permanece puramente sequencial/estável; `nome` é o rótulo exibido nas
 // telas. BLOCADO 2 fica sempre na sequência, logo depois do Box 13.
 const CONFIG_BOXES = [
-  { numero: 1, nome: 'BLOCADO 1', totalVagas: 36 },
+  { numero: 1, nome: 'BOX 1 (BLOCADO)', totalVagas: 36 },
   { numero: 2, nome: 'Box 2', totalVagas: 26 },
   { numero: 3, nome: 'Box 3', totalVagas: 26 },
   { numero: 4, nome: 'Box 4', totalVagas: 26 },
@@ -40,7 +40,7 @@ const CONFIG_BOXES = [
   { numero: 11, nome: 'Box 11', totalVagas: 18 },
   { numero: 12, nome: 'Box 12', totalVagas: 18 },
   { numero: 13, nome: 'Box 13', totalVagas: 18 },
-  { numero: 14, nome: 'BLOCADO 2', totalVagas: 42 },
+  { numero: 14, nome: 'BOX 14 (BLOCADO)', totalVagas: 42 },
   { numero: 15, nome: 'Box Frios', totalVagas: 20 },
 ];
 
@@ -50,7 +50,17 @@ export const BOX_NUMBERS = CONFIG_BOXES.map((b) => b.numero);
 // BLOCADO 2 e Box Frios não são boxes "padrão" de carga solta, então
 // aparecem com uma cor própria no card, pra ficarem fáceis de identificar
 // de relance no meio dos demais).
-const NOMES_BOX_ESPECIAIS = new Set(['BLOCADO 1', 'BLOCADO 2', 'Box Frios']);
+const NOMES_BOX_ESPECIAIS = new Set(['BOX 1 (BLOCADO)', 'BOX 14 (BLOCADO)', 'Box Frios']);
+
+// Pedido do usuário: o Box Frios só aparece nas telas (boxes, dashboard,
+// escolha de box) quando o filtro de tipo de carga do cabeçalho está em
+// Resfriada — com Seca ele fica escondido, já que só recebe carga Resfriada.
+// Não muda nada na alocação: só decide se o box é MOSTRADO.
+export function boxVisivelNoFiltro(box, filtroTipoCarga) {
+  const nome = typeof box === 'object' && box !== null ? box.nome : getNomeBox(box);
+  if (nome !== 'Box Frios') return true;
+  return filtroTipoCarga === 'resfriada' || filtroTipoCarga === 'todos';
+}
 
 export function boxEhEspecial(nome) {
   return NOMES_BOX_ESPECIAIS.has(nome);

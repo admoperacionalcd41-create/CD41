@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { useApp } from '../../context/AppContext.jsx';
-import { boxEhEspecial } from '../../utils/boxLogic';
+import { boxVisivelNoFiltro } from '../../utils/boxLogic';
 import BoxCard from './BoxCard.jsx';
 import ResumoProcessoCard from './ResumoProcessoCard.jsx';
 import AndamentoEntregasCard from '../Dashboard/AndamentoEntregasCard.jsx';
@@ -10,7 +10,7 @@ import AndamentoEntregasCard from '../Dashboard/AndamentoEntregasCard.jsx';
 // de etiquetas dessa loja lá (ver App.jsx e GroupingPage.jsx). É lá que
 // ficam as outras ações da loja (mover de box, concluir agrupamento etc.).
 export default function BoxGrid({ irPara, aoAbrirAgrupamento }) {
-  const { state } = useApp();
+  const { state, filtroTipoCarga } = useApp();
 
   const lojasPorId = useMemo(() => {
     const mapa = {};
@@ -20,20 +20,16 @@ export default function BoxGrid({ irPara, aoAbrirAgrupamento }) {
     return mapa;
   }, [state.lojas]);
 
-  // Ordem de EXIBIÇÃO nesta tela (pedido do usuário): Box 2 ao Box 13
-  // primeiro, e só depois os boxes "especiais" (BLOCADO 1, BLOCADO 2, Box
-  // Frios) por último. Não muda o `numero` interno de cada box (usado em
-  // toda alocação/movimentação de vaga) — só a ordem em que os cards
-  // aparecem aqui.
+  // Ordem de EXIBIÇÃO nesta tela (pedido do usuário): sequencial, do Box 1 ao
+  // Box 14 (os dois blocados já se chamam BOX 1 (BLOCADO) e BOX 14 (BLOCADO),
+  // então ficam no lugar certo da sequência), e o Box Frios — que só aparece
+  // quando o filtro de tipo de carga é Resfriada — por último.
   const boxesOrdenados = useMemo(
     () =>
-      state.boxes.slice().sort((a, b) => {
-        const especialA = boxEhEspecial(a.nome) ? 1 : 0;
-        const especialB = boxEhEspecial(b.nome) ? 1 : 0;
-        if (especialA !== especialB) return especialA - especialB;
-        return a.numero - b.numero;
-      }),
-    [state.boxes]
+      state.boxes
+        .filter((b) => boxVisivelNoFiltro(b, filtroTipoCarga))
+        .sort((a, b) => a.numero - b.numero),
+    [state.boxes, filtroTipoCarga]
   );
 
   // Pedido do usuário: em telas de notebook/desktop (xl pra cima), todos os

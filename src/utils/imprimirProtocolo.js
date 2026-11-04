@@ -11,7 +11,7 @@ import { imprimirHtml } from './imprimirHtml';
 // houver), cada uma como { carga, loja, nomeLoja, paletesEnviados } — usada
 // só para o motorista ter, no papel, a relação completa do que está sendo
 // transportado naquele veículo.
-function montarHtmlProtocolo(protocolo, loja, outrasLojas) {
+export function montarHtmlProtocolo(protocolo, loja, outrasLojas) {
   const estilo = `
     * { box-sizing: border-box; }
     body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; margin: 0; padding: 24px; color: #0f172a; }
@@ -25,12 +25,15 @@ function montarHtmlProtocolo(protocolo, loja, outrasLojas) {
     th, td { text-align: left; border-bottom: 1px solid #e2e8f0; padding: 6px 8px; }
     th { color: #64748b; font-weight: 600; text-transform: uppercase; font-size: 10px; }
     tfoot td { font-weight: 700; border-top: 2px solid #1e293b; border-bottom: none; }
-    /* Campo em branco pra anotar à caneta o lacre de cada loja além da
-       primeira — quando o veículo leva mais de uma loja, cada uma é lacrada
-       separadamente e essa numeração só existe fisicamente depois da
-       impressão, então não dá pra vir preenchida (ver comentário acima de
-       montarHtmlProtocolo). */
-    .lacre-manual { display: inline-block; min-width: 70px; border-bottom: 1px solid #1e293b; }
+    /* Campo em branco pra anotar à caneta o lacre de CADA loja (pedido do
+       usuário) — a numeração só existe fisicamente depois da impressão, então
+       não dá pra vir preenchida. A última loja ganha uma segunda linha pro
+       lacre do caminhão voltar pra base. */
+    .lacre-manual { display: inline-block; min-width: 110px; border-bottom: 1px solid #1e293b; }
+    .lacre-linha { display: flex; align-items: flex-end; gap: 6px; margin: 5px 0; white-space: nowrap; }
+    .lacre-rotulo { font-size: 9px; text-transform: uppercase; color: #64748b; }
+    .lacre-celula { min-width: 190px; padding-top: 8px; padding-bottom: 8px; }
+    .nota-lacre { font-size: 11px; color: #334155; margin: 8px 0 0; }
     .obs-celula { max-width: 160px; }
     .saldo-detalhe { display: block; font-weight: 400; color: #64748b; font-size: 10px; margin-top: 1px; }
     @media print { body { padding: 12px; } }
@@ -82,10 +85,9 @@ function montarHtmlProtocolo(protocolo, loja, outrasLojas) {
       observacaoLoja: loja.observacaoLoja,
       statusEnvio: protocolo.statusEnvio,
       lotesRestantesDescricao: protocolo.lotesRestantesDescricao,
-      // A primeira loja do protocolo é a única cujo(s) lacre(s) já vêm
-      // digitados (campo "Lacres" no formulário, impresso na grade acima) —
-      // as demais lojas do mesmo veículo são lacradas à parte, então ganham
-      // uma coluna em branco na tabela pra anotar à mão (ver .lacre-manual).
+      // Os lacres digitados no formulário saem na grade acima; na tabela,
+      // TODAS as lojas (inclusive a primeira) ganham um campo em branco pra
+      // anotar o lacre à mão (ver .lacre-manual).
       principal: true,
     },
     ...outrasLojas.map((l) => ({ ...l, principal: false })),
@@ -102,7 +104,8 @@ function montarHtmlProtocolo(protocolo, loja, outrasLojas) {
     : todasLojas;
 
   const linhasLojas = lojasParaImprimir
-    .map((l) => {
+    .map((l, indice) => {
+      const ehUltima = indice === lojasParaImprimir.length - 1;
       const statusTexto = l.statusEnvio === 'completo' ? 'Completo' : 'Saldo';
       const saldoDetalhe =
         l.statusEnvio === 'saldo' && l.lotesRestantesDescricao?.length
@@ -115,7 +118,11 @@ function montarHtmlProtocolo(protocolo, loja, outrasLojas) {
       <td>${l.loja}</td>
       <td>${l.nomeLoja}</td>
       <td>${l.paletesEnviados}</td>
-      ${todasLojas.length > 1 ? `<td>${l.principal ? '(ver acima)' : '<span class="lacre-manual">&nbsp;</span>'}</td>` : ''}
+      <td class="lacre-celula">${
+        ehUltima
+          ? '<div class="lacre-linha"><span class="lacre-rotulo">Lacre loja</span><span class="lacre-manual">&nbsp;</span></div><div class="lacre-linha"><span class="lacre-rotulo">Retorno à base</span><span class="lacre-manual">&nbsp;</span></div>'
+          : '<div class="lacre-linha"><span class="lacre-manual">&nbsp;</span></div>'
+      }</td>
       <td>${getNomeBox(l.boxNumero)}</td>
       <td>${statusTexto}${saldoDetalhe}</td>
       <td class="obs-celula">${l.observacaoLoja || '—'}</td>
@@ -153,7 +160,7 @@ function montarHtmlProtocolo(protocolo, loja, outrasLojas) {
         <tr>
           ${temSequencia ? '<th>Entrega</th>' : ''}
           <th>Carga</th><th>Loja</th><th>Nome da Loja</th><th>Paletes</th>
-          ${todasLojas.length > 1 ? '<th>Lacre</th>' : ''}
+          <th>Lacre</th>
           <th>Box de Origem</th><th>Status de Envio</th><th>Observação</th>
         </tr>
       </thead>
@@ -164,6 +171,7 @@ function montarHtmlProtocolo(protocolo, loja, outrasLojas) {
           : ''
       }
     </table>
+    <p class="nota-lacre"><strong>Última loja:</strong> informar também o lacre do caminhão para o retorno à base.</p>
   </div>
   </div>
 </body>

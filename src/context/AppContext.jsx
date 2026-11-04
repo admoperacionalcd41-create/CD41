@@ -978,6 +978,43 @@ function aplicarAcaoInterna(state, acao) {
       };
     }
 
+    // Pedido do usuário: ao finalizar um carregamento o operador percebeu que
+    // errou a data de entrega — precisa corrigir SEM cancelar o protocolo (o
+    // que devolveria a carga ao box). Só mexe em `diaEntregaReferencia`
+    // (ver diaReferenciaProtocolo em selectors.js): `dataHora` continua sendo
+    // o horário real do registro. Vale pra viagem inteira (todas as lojas do
+    // mesmo veículo, mesmo `viagemId`), já que a data de entrega é escolhida
+    // uma vez só ao registrar o protocolo em lote. `dia` vazio/null volta a
+    // contar no dia real do registro.
+    case 'ALTERAR_DIA_ENTREGA_PROTOCOLO': {
+      const { protocoloId, dia } = acao.payload;
+      const protocolo = state.protocolos.find((p) => p.id === protocoloId);
+      if (!protocolo) {
+        return { ...state, ultimoErro: 'Protocolo não encontrado.' };
+      }
+      const novoDia = dia ? String(dia).slice(0, 10) : null;
+      if (novoDia && !/^\d{4}-\d{2}-\d{2}$/.test(novoDia)) {
+        return { ...state, ultimoErro: 'Data de entrega inválida.' };
+      }
+      const afetado = (p) =>
+        p.id === protocoloId || (protocolo.viagemId != null && p.viagemId === protocolo.viagemId);
+      const atualizarProtocolo = (p) => (afetado(p) ? { ...p, diaEntregaReferencia: novoDia } : p);
+      const quantos = state.protocolos.filter(afetado).length;
+      const [ano, mes, diaMes] = novoDia ? novoDia.split('-') : [];
+
+      return {
+        ...state,
+        protocolos: state.protocolos.map(atualizarProtocolo),
+        lojas: state.lojas.map((l) =>
+          l.protocolos?.some(afetado) ? { ...l, protocolos: l.protocolos.map(atualizarProtocolo) } : l
+        ),
+        ultimoErro: null,
+        ultimoAviso: novoDia
+          ? `Data de entrega alterada para ${diaMes}/${mes}/${ano} (${quantos} loja${quantos !== 1 ? 's' : ''}).`
+          : 'Data de entrega voltou a ser o dia do registro.',
+      };
+    }
+
     case 'DESFAZER_ENTREGA_NF': {
       const { protocoloId } = acao.payload;
       const protocolo = state.protocolos.find((p) => p.id === protocoloId);
@@ -1473,6 +1510,8 @@ export function AppProvider({ children }) {
       registrarEntregaNF: (protocoloId, dataHora) =>
         dispatch({ tipo: 'REGISTRAR_ENTREGA_NF', payload: { protocoloId, dataHora } }),
       desfazerEntregaNF: (protocoloId) => dispatch({ tipo: 'DESFAZER_ENTREGA_NF', payload: { protocoloId } }),
+      alterarDiaEntregaProtocolo: (protocoloId, dia) =>
+        dispatch({ tipo: 'ALTERAR_DIA_ENTREGA_PROTOCOLO', payload: { protocoloId, dia } }),
       encerrarDia: () => dispatch({ tipo: 'ENCERRAR_DIA' }),
       restaurarDadosExemplo: () => dispatch({ tipo: 'RESTAURAR_DADOS_EXEMPLO' }),
       limparTudo: () => dispatch({ tipo: 'LIMPAR_TUDO' }),
