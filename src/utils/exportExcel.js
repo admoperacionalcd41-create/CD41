@@ -4,6 +4,7 @@ import {
   getCodigosLojaNoPeriodo,
   getEntregaCodigoLojaNaData,
   getPermanenciasRegistradas,
+  consolidarPermanenciaPorLoja,
   getEntregasPorMotorista,
   getLojasAgrupadasOuAlem,
 } from './selectors';
@@ -95,6 +96,25 @@ function construirPlanilhaTempoPermanencia(state, tipo, passaPeriodo) {
   return planilha;
 }
 
+// Visão "Semana" do Tempo de Permanência: consolidado por loja (menor, maior
+// e média), da pior média pra melhor.
+function construirPlanilhaPermanenciaPorLoja(state, tipo, passaPeriodo) {
+  const permanencias = getPermanenciasRegistradas(state, tipo).filter((p) => !passaPeriodo || passaPeriodo(p.saidaLoja));
+  const minutos = (ms) => Math.round(ms / 60000);
+  const linhas = consolidarPermanenciaPorLoja(permanencias).map((l, i) => ({
+    Posição: `${i + 1}º`,
+    Código: l.codigo,
+    Loja: l.nome,
+    Entregas: l.entregas,
+    'Menor tempo (min)': minutos(l.menorMs),
+    'Maior tempo (min)': minutos(l.maiorMs),
+    'Média (min)': minutos(l.mediaMs),
+  }));
+  const planilha = XLSX.utils.json_to_sheet(linhas);
+  definirLargurasColunas(planilha, [9, 10, 26, 10, 18, 18, 12]);
+  return planilha;
+}
+
 function construirPlanilhaLojasPorMotorista(state, tipo, passaPeriodo) {
   const dados = getEntregasPorMotorista(state, tipo, passaPeriodo);
   const linhas = dados.map((m) => ({
@@ -152,6 +172,7 @@ function construirPlanilhaProdutividade(state, filtroTipoCarga, passaPeriodo) {
 function sufixoArquivoPeriodo(periodoRelatorio) {
   if (!periodoRelatorio) return '';
   if (periodoRelatorio.periodo === 'hoje') return '-hoje';
+  if (periodoRelatorio.periodo === 'semana') return periodoRelatorio.semanasAtras ? `-semana-${periodoRelatorio.semanasAtras}-atras` : '-semana-atual';
   if (periodoRelatorio.periodo === 'escolher') return `-mes-${periodoRelatorio.mesEscolhido}`;
   return '-mes-atual';
 }
@@ -186,6 +207,9 @@ export async function exportarRelatoriosParaExcel(state, filtroTipoCarga, period
   XLSX.utils.book_append_sheet(workbook, construirPlanilhaMetaDiaria(state, tipo, rotuloTipo), 'Meta Diaria');
   XLSX.utils.book_append_sheet(workbook, construirPlanilhaMetaPorLoja(state, tipo), 'Meta por Loja');
   XLSX.utils.book_append_sheet(workbook, construirPlanilhaTempoPermanencia(state, tipo, passaPeriodo), 'Tempo de Permanencia');
+  if (periodoRelatorio?.periodo === 'semana') {
+    XLSX.utils.book_append_sheet(workbook, construirPlanilhaPermanenciaPorLoja(state, tipo, passaPeriodo), 'Permanencia por Loja');
+  }
   XLSX.utils.book_append_sheet(workbook, construirPlanilhaLojasPorMotorista(state, tipo, passaPeriodo), 'Lojas por Motorista');
   XLSX.utils.book_append_sheet(workbook, construirPlanilhaProdutividade(state, filtroTipoCarga, passaPeriodo), 'Produtividade');
 

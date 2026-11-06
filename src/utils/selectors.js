@@ -610,3 +610,35 @@ export function getEntregasPorMotorista(state, tipoCarga, filtroData) {
     .map(([motorista, codigos]) => ({ motorista, lojasEntregues: codigos.size }))
     .sort((a, b) => b.lojasEntregues - a.lojasEntregues || a.motorista.localeCompare(b.motorista));
 }
+
+
+/**
+ * Consolida as permanências (ver getPermanenciasRegistradas) POR LOJA:
+ * quantidade de entregas, menor tempo, maior tempo e média — ordenado da
+ * PIOR média pra melhor (relatório de Tempo de Permanência, visão Semana).
+ * Agrupa pelo código da loja (a mesma loja aparece em cargas diferentes ao
+ * longo da semana).
+ */
+export function consolidarPermanenciaPorLoja(permanencias) {
+  const mapa = new Map();
+  (permanencias || []).forEach((p) => {
+    const codigo = p.loja?.loja ?? '—';
+    const atual = mapa.get(codigo) || {
+      codigo,
+      nome: p.loja?.nomeLoja || '',
+      tipoCarga: p.loja?.tipoCarga,
+      entregas: 0,
+      somaMs: 0,
+      menorMs: Infinity,
+      maiorMs: -Infinity,
+    };
+    atual.entregas += 1;
+    atual.somaMs += p.permanenciaMs;
+    atual.menorMs = Math.min(atual.menorMs, p.permanenciaMs);
+    atual.maiorMs = Math.max(atual.maiorMs, p.permanenciaMs);
+    mapa.set(codigo, atual);
+  });
+  return [...mapa.values()]
+    .map((l) => ({ ...l, mediaMs: l.somaMs / l.entregas }))
+    .sort((a, b) => b.mediaMs - a.mediaMs || b.maiorMs - a.maiorMs || String(a.codigo).localeCompare(String(b.codigo), 'pt-BR'));
+}

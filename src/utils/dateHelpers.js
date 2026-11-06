@@ -144,3 +144,25 @@ export function getDiasUteisSemana(semanasAtras = 0) {
 export function getDiasUteisSemanaAtual() {
   return getDiasUteisSemana(0);
 }
+
+/**
+ * Intervalo da semana civil de segunda a domingo (datas YYYY-MM-DD, mesma
+ * base de datas usada por hojeISO/eHoje), `semanasAtras` semanas antes da
+ * atual (0 = esta semana, 1 = semana passada...). Usado no filtro "Semana"
+ * dos relatórios (ver usePeriodoRelatorio.js e FiltroPeriodo.jsx).
+ */
+export function getIntervaloSemana(semanasAtras = 0) {
+  const hoje = hojeISO();
+  const diaSemana = new Date(`${hoje}T12:00:00Z`).getUTCDay(); // 0=domingo ... 6=sábado
+  const voltarAteSegunda = (diaSemana + 6) % 7;
+  const segunda = somarDias(hoje, -voltarAteSegunda - semanasAtras * 7);
+  return { inicio: segunda, fim: somarDias(segunda, 6) };
+}
+
+/** O timestamp ISO cai na semana (segunda a domingo) `semanasAtras` semanas antes da atual? */
+export function eNaSemana(isoCompleto, semanasAtras = 0) {
+  if (!isoCompleto) return false;
+  const dia = isoCompleto.slice(0, 10);
+  const { inicio, fim } = getIntervaloSemana(semanasAtras);
+  return dia >= inicio && dia <= fim;
+}

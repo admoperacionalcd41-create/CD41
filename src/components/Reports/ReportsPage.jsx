@@ -4,7 +4,7 @@ import { useApp } from '../../context/AppContext.jsx';
 import { exportarRelatoriosParaExcel } from '../../utils/exportExcel';
 import { imprimirRelatorioAtivo } from '../../utils/imprimirRelatorio';
 import { usePeriodoRelatorio } from '../../hooks/usePeriodoRelatorio';
-import { formatarMesAno } from '../../utils/dateHelpers';
+import { formatarMesAno, getIntervaloSemana, formatarData } from '../../utils/dateHelpers';
 import DailyProcessReport from './DailyProcessReport.jsx';
 import DailyGoalReport from './DailyGoalReport.jsx';
 import DwellTimeReport from './DwellTimeReport.jsx';
@@ -16,8 +16,12 @@ import FiltroPeriodo from './FiltroPeriodo.jsx';
 // mês/Escolher mês) — usado no subtítulo da impressão e, em exportExcel.js,
 // como sufixo do nome do arquivo, pra deixar claro ali qual período foi
 // exportado.
-function descreverPeriodo({ periodo, mesEscolhido }) {
+function descreverPeriodo({ periodo, mesEscolhido, semanasAtras = 0 }) {
   if (periodo === 'hoje') return 'Período: hoje';
+  if (periodo === 'semana') {
+    const { inicio, fim } = getIntervaloSemana(semanasAtras);
+    return `Período: semana de ${formatarData(inicio)} a ${formatarData(fim)}`;
+  }
   if (periodo === 'escolher') return `Período: ${formatarMesAno(mesEscolhido)}`;
   return 'Período: este mês';
 }
@@ -185,6 +189,8 @@ export default function ReportsPage() {
             setPeriodo={periodoRelatorio.setPeriodo}
             mesEscolhido={periodoRelatorio.mesEscolhido}
             setMesEscolhido={periodoRelatorio.setMesEscolhido}
+            semanasAtras={periodoRelatorio.semanasAtras}
+            setSemanasAtras={periodoRelatorio.setSemanasAtras}
           />
         )}
       </div>

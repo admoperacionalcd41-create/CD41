@@ -1,8 +1,8 @@
 import React, { useMemo } from 'react';
-import { Clock, AlertTriangle, MessageSquareWarning } from 'lucide-react';
+import { Clock, AlertTriangle, MessageSquareWarning, TrendingDown } from 'lucide-react';
 import { useApp } from '../../context/AppContext.jsx';
-import { getPermanenciasRegistradas } from '../../utils/selectors';
-import { formatarHora, formatarData, formatarDuracao } from '../../utils/dateHelpers';
+import { getPermanenciasRegistradas, consolidarPermanenciaPorLoja } from '../../utils/selectors';
+import { formatarHora, formatarData, formatarDuracao, getIntervaloSemana } from '../../utils/dateHelpers';
 import TipoCargaBadge from '../Shared/TipoCargaBadge.jsx';
 
 // Tempo de permanência = intervalo entre o motorista registrar chegada e
@@ -22,7 +22,7 @@ function formatarPermanenciaMedia(msArray) {
 // ficam no nível de ReportsPage (ver ReportsPage.jsx e exportExcel.js).
 export default function DwellTimeReport({ periodoRelatorio }) {
   const { state, filtroTipoCarga } = useApp();
-  const { periodo, mesEscolhido, passaPeriodo } = periodoRelatorio;
+  const { periodo, mesEscolhido, passaPeriodo, semanasAtras = 0 } = periodoRelatorio;
   const tipo = filtroTipoCarga && filtroTipoCarga !== 'todos' ? filtroTipoCarga : undefined;
 
   const permanencias = useMemo(() => {
@@ -35,7 +35,7 @@ export default function DwellTimeReport({ periodoRelatorio }) {
       (a, b) => new Date(b.saidaLoja) - new Date(a.saidaLoja) || b.permanenciaMs - a.permanenciaMs
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state, tipo, periodo, mesEscolhido]);
+  }, [state, tipo, periodo, mesEscolhido, semanasAtras]);
 
   const mediaMs = useMemo(() => {
     if (permanencias.length === 0) return 0;
@@ -49,6 +49,15 @@ export default function DwellTimeReport({ periodoRelatorio }) {
     if (permanencias.length === 0) return null;
     return permanencias.reduce((maior, p) => (p.permanenciaMs > maior.permanenciaMs ? p : maior), permanencias[0]);
   }, [permanencias]);
+  // Visão "Semana": consolidado por loja (menor, maior e média), da pior
+  // média pra melhor — pedido do usuário, pra identificar as lojas que mais
+  // seguram os motoristas.
+  const consolidadoPorLoja = useMemo(
+    () => (periodo === 'semana' ? consolidarPermanenciaPorLoja(permanencias) : []),
+    [periodo, permanencias]
+  );
+  const maiorMedia = consolidadoPorLoja.length ? consolidadoPorLoja[0].mediaMs : 0;
+  const semana = getIntervaloSemana(semanasAtras);
   // Acima de 1h de permanência costuma chamar atenção — usado só pra
   // destacar visualmente as linhas mais demoradas na tabela.
   const LIMITE_ATENCAO_MS = 60 * 60 * 1000;
@@ -87,7 +96,92 @@ export default function DwellTimeReport({ periodoRelatorio }) {
         </div>
       </div>
 
+      {periodo === 'semana' && permanencias.length > 0 && (
+        <div className="mt-5 rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800" data-testid="consolidado-semana">
+          <div className="mb-3 flex items-center gap-2">
+            <TrendingDown size={16} className="text-red-500 dark:text-red-400" />
+            <div>
+              <h3 className="text-sm font-bold text-slate-700 dark:text-slate-200">Consolidado da semana por loja</h3>
+              <p className="text-xs text-slate-400 dark:text-slate-500">
+                {formatarData(semana.inicio)} a {formatarData(semana.fim)} — ordenado da PIOR média de permanência para a melhor
+              </p>
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="text-slate-500 dark:text-slate-400">
+                <tr className="border-b border-slate-100 dark:border-slate-700">
+                  <th className="py-2 pr-3 font-semibold">#</th>
+                  <th className="py-2 pr-3 font-semibold">Loja</th>
+                  <th className="py-2 pr-3 font-semibold text-right">Entregas</th>
+                  <th className="py-2 pr-3 font-semibold text-right">Menor tempo</th>
+                  <th className="py-2 pr-3 font-semibold text-right">Maior tempo</th>
+                  <th className="py-2 pr-3 font-semibold">Média de tempo</th>
+                </tr>
+              </thead>
+              <tbody>
+                {consolidadoPorLoja.map((l, i) => {
+                  const acimaLimite = l.mediaMs >= LIMITE_ATENCAO_MS;
+                  const piorTres = i < 3;
+                  const acimaDaMedia = l.mediaMs > mediaMs;
+                  const cor = acimaLimite
+                    ? 'text-red-600 dark:text-red-400'
+                    : acimaDaMedia
+                      ? 'text-amber-600 dark:text-amber-400'
+                      : 'text-slate-700 dark:text-slate-200';
+                  return (
+                    <tr
+                      key={l.codigo}
+                      data-testid={`linha-loja-${l.codigo}`}
+                      className={`border-b border-slate-50 last:border-0 dark:border-slate-700/60 ${
+                        acimaLimite ? 'bg-red-50/50 dark:bg-red-950/15' : piorTres ? 'bg-amber-50/40 dark:bg-amber-950/10' : ''
+                      }`}
+                    >
+                      <td className="py-2 pr-3 text-slate-400 dark:text-slate-500">{i + 1}º</td>
+                      <td className="py-2 pr-3">
+                        <p className="flex flex-wrap items-center gap-1.5 font-semibold text-slate-700 dark:text-slate-200">
+                          {l.codigo}{l.nome ? ` — ${l.nome}` : ''}
+                          <TipoCargaBadge tipo={l.tipoCarga} />
+                          {piorTres && (
+                            <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-600 dark:border dark:border-current dark:bg-red-500/10 dark:text-red-300">
+                              {i + 1}ª pior média
+                            </span>
+                          )}
+                        </p>
+                      </td>
+                      <td className="py-2 pr-3 text-right text-slate-600 dark:text-slate-300">{l.entregas}</td>
+                      <td className="py-2 pr-3 text-right text-slate-600 dark:text-slate-300">{formatarDuracao(l.menorMs)}</td>
+                      <td className="py-2 pr-3 text-right font-semibold text-slate-700 dark:text-slate-200">{formatarDuracao(l.maiorMs)}</td>
+                      <td className="py-2 pr-3">
+                        <div className="flex items-center gap-2">
+                          <div className="h-2 w-24 flex-shrink-0 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-700">
+                            <div
+                              className={`h-full rounded-full ${acimaLimite ? 'bg-red-500' : acimaDaMedia ? 'bg-amber-400' : 'bg-emerald-400'}`}
+                              style={{ width: `${maiorMedia > 0 ? (l.mediaMs / maiorMedia) * 100 : 0}%` }}
+                            />
+                          </div>
+                          <span className={`inline-flex items-center gap-1 font-bold ${cor}`}>
+                            {acimaLimite && <AlertTriangle size={12} />}
+                            {formatarDuracao(l.mediaMs)}
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-3 text-[11px] text-slate-400 dark:text-slate-500">
+            Vermelho: média de 1h ou mais. Âmbar: acima da média geral da semana ({formatarDuracao(mediaMs)}). As 3 lojas com pior média ganham a etiqueta "pior média".
+          </p>
+        </div>
+      )}
+
       <div className="mt-5 rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+        {periodo === 'semana' && permanencias.length > 0 && (
+          <h3 className="mb-3 text-sm font-bold text-slate-700 dark:text-slate-200">Entregas da semana, uma a uma</h3>
+        )}
         {permanencias.length === 0 ? (
           <p className="text-sm text-slate-400 dark:text-slate-500">
             Nenhuma entrega com chegada e saída registradas no período selecionado ainda.
