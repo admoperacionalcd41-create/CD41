@@ -7,6 +7,10 @@
 -- recria as duas funções de gravação pra também registrarem nesse diário, e
 -- cria a versão "leve" da gravação por patches (devolve só o número da versão).
 --
+-- Também protege contra aparelhos com versão ANTIGA do app ainda aberta: a
+-- gravação passa a descartar a cópia redundante `lojas[].protocolos` que o app
+-- antigo regravava em laço (principal causa do consumo alto de egress/Realtime).
+--
 -- Pré-requisito: já ter rodado as migrações anteriores (versão monotônica e
 -- gravação por campo).
 --
@@ -53,7 +57,7 @@ begin
 end $$;
 
 
--- 2) gravação por patches (agora registra no diário)
+-- 2) gravação por patches (registra no diário, ignora patch que não muda nada e descarta a cópia aninhada lojas[].protocolos que o app antigo regravava em laço)
 create or replace function public.app_state_aplicar_patches(
   p_patches jsonb,
   p_usuario uuid default null
@@ -65,6 +69,7 @@ set search_path = public
 as $$
 declare
   v_dados jsonb;
+  v_dados_original jsonb;
   v_patch jsonb;
   v_colecao text;
   v_campo text;
@@ -91,6 +96,29 @@ begin
   if v_dados is null then
     raise exception 'app_state estado-v1 não existe — faça a gravação inicial completa (upsert do documento inteiro) antes de usar patches';
   end if;
+
+  v_dados_original := v_dados;
+
+  -- Escudo contra aparelhos com app ANTIGO: `lojas[].protocolos` é uma cópia
+  -- redundante de `protocolos` que o app antigo regravava sem parar (ver
+  -- iguais() em mesclarEstadoSincronizado.js). Aqui ela é descartada dos
+  -- patches de lojas — tanto na aplicação quanto no diário (p_patches é
+  -- reescrito), então o JS (aplicarPatchesEstado.js) chega ao mesmo
+  -- documento. Os apps novos nunca mandam esse campo e o reconstroem a
+  -- partir de `protocolos`.
+  p_patches := coalesce((
+    select jsonb_agg(
+      case
+        when e->>'colecao' = 'lojas' and e->>'op' = 'mesclar_item' and jsonb_typeof(e->'campos') = 'object'
+          then jsonb_set(e, '{campos}', (e->'campos') - 'protocolos')
+        when e->>'colecao' = 'lojas' and e->>'op' = 'upsert_item' and jsonb_typeof(e->'item') = 'object'
+          then jsonb_set(e, '{item}', (e->'item') - 'protocolos')
+        else e
+      end
+      order by ord
+    )
+    from jsonb_array_elements(p_patches) with ordinality as t(e, ord)
+  ), '[]'::jsonb);
 
   for v_patch in select * from jsonb_array_elements(p_patches)
   loop
@@ -208,6 +236,19 @@ begin
       raise exception 'patch com op desconhecida: %', v_patch->>'op';
     end case;
   end loop;
+
+  -- Patch que não muda nada de verdade (o documento resultante é idêntico ao
+  -- que já está no banco — o `=` de jsonb ignora a ordem das chaves): não
+  -- grava, não incrementa a versão e não gera evento pro Realtime. Um app
+  -- antigo preso num laço de regravação (ver iguais() em
+  -- mesclarEstadoSincronizado.js) deixa de multiplicar mensagens e egress
+  -- pra todos os aparelhos. `dados` volta nulo (resposta minúscula).
+  if v_dados = v_dados_original then
+    select app_state.versao, app_state.atualizado_em into v_versao, v_agora
+      from public.app_state where id = 'estado-v1';
+    return query select v_versao, v_agora, null::jsonb;
+    return;
+  end if;
 
   update public.app_state
     set dados = v_dados, atualizado_em = now(), atualizado_por = p_usuario, versao = app_state.versao + 1

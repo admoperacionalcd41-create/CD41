@@ -67,6 +67,22 @@ const pwaPlugin = VitePWA({
   },
 });
 
+// Publica, junto com o app, um arquivo minúsculo /version.json com a versão
+// (hash do commit) que acabou de ser gerada. Cada aparelho com o app aberto
+// consulta esse arquivo de tempos em tempos (ver useAtualizacaoAutomatica.js);
+// se a versão publicada for diferente da que ele está rodando, ele mesmo
+// busca a atualização e recarrega — ninguém precisa ir aparelho por aparelho.
+const versaoJsonPlugin = {
+  name: 'doca-version-json',
+  generateBundle() {
+    this.emitFile({
+      type: 'asset',
+      fileName: 'version.json',
+      source: JSON.stringify({ versao: VERSAO_APP, data: DATA_BUILD_APP }),
+    });
+  },
+};
+
 export default defineConfig({
   // O preview de Artifact (ver build-artifact-source.mjs) vira um único
   // arquivo HTML autônomo embutido no claude.ai — não é o site publicado de
@@ -74,7 +90,7 @@ export default defineConfig({
   // pena, e registrar um ali seria só ruído (ou erro) dentro do sandbox do
   // preview. Por isso o plugin de PWA entra só no build normal (o que vira
   // o site do Vercel), nunca em BUILD_ARTIFACT_PREVIEW=true.
-  plugins: [react(), ...(process.env.BUILD_ARTIFACT_PREVIEW === 'true' ? [] : [pwaPlugin])],
+  plugins: [react(), ...(process.env.BUILD_ARTIFACT_PREVIEW === 'true' ? [] : [pwaPlugin, versaoJsonPlugin])],
   define: {
     __SUPABASE_URL__: JSON.stringify(process.env.VITE_SUPABASE_URL || ''),
     __SUPABASE_ANON_KEY__: JSON.stringify(process.env.VITE_SUPABASE_ANON_KEY || ''),

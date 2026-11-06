@@ -13,6 +13,8 @@
 //   node --import ./loader.mjs simular.mjs novo [seed] [usuarios] [acoes]
 // Pré-requisito: um Postgres com supabase/schema.sql carregado (ver README.md).
 import pg from 'pg';
+import { normalizarEstadoRecebido } from '../../src/sync/normalizarEstado.js';
+import { criarBoxesIniciais } from '../../src/utils/boxLogic.js';
 // Variáveis: PGHOST (padrão 127.0.0.1), PGUSER/PGPASSWORD (padrão postgres/postgres), PGDATABASE (padrão doca_sim).
 
 const [, , nomeMotor = 'novo', seedArg = '1', usuariosArg = '5', acoesArg = '30'] = process.argv;
@@ -26,6 +28,10 @@ const [, , nomeMotor = 'novo', seedArg = '1', usuariosArg = '5', acoesArg = '30'
 const MODO = process.env.MODO || 'leve';
 const PERDA_EVENTOS = Number(process.env.PERDA_EVENTOS || 0);
 // PAD_KB=300: engorda o documento (simula o tamanho real, ~300 kB) pra medir o egress.
+// REAL=1: usa a normalização REAL do app (normalizarEstadoRecebido, que reconstrói
+// os boxes etc.) e boxes no formato real ({ numero, ocupada, lojaId }) — a
+// simulação padrão usa um documento simples, sem normalização.
+const REAL = process.env.REAL === '1';
 const PAD_KB = Number(process.env.PAD_KB || 0);
 const SEED = Number(seedArg);
 const N_USUARIOS = Number(usuariosArg);
@@ -56,13 +62,15 @@ const BOXES = [1, 2, 3];
 
 function estadoInicial() {
   return {
-    lojas: LOJAS.map((id) => ({ id, loja: id, status: 'pendente', ...(PAD_KB ? { enchimento: 'x'.repeat(Math.round((PAD_KB * 1024) / LOJAS.length)) } : {}) })),
+    lojas: LOJAS.map((id) => ({ id, loja: id, status: 'pendente', ...(REAL ? { protocolos: [], composicaoPaletes: [] } : {}), ...(PAD_KB ? { enchimento: 'x'.repeat(Math.round((PAD_KB * 1024) / LOJAS.length)) } : {}) })),
     protocolos: [],
-    boxes: BOXES.map((numero) => ({
-      numero,
-      nome: `Box ${numero}`,
-      vagas: Array.from({ length: N_USUARIOS }, (_, i) => ({ numero: i + 1, ocupante: null })),
-    })),
+    boxes: REAL
+      ? criarBoxesIniciais()
+      : BOXES.map((numero) => ({
+          numero,
+          nome: `Box ${numero}`,
+          vagas: Array.from({ length: N_USUARIOS }, (_, i) => ({ numero: i + 1, ocupante: null })),
+        })),
     diaAtual: '2026-10-28',
     colaboradoresCadastrados: [],
     motoristasCadastrados: [],
@@ -83,14 +91,40 @@ const setCampoLoja = (id, campo, valor) => (s) => ({
 const setVaga = (box, vaga, valor) => (s) => ({
   ...s,
   boxes: s.boxes.map((b) =>
-    b.numero === box ? { ...b, vagas: b.vagas.map((v) => (v.numero === vaga ? { ...v, ocupante: valor } : v)) } : b
+    b.numero === box
+      ? {
+          ...b,
+          vagas: b.vagas.map((v) =>
+            v.numero === vaga ? (REAL ? { ...v, ocupada: valor != null, lojaId: valor } : { ...v, ocupante: valor }) : v
+          ),
+        }
+      : b
   ),
 });
-const addProtocolo = (id, valor) => (s) => ({ ...s, protocolos: [...s.protocolos, { id, criadoPor: valor }] });
-const setCampoProtocolo = (id, campo, valor) => (s) => ({
-  ...s,
-  protocolos: s.protocolos.map((p) => (p.id === id ? { ...p, [campo]: valor } : p)),
+// No app real cada protocolo existe DUAS vezes: em state.protocolos e dentro da
+// própria loja (loja.protocolos), com os campos na ordem em que o app os cria —
+// que NÃO é a ordem em que o Postgres (jsonb) devolve as chaves. REAL=1 reproduz
+// isso; é o que faltava pra pegar o laço de regravação por ordem de chaves.
+const novoProtocoloReal = (id, valor, lojaId) => ({
+  id, lojaId, placa: 'ABC1D23', motorista: 'Antonio', lacres: ['111', '', ''], statusEnvio: 'completo',
+  paletesEnviados: 5, dataHora: '2026-10-28T12:00:00.000Z', diaEntregaReferencia: null, criadoPor: valor,
 });
+const addProtocolo = (id, valor, lojaId) => (s) =>
+  REAL
+    ? {
+        ...s,
+        protocolos: [...s.protocolos, novoProtocoloReal(id, valor, lojaId)],
+        lojas: s.lojas.map((l) => (l.id === lojaId ? { ...l, protocolos: [...l.protocolos, novoProtocoloReal(id, valor, lojaId)] } : l)),
+      }
+    : { ...s, protocolos: [...s.protocolos, { id, criadoPor: valor }] };
+const setCampoProtocolo = (id, campo, valor, lojaId) => (s) => {
+  const atualizar = (p) => (p.id === id ? { ...p, [campo]: valor } : p);
+  return {
+    ...s,
+    protocolos: s.protocolos.map(atualizar),
+    ...(REAL ? { lojas: s.lojas.map((l) => (l.id === lojaId ? { ...l, protocolos: l.protocolos.map(atualizar) } : l)) } : {}),
+  };
+};
 const compor = (...fns) => (s) => fns.reduce((acc, f) => f(acc), s);
 
 // --- transporte + "Realtime" ---------------------------------------------
@@ -207,7 +241,11 @@ async function main() {
 
   for (let i = 0; i < N_USUARIOS; i += 1) {
     const leve = MODO === 'leve' || (MODO === 'misto' && i % 2 === 0);
-    const motor = criarMotor({ transporte: criarTransporte(leve), estadoInicial: estadoInicial() });
+    const motor = criarMotor({
+      transporte: criarTransporte(leve),
+      estadoInicial: estadoInicial(),
+      ...(REAL ? { normalizar: normalizarEstadoRecebido } : {}),
+    });
     motor.carregarInicial(JSON.parse(JSON.stringify(linhaInicial)));
     clientes.push({ id: i + 1, leve, motor, filaRealtime: Promise.resolve() });
   }
@@ -232,12 +270,12 @@ async function main() {
             esperado.set(`vaga:${box}:${c.id}`, token);
           } else if (tipo < 0.75 || meusProtocolos.length === 0) {
             const id = `P-${token}`;
-            c.motor.aplicarLocal(addProtocolo(id, token));
-            meusProtocolos.push(id);
+            c.motor.aplicarLocal(addProtocolo(id, token, loja));
+            meusProtocolos.push({ id, loja });
             esperado.set(`protocolo:${id}:criadoPor`, token);
           } else {
-            const id = meusProtocolos[entre(0, meusProtocolos.length)];
-            c.motor.aplicarLocal(setCampoProtocolo(id, `entrega`, token));
+            const { id, loja: lojaDoProtocolo } = meusProtocolos[entre(0, meusProtocolos.length)];
+            c.motor.aplicarLocal(setCampoProtocolo(id, `entrega`, token, lojaDoProtocolo));
             esperado.set(`protocolo:${id}:entrega`, token);
           }
         } catch (e) {
@@ -274,8 +312,15 @@ async function main() {
   const ler = (dados, chave) => {
     const [tipo, a, b] = chave.split(':');
     if (tipo === 'loja') return dados.lojas.find((l) => l.id === a)?.[b];
-    if (tipo === 'vaga') return dados.boxes.find((x) => x.numero === Number(a))?.vagas.find((v) => v.numero === Number(b))?.ocupante;
+    if (tipo === 'vaga') {
+      const v = dados.boxes.find((x) => x.numero === Number(a))?.vagas.find((x) => x.numero === Number(b));
+      return REAL ? v?.lojaId : v?.ocupante;
+    }
     if (tipo === 'protocolo') return dados.protocolos.find((p) => p.id === a)?.[b];
+    if (tipo === 'lojaproto') {
+      const [lojaId, protoId] = a.split('/');
+      return dados.lojas.find((l) => l.id === lojaId)?.protocolos?.find((p) => p.id === protoId)?.[b];
+    }
     return undefined;
   };
 
@@ -297,8 +342,30 @@ async function main() {
     JSON.stringify(v, (_k, x) =>
       x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.entries(x).sort(([a], [b]) => (a < b ? -1 : 1))) : x
     );
-  const docServidor = canonico(servidor);
-  const documentosDiferentes = clientes.filter((c) => canonico(c.motor.estadoLocal()) !== docServidor).length;
+  // `loja.protocolos` (cópia redundante de state.protocolos) não é sincronizada
+  // — ver calcularPatchesEstado.js — então fica de fora da comparação.
+  // No protocolo antigo (documento inteiro) dois protocolos criados ao mesmo tempo
+  // podem ficar em ordem diferente em cada aparelho — só a ORDEM; o conteúdo é o
+  // mesmo. No leve (patches aplicados na ordem do servidor) a ordem tem que bater.
+  const ordenaSeLegado = (lista) => (MODO === 'leve' ? lista : [...(lista || [])].sort((a, b) => (String(a?.id) < String(b?.id) ? -1 : 1)));
+  const semCopiaAninhada = (doc) => ({
+    ...doc,
+    protocolos: ordenaSeLegado(doc.protocolos),
+    lojas: (doc.lojas || []).map(({ protocolos: _ignorado, ...resto }) => resto),
+  });
+  const docServidor = canonico(semCopiaAninhada(servidor));
+  if (process.env.DEBUG_DIFF) {
+    const caminhos = (a, b, pre = '') => {
+      if (JSON.stringify(a) === JSON.stringify(b)) return [];
+      if (!a || !b || typeof a !== 'object' || typeof b !== 'object') return [`${pre}: ${JSON.stringify(a)?.slice(0, 80)} != ${JSON.stringify(b)?.slice(0, 80)}`];
+      return [...new Set([...Object.keys(a), ...Object.keys(b)])].flatMap((k) => caminhos(a[k], b[k], `${pre}/${k}`));
+    };
+    clientes.forEach((c, i) => {
+      const d = caminhos(JSON.parse(docServidor), JSON.parse(canonico(semCopiaAninhada(c.motor.estadoLocal()))));
+      if (d.length) console.log('DIFF cliente', i, d.slice(0, 6));
+    });
+  }
+  const documentosDiferentes = clientes.filter((c) => canonico(semCopiaAninhada(c.motor.estadoLocal())) !== docServidor).length;
 
   console.log(
     JSON.stringify({
@@ -314,6 +381,8 @@ async function main() {
       motor: nomeMotor,
       seed: SEED,
       versaoFinal: Number(finais[0].versao),
+      gravacoes: Number(finais[0].versao) - Number(linhaInicial.versao),
+      acoesTotais: N_USUARIOS * N_ACOES,
       camposVerificados: esperado.size,
       atualizacoesPerdidas: perdidas.length,
       telasDiferentesDoBanco: divergentes,

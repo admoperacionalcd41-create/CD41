@@ -75,13 +75,39 @@ export const MAPAS_OBJETO = ['observacoesLoja'];
 // simples fazem) preservaria os itens mas destruiria a ordem arrastada.
 export const CAMPOS_ESCALARES = ['diaAtual', 'valorPaletesAgrupamento', 'sequenciaLojas'];
 
+// Igualdade profunda que IGNORA a ordem das chaves dos objetos (e trata chave
+// com valor `undefined` como ausente, igual ao JSON). Antes era
+// `JSON.stringify(a) === JSON.stringify(b)`, que é sensível à ordem das
+// chaves — e o Postgres (jsonb) devolve as chaves de cada objeto numa ordem
+// DIFERENTE da que o app usa ao criar/alterar (jsonb ordena por tamanho e
+// depois alfabeticamente). Em dados aninhados (ex.: o array `protocolos`
+// dentro de cada loja) isso fazia a tela achar que um valor idêntico tinha
+// "mudado", regravar, receber de volta com a ordem do banco, achar que mudou
+// de novo… um laço de regravação sem fim (centenas de gravações iguais, e
+// cada uma mandando dados a todos os aparelhos — a causa do estouro de
+// egress do Supabase). A ordem dos ITENS de um array continua importando.
 export function iguais(a, b) {
   if (a === b) return true;
-  try {
-    return JSON.stringify(a) === JSON.stringify(b);
-  } catch {
-    return false;
+  if (a === null || b === null || typeof a !== 'object' || typeof b !== 'object') {
+    // NaN é o único valor diferente de si mesmo; tratado como igual a NaN.
+    return a !== a && b !== b; // eslint-disable-line no-self-compare
   }
+  const aEhLista = Array.isArray(a);
+  if (aEhLista !== Array.isArray(b)) return false;
+  if (aEhLista) {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i += 1) {
+      if (!iguais(a[i], b[i])) return false;
+    }
+    return true;
+  }
+  const chavesA = Object.keys(a).filter((k) => a[k] !== undefined);
+  const chavesB = Object.keys(b).filter((k) => b[k] !== undefined);
+  if (chavesA.length !== chavesB.length) return false;
+  for (const k of chavesA) {
+    if (!Object.prototype.hasOwnProperty.call(b, k) || !iguais(a[k], b[k])) return false;
+  }
+  return true;
 }
 
 function paraMapa(colecao, chave) {

@@ -71,6 +71,24 @@ function paraMapa(colecao, chave) {
 // `granularidadeCampo: false` volta pro comportamento antigo (item inteiro)
 // — usado só como contingência automática se o banco ainda não tiver a
 // op `mesclar_item` (migração não rodada), ver motorSincronizacao.js.
+//
+// `camposIgnorados`: campos que NÃO são sincronizados. Hoje só `protocolos`
+// dentro de cada loja: é uma cópia redundante de state.protocolos (filtrada
+// pela loja), que o app só mantém mas nunca lê — e sincronizá-la fazia duas
+// pessoas mexendo em protocolos da MESMA loja se sobrescreverem (o array
+// inteiro ia de uma vez), além de dobrar o tamanho de cada gravação. A cópia
+// é reconstruída a partir de state.protocolos ao receber (ver
+// normalizarEstado.js).
+const CAMPOS_NAO_SINCRONIZADOS_POR_COLECAO = { lojas: ['protocolos'] };
+
+function semCamposNaoSincronizados(colecao, item) {
+  const ignorados = CAMPOS_NAO_SINCRONIZADOS_POR_COLECAO[colecao];
+  if (!ignorados || !item || typeof item !== 'object') return item;
+  const copia = { ...item };
+  ignorados.forEach((campo) => delete copia[campo]);
+  return copia;
+}
+
 function diferencaDeCampos(emBase, item) {
   const campos = {};
   const removidos = [];
@@ -92,8 +110,9 @@ function calcularPatchesColecao(colecao, chave, base, atual, granularidadeCampo)
   const atualMapa = paraMapa(atual, chave);
   const patches = [];
 
-  atualMapa.forEach((item, id) => {
-    const emBase = baseMapa.get(id);
+  atualMapa.forEach((itemCompleto, id) => {
+    const item = semCamposNaoSincronizados(colecao, itemCompleto);
+    const emBase = semCamposNaoSincronizados(colecao, baseMapa.get(id));
     if (!emBase) {
       patches.push({ op: 'upsert_item', colecao, chave, valorChave: String(id), item });
     } else if (!iguais(emBase, item)) {

@@ -28,6 +28,13 @@ function achaIndice(colecao, chave, valorChave) {
 
 const comoLista = (v) => (Array.isArray(v) ? v : []);
 const comoMapa = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
+// Espelho do "escudo" do SQL: `lojas[].protocolos` (cópia redundante, ver
+// calcularPatchesEstado.js) é descartada dos patches de lojas.
+const semProtocolosAninhados = (colecao, obj) => {
+  if (colecao !== 'lojas' || !obj || typeof obj !== 'object' || Array.isArray(obj)) return obj;
+  const { protocolos: _descartado, ...resto } = obj;
+  return resto;
+};
 const texto = (v) => (v === undefined || v === null ? null : typeof v === 'object' ? JSON.stringify(v) : String(v));
 
 export function aplicarPatchesEstado(estado, patches) {
@@ -39,14 +46,15 @@ export function aplicarPatchesEstado(estado, patches) {
       case 'upsert_item': {
         const lista = comoLista(dados[patch.colecao]);
         const i = achaIndice(lista, patch.chave, patch.valorChave);
-        dados[patch.colecao] = i < 0 ? [...lista, patch.item] : lista.map((x, k) => (k === i ? patch.item : x));
+        const itemNovo = semProtocolosAninhados(patch.colecao, patch.item);
+        dados[patch.colecao] = i < 0 ? [...lista, itemNovo] : lista.map((x, k) => (k === i ? itemNovo : x));
         break;
       }
       case 'mesclar_item': {
         const lista = comoLista(dados[patch.colecao]);
         const i = achaIndice(lista, patch.chave, patch.valorChave);
         if (i < 0) break; // item excluído por outra pessoa: respeita (igual ao SQL)
-        const item = { ...lista[i], ...(patch.campos || {}) };
+        const item = { ...lista[i], ...(semProtocolosAninhados(patch.colecao, patch.campos) || {}) };
         if (Array.isArray(patch.removidos)) patch.removidos.forEach((campo) => delete item[campo]);
         dados[patch.colecao] = lista.map((x, k) => (k === i ? item : x));
         break;

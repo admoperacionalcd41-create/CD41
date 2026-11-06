@@ -4,6 +4,7 @@ import App from './App.jsx';
 import { AppProvider } from './context/AppContext.jsx';
 import { AuthProvider } from './context/AuthContext.jsx';
 import { ErrorBoundary } from './components/Shared/ErrorBoundary.jsx';
+import AvisoNovaVersao from './components/Layout/AvisoNovaVersao.jsx';
 // Importado só pelo efeito colateral: registra bem cedo o listener que
 // captura o evento de instalação do app (ver useInstalarApp.js) — tem que
 // ser aqui, antes de qualquer aba (lazy-loaded) montar, senão o navegador
@@ -25,5 +26,8 @@ ReactDOM.createRoot(document.getElementById('root')).render(
         </AppProvider>
       </AuthProvider>
     </ErrorBoundary>
+    {/* Fora dos providers e do ErrorBoundary de propósito: funciona também na
+        tela de login e continua atualizando o aparelho se o app quebrar. */}
+    <AvisoNovaVersao />
   </React.StrictMode>
 );

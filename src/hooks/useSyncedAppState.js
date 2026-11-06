@@ -2,9 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase, SUPABASE_CONFIGURADO } from '../lib/supabaseClient';
 import { useAuth } from '../context/AuthContext';
 import { useLocalStorage } from './useLocalStorage';
-import { sincronizarBoxes, criarBoxesIniciais } from '../utils/boxLogic';
-import { hojeISO } from '../utils/dateHelpers';
 import { criarMotorSincronizacao } from '../sync/motorSincronizacao';
+import { normalizarEstadoRecebido } from '../sync/normalizarEstado';
 
 // Id fixo da única linha compartilhada da tabela `app_state` — o estado
 // inteiro do sistema (lojas, boxes, motoristas, carregamentos etc.) vive
@@ -23,46 +22,6 @@ const ID_ESTADO_COMPARTILHADO = 'estado-v1';
 // dela, que é a situação que a mesclagem abaixo existe pra tratar quando
 // acontece mesmo assim.
 const ATRASO_GRAVACAO_MS = 200;
-
-// Garante que qualquer estado vindo de fora (do Supabase — outra pessoa
-// pode estar numa versão ligeiramente diferente do app, ou a linha
-// compartilhada pode ter sido criada antes de algum campo existir) tenha
-// todos os campos que o app espera, com o mesmo valor "vazio" que o
-// reducer usa (ver SINCRONIZAR_BOXES/SINCRONIZAR_CADASTROS em
-// AppContext.jsx). Sem isso, um campo ausente (ex.: contatosNotificacao)
-// quebra a tela com "Cannot read properties of undefined".
-function normalizarEstadoRecebido(dados) {
-  if (!dados || typeof dados !== 'object') return dados;
-  const placasBrutas = Array.isArray(dados.placasCadastradas) ? dados.placasCadastradas : [];
-  return {
-    ...dados,
-    lojas: Array.isArray(dados.lojas) ? dados.lojas : [],
-    protocolos: Array.isArray(dados.protocolos) ? dados.protocolos : [],
-    boxes: sincronizarBoxes(Array.isArray(dados.boxes) ? dados.boxes : criarBoxesIniciais()),
-    diaAtual: dados.diaAtual || hojeISO(),
-    colaboradoresCadastrados: Array.isArray(dados.colaboradoresCadastrados) ? dados.colaboradoresCadastrados : [],
-    motoristasCadastrados: Array.isArray(dados.motoristasCadastrados) ? dados.motoristasCadastrados : [],
-    placasCadastradas: placasBrutas.map((p) => (typeof p === 'string' ? { placa: p, possuiPlataforma: false } : p)),
-    contatosNotificacao: Array.isArray(dados.contatosNotificacao) ? dados.contatosNotificacao : [],
-    localizacaoLojas: Array.isArray(dados.localizacaoLojas) ? dados.localizacaoLojas : [],
-    // Observações das lojas (ver AppContext.jsx, DEFINIR_OBSERVACAO_LOJA) —
-    // mapa { código da loja: texto }, não um array; mesmo cuidado de
-    // normalização dos campos acima, pro caso de chegar aqui uma linha
-    // compartilhada salva antes desse campo existir.
-    observacoesLoja:
-      dados.observacoesLoja && typeof dados.observacoesLoja === 'object' && !Array.isArray(dados.observacoesLoja)
-        ? dados.observacoesLoja
-        : {},
-    // Ordem customizada das lojas (Modo sequência, ver DailyProcessReport.jsx)
-    // — mesmo cuidado: estado compartilhado salvo antes desse campo existir
-    // não tem essa chave.
-    sequenciaLojas: Array.isArray(dados.sequenciaLojas) ? dados.sequenciaLojas : [],
-    // Valor pago por palete agrupado (ver ValoresConfigCard.jsx) — mesmo
-    // padrão de 0,58 usado em SINCRONIZAR_CADASTROS/mockData.js, pro caso de
-    // chegar aqui um estado compartilhado salvo antes desse campo existir.
-    valorPaletesAgrupamento: typeof dados.valorPaletesAgrupamento === 'number' ? dados.valorPaletesAgrupamento : 0.58,
-  };
-}
 
 /**
  * Substituto de useLocalStorage que, com o Supabase configurado (site
