@@ -1034,6 +1034,58 @@ function aplicarAcaoInterna(state, acao) {
       };
     }
 
+    // Pedido do usuário: o "Alterar" dos Últimos Protocolos Registrados só
+    // mexia na data de entrega — agora corrige também placa, motorista e
+    // lacres de um protocolo JÁ finalizado, sem cancelar (a carga não volta
+    // pro box, nada de boxes/vagas/paletes muda). Vale pra viagem inteira
+    // (mesmo `viagemId`): é um único veículo/motorista/conjunto de lacres.
+    // Só entram os campos informados no payload; horários (dataHora, NF,
+    // chegada/saída) nunca mudam aqui.
+    case 'EDITAR_PROTOCOLO': {
+      const { protocoloId, placa, motorista, lacres, dia } = acao.payload;
+      const protocolo = state.protocolos.find((p) => p.id === protocoloId);
+      if (!protocolo) {
+        return { ...state, ultimoErro: 'Protocolo não encontrado.' };
+      }
+      const campos = {};
+      if (placa !== undefined) {
+        const novaPlaca = String(placa).trim().toUpperCase();
+        if (!novaPlaca) return { ...state, ultimoErro: 'Informe a placa do veículo.' };
+        campos.placa = novaPlaca;
+      }
+      if (motorista !== undefined) {
+        const novoMotorista = String(motorista).trim();
+        if (!novoMotorista) return { ...state, ultimoErro: 'Informe o motorista.' };
+        campos.motorista = novoMotorista;
+      }
+      if (lacres !== undefined) {
+        const novosLacres = [0, 1, 2].map((i) => String((lacres || [])[i] ?? '').trim());
+        if (!novosLacres[0]) return { ...state, ultimoErro: 'Informe pelo menos o lacre 1.' };
+        campos.lacres = novosLacres;
+      }
+      if (dia !== undefined) {
+        const novoDia = dia ? String(dia).slice(0, 10) : null;
+        if (novoDia && !/^\d{4}-\d{2}-\d{2}$/.test(novoDia)) {
+          return { ...state, ultimoErro: 'Data de entrega inválida.' };
+        }
+        campos.diaEntregaReferencia = novoDia;
+      }
+      const afetado = (p) =>
+        p.id === protocoloId || (protocolo.viagemId != null && p.viagemId === protocolo.viagemId);
+      const atualizarProtocolo = (p) => (afetado(p) ? { ...p, ...campos } : p);
+      const quantos = state.protocolos.filter(afetado).length;
+
+      return {
+        ...state,
+        protocolos: state.protocolos.map(atualizarProtocolo),
+        lojas: state.lojas.map((l) =>
+          l.protocolos?.some(afetado) ? { ...l, protocolos: l.protocolos.map(atualizarProtocolo) } : l
+        ),
+        ultimoErro: null,
+        ultimoAviso: `Protocolo alterado (${quantos} loja${quantos !== 1 ? 's' : ''}).`,
+      };
+    }
+
     case 'DESFAZER_ENTREGA_NF': {
       const { protocoloId } = acao.payload;
       const protocolo = state.protocolos.find((p) => p.id === protocoloId);
@@ -1529,6 +1581,8 @@ export function AppProvider({ children }) {
       registrarEntregaNF: (protocoloId, dataHora) =>
         dispatch({ tipo: 'REGISTRAR_ENTREGA_NF', payload: { protocoloId, dataHora } }),
       desfazerEntregaNF: (protocoloId) => dispatch({ tipo: 'DESFAZER_ENTREGA_NF', payload: { protocoloId } }),
+      editarProtocolo: (protocoloId, campos) =>
+        dispatch({ tipo: 'EDITAR_PROTOCOLO', payload: { protocoloId, ...campos } }),
       alterarDiaEntregaProtocolo: (protocoloId, dia) =>
         dispatch({ tipo: 'ALTERAR_DIA_ENTREGA_PROTOCOLO', payload: { protocoloId, dia } }),
       encerrarDia: () => dispatch({ tipo: 'ENCERRAR_DIA' }),

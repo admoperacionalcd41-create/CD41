@@ -16,6 +16,7 @@ import { imprimirProtocolo } from '../../utils/imprimirProtocolo';
 import { imprimirEtiquetaCarregamento } from '../../utils/imprimirEtiquetaCarregamento';
 import { montarMensagemProtocolo } from '../../utils/notificacoes';
 import NotifyWhatsappModal from '../Shared/NotifyWhatsappModal.jsx';
+import EditarProtocoloModal from './EditarProtocoloModal.jsx';
 import TipoCargaBadge from '../Shared/TipoCargaBadge.jsx';
 import { lojaPassaFiltroTipoCarga } from '../../utils/tipoCarga';
 
@@ -55,9 +56,9 @@ export default function LoadingList({ aoAbrirProtocolo, irPara }) {
   const [valorManualNF, setValorManualNF] = useState({});
   // id do protocolo com "Desfazer entrega de NF?" em confirmação na tabela.
   const [confirmandoDesfazerNF, setConfirmandoDesfazerNF] = useState(null);
-  // Alteração da data de entrega de um protocolo já finalizado (ver coluna
-  // Data/Hora abaixo): { id, valor } do protocolo em edição, ou null.
-  const [editandoDiaEntrega, setEditandoDiaEntrega] = useState(null);
+  // Protocolo já finalizado em edição (botão "Alterar" na coluna Data/Hora):
+  // data de entrega, placa, motorista e lacres — ver EditarProtocoloModal.jsx.
+  const [editandoProtocolo, setEditandoProtocolo] = useState(null);
 
   const prontas = useMemo(
     () => getLojasProntasParaCarregar(state).filter((l) => lojaPassaFiltroTipoCarga(l, filtroTipoCarga)),
@@ -270,12 +271,6 @@ export default function LoadingList({ aoAbrirProtocolo, irPara }) {
   function confirmarEntregaNFManual(protocoloId) {
     actions.registrarEntregaNF(protocoloId, deDataHoraLocalInput(valorManualNF[protocoloId]));
     setManualNFAberto((atual) => ({ ...atual, [protocoloId]: false }));
-  }
-
-  function salvarDiaEntrega() {
-    if (!editandoDiaEntrega) return;
-    actions.alterarDiaEntregaProtocolo(editandoDiaEntrega.id, editandoDiaEntrega.valor || null);
-    setEditandoDiaEntrega(null);
   }
 
   function aoDesfazerEntregaNF(protocoloId) {
@@ -525,65 +520,32 @@ export default function LoadingList({ aoAbrirProtocolo, irPara }) {
                       </td>
                       <td className="py-2 pr-3 text-slate-400 dark:text-slate-500">
                         {formatarDataHora(p.dataHora)}
-                        {/* Pedido do usuário: corrigir a data de entrega depois
-                            de finalizar o carregamento, sem cancelar o
-                            protocolo (a carga não volta pro box). Só muda
-                            diaEntregaReferencia — `dataHora` (acima) continua
-                            sendo o horário real do registro. Vale pra todas
-                            as lojas da mesma viagem. */}
-                        {editandoDiaEntrega?.id === p.id ? (
-                          <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                            <input
-                              type="date"
-                              value={editandoDiaEntrega.valor}
-                              onChange={(e) => setEditandoDiaEntrega({ id: p.id, valor: e.target.value })}
-                              aria-label="Nova data de entrega"
-                              className="rounded border border-slate-300 bg-white px-1.5 py-0.5 text-xs text-slate-800 focus:border-totvs-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-whatsapp-500"
-                            />
-                            <button
-                              type="button"
-                              onClick={salvarDiaEntrega}
-                              disabled={!editandoDiaEntrega.valor}
-                              className="font-semibold text-totvs-600 hover:underline disabled:opacity-40 dark:text-whatsapp-400"
-                            >
-                              Salvar
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setEditandoDiaEntrega(null)}
-                              className="text-slate-400 hover:underline dark:text-slate-500"
-                            >
-                              Cancelar
-                            </button>
-                            {p.viagemId && contagemPorViagem[p.viagemId] > 1 && (
-                              <span className="basis-full text-[10px] text-slate-400 dark:text-slate-500">
-                                Vale para as {contagemPorViagem[p.viagemId]} lojas desta viagem.
-                              </span>
-                            )}
-                          </div>
-                        ) : (
-                          <div
-                            className="mt-0.5 flex items-center gap-1.5"
-                            title="Dia em que esse carregamento conta como entrega nos relatórios (Processo do Dia, Meta de Entrega, Entregas por Motorista, Exportar Excel)."
+                        {/* Pedido do usuário: corrigir depois de finalizar o
+                            carregamento, sem cancelar o protocolo (a carga não
+                            volta pro box) — data de entrega, placa, motorista
+                            e lacres, na janela EditarProtocoloModal. `dataHora`
+                            (acima) continua sendo o horário real do registro.
+                            Vale pra todas as lojas da mesma viagem. */}
+                        <div
+                          className="mt-0.5 flex items-center gap-1.5"
+                          title="Dia em que esse carregamento conta como entrega nos relatórios (Processo do Dia, Meta de Entrega, Entregas por Motorista, Exportar Excel)."
+                        >
+                          <span
+                            className={`font-semibold ${
+                              p.diaEntregaReferencia ? 'text-amber-600 dark:text-amber-400' : 'text-slate-500 dark:text-slate-400'
+                            }`}
                           >
-                            <span
-                              className={`font-semibold ${
-                                p.diaEntregaReferencia ? 'text-amber-600 dark:text-amber-400' : 'text-slate-500 dark:text-slate-400'
-                              }`}
-                            >
-                              Entrega: {formatarData(diaReferenciaProtocolo(p).slice(0, 10))}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setEditandoDiaEntrega({ id: p.id, valor: diaReferenciaProtocolo(p).slice(0, 10) })
-                              }
-                              className="inline-flex items-center gap-0.5 text-[10px] text-slate-400 underline decoration-dotted underline-offset-2 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
-                            >
-                              <CalendarDays size={10} /> Alterar
-                            </button>
-                          </div>
-                        )}
+                            Entrega: {formatarData(diaReferenciaProtocolo(p).slice(0, 10))}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setEditandoProtocolo(p)}
+                            title="Alterar data de entrega, placa, motorista e lacres deste protocolo"
+                            className="inline-flex items-center gap-0.5 text-[10px] text-slate-400 underline decoration-dotted underline-offset-2 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
+                          >
+                            <CalendarDays size={10} /> Alterar
+                          </button>
+                        </div>
                       </td>
                       <td className="py-2 pr-3">
                         {p.entregaNotasFiscais ? (
@@ -736,6 +698,14 @@ export default function LoadingList({ aoAbrirProtocolo, irPara }) {
           </div>
         )}
       </div>
+
+      {editandoProtocolo && (
+        <EditarProtocoloModal
+          protocolo={editandoProtocolo}
+          quantidadeLojasDaViagem={editandoProtocolo.viagemId ? contagemPorViagem[editandoProtocolo.viagemId] || 1 : 1}
+          aoFechar={() => setEditandoProtocolo(null)}
+        />
+      )}
 
       {mensagemNotificarManual && (
         <NotifyWhatsappModal
