@@ -443,8 +443,17 @@ function aplicarAcaoInterna(state, acao) {
     }
 
     case 'FINALIZAR_CARREGAMENTO': {
-      const { lojaId, placa, motorista, lacres, statusEnvio, paletesEnviados, lotesRestantes, diaEntregaReferencia } =
-        acao.payload;
+      const {
+        lojaId,
+        placa,
+        motorista,
+        lacres,
+        statusEnvio,
+        paletesEnviados,
+        lotesRestantes,
+        diaEntregaReferencia,
+        observacaoLoja,
+      } = acao.payload;
       const loja = state.lojas.find((l) => l.id === lojaId);
       if (!loja || loja.boxNumero == null) {
         return { ...state, ultimoErro: 'Loja inválida para finalização de carregamento.' };
@@ -503,6 +512,12 @@ function aplicarAcaoInterna(state, acao) {
         // diaReferenciaProtocolo em selectors.js. `dataHora` continua sendo
         // sempre o horário real do registro, sem alteração.
         diaEntregaReferencia: diaEntregaReferencia || null,
+        // Observação da loja vigente NO MOMENTO do protocolo (texto copiado
+        // do cadastro de Observações — a tela já mostra isso antes de
+        // finalizar). Fica gravada aqui porque o operador pode responder
+        // "Sim, atendida", o que apaga a observação do cadastro; mesmo
+        // assim ela precisa sair na etiqueta de carregamento desta carga.
+        observacaoLoja: observacaoLoja || null,
         boxNumero: loja.boxNumero,
         vagasLiberadas,
       };
@@ -563,6 +578,7 @@ function aplicarAcaoInterna(state, acao) {
         ordemCarregamento,
         lotesRestantesPorLoja = {},
         diaEntregaReferencia,
+        observacoesPorLoja = {},
       } = acao.payload;
       const lojasSelecionadas = lojaIds
         .map((id) => state.lojas.find((l) => l.id === id))
@@ -637,6 +653,9 @@ function aplicarAcaoInterna(state, acao) {
           // comentário lá. Comum a todas as lojas da viagem, já que é um
           // único veículo/uma única saída.
           diaEntregaReferencia: diaEntregaReferencia || null,
+          // Observação da loja no momento do protocolo — ver
+          // FINALIZAR_CARREGAMENTO.
+          observacaoLoja: observacoesPorLoja[loja.id] || null,
           viagemId,
           boxNumero: loja.boxNumero,
           vagasLiberadas,

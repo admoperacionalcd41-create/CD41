@@ -161,6 +161,15 @@ export default function LoadingList({ aoAbrirProtocolo, irPara }) {
   // protocolo em lote (viagemId), reconstrói TODAS as lojas daquela viagem
   // — não só a linha clicada — pra sair a mesma etiqueta única com uma
   // seção por loja, na ordem de carregamento, que o fluxo antigo gerava.
+  // Observação que sai na etiqueta: a que estava valendo quando o protocolo
+  // foi feito (gravada no próprio protocolo — vale mesmo se depois foi
+  // marcada como atendida e apagada do cadastro). Protocolos antigos, de
+  // antes desse campo existir, usam a observação atual da loja.
+  function observacaoDoProtocolo(protocolo, loja) {
+    if (protocolo.observacaoLoja !== undefined) return protocolo.observacaoLoja;
+    return state.observacoesLoja?.[loja.loja] || null;
+  }
+
   function aoImprimirEtiqueta(protocolo) {
     const lojaBase = state.lojas.find((l) => l.id === protocolo.lojaId);
     if (!lojaBase) return;
@@ -178,6 +187,7 @@ export default function LoadingList({ aoAbrirProtocolo, irPara }) {
                   boxNumero: p.boxNumero,
                   colaboradores: l.colaboradores,
                   posicaoCarregamento: p.posicaoCarregamento,
+                  observacaoLoja: observacaoDoProtocolo(p, l),
                 }
               : null;
           })
@@ -190,6 +200,7 @@ export default function LoadingList({ aoAbrirProtocolo, irPara }) {
             paletesEnviados: protocolo.paletesEnviados,
             boxNumero: protocolo.boxNumero,
             colaboradores: lojaBase.colaboradores,
+            observacaoLoja: observacaoDoProtocolo(protocolo, lojaBase),
           },
         ];
     const sucesso = imprimirEtiquetaCarregamento(itens);

@@ -25,6 +25,10 @@ import { imprimirHtml } from './imprimirHtml';
 const LARGURA_ETIQUETA_MM = 100;
 const ALTURA_ETIQUETA_MM = 50;
 
+function escaparHtml(texto) {
+  return texto.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 function ordenarPorSequenciaDeCarregamento(itens) {
   const temSequencia = itens.length > 1 && itens.every((item) => item.posicaoCarregamento != null);
   if (!temSequencia) return itens;
@@ -211,6 +215,19 @@ function montarHtmlEtiquetaCarregamento(itens, tamanho = TAMANHO_MAXIMO, central
       overflow-wrap: break-word;
     }
     .agrupadores .rotulo { font-weight: 800; text-transform: uppercase; }
+    /* Observação da loja (só aparece quando existe — sem observação o HTML
+       da etiqueta fica idêntico ao de antes). Mesmo tamanho/estilo dos
+       agrupadores, entra no encolhimento medido igual a eles. */
+    .observacao {
+      margin: 0.2mm 0 0;
+      font-size: ${t.agrupadores}pt;
+      font-weight: 800;
+      line-height: 1.15;
+      color: #000;
+      white-space: normal;
+      overflow-wrap: break-word;
+    }
+    .observacao .rotulo { font-weight: 900; text-transform: uppercase; }
 
     /* Pedido do usuário: total de paletes (soma de todas as lojas) no
        rodapé da etiqueta — útil pra conferência rápida de quantos paletes
@@ -234,6 +251,8 @@ function montarHtmlEtiquetaCarregamento(itens, tamanho = TAMANHO_MAXIMO, central
       const sequencia = temSequencia
         ? `<span class="sequencia">${item.posicaoCarregamento}º CARREGAR</span>`
         : '';
+      const textoObservacao = item.observacaoLoja ? escaparHtml(String(item.observacaoLoja).replace(/\s+/g, ' ').trim()) : '';
+      const observacao = textoObservacao ? `\n        <p class="observacao"><span class="rotulo">Obs:</span> ${textoObservacao}</p>` : '';
       const agrupadores = (item.colaboradores && item.colaboradores.filter(Boolean).join(', ')) || '—';
       return `
       <div class="secao-loja">
@@ -243,7 +262,7 @@ function montarHtmlEtiquetaCarregamento(itens, tamanho = TAMANHO_MAXIMO, central
           <span class="campo-loja"><span class="rotulo">Paletes:</span> <span class="valor">${item.paletesEnviados}</span></span>
           <span class="campo-loja"><span class="rotulo">Box:</span> <span class="valor">${getNomeBox(item.boxNumero)}</span></span>
         </div>
-        <p class="agrupadores"><span class="rotulo">Agrupadores:</span> ${agrupadores}</p>
+        <p class="agrupadores"><span class="rotulo">Agrupadores:</span> ${agrupadores}</p>${observacao}
       </div>`;
     })
     .join('');
@@ -309,7 +328,7 @@ function medirSeCabeNaEtiqueta(html) {
   if (!etiqueta) return true;
   const limite = etiqueta.getBoundingClientRect();
   const EPS = 0.5; // tolera arredondamento de subpixel, não recorte real
-  const elementos = container.querySelectorAll('.secao-loja, .agrupadores, .rodape-total, .cabecalho');
+  const elementos = container.querySelectorAll('.secao-loja, .agrupadores, .observacao, .rodape-total, .cabecalho');
   for (const elemento of elementos) {
     const r = elemento.getBoundingClientRect();
     // Checa os 4 lados — não só embaixo/direita. Ver nota em `.lojas`
@@ -350,7 +369,9 @@ function limparContainerMedicao() {
 // quebra em mais linhas em vez de truncar.
 //
 // Cada item: { motorista, placa, loja, paletesEnviados, boxNumero,
-// colaboradores?, posicaoCarregamento? }. `colaboradores` é a lista de quem
+// colaboradores?, posicaoCarregamento?, observacaoLoja? }. `observacaoLoja` é
+// a observação da loja no momento do protocolo — só aparece quando existe.
+// `colaboradores` é a lista de quem
 // agrupou aquela loja (ver loja.colaboradores em AppContext.jsx).
 export function imprimirEtiquetaCarregamento(itens) {
   if (!itens || itens.length === 0) return false;

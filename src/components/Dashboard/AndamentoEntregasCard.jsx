@@ -122,6 +122,68 @@ function getStatusEntrega(protocolo, agoraMs, limiteMs) {
   return 'aguardando';
 }
 
+// Cards de resumo do topo — também são os FILTROS da lista de veículos.
+// `filtro` é o valor guardado em `filtroStatus` (null = sem filtro / Total);
+// `campo` é a chave em `resumoEntregas`.
+const CARDS_RESUMO = [
+  {
+    rotulo: 'Total', filtro: null, campo: 'total', Icone: Package,
+    corIconeFundo: 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-300',
+    corNumero: 'text-slate-800 dark:text-slate-100',
+  },
+  {
+    // Estágio anterior ao "A caminho": carregamento feito, mas o veículo
+    // ainda está parado no CD esperando a NF (ver getStatusEntrega).
+    rotulo: 'Aguardando NF', filtro: 'aguardando_nf', campo: 'aguardandoNF', Icone: Clock,
+    corIconeFundo: 'bg-blue-50 text-blue-500 dark:bg-blue-500/10 dark:text-blue-400',
+    corNumero: 'text-blue-600 dark:text-blue-400',
+    destacarSeMaiorQueZero: true,
+    corBordaDestaque: 'border-blue-200 dark:border-blue-900/60',
+    corAtivo: 'border-blue-400 ring-blue-300/60 dark:border-blue-500 dark:ring-blue-500/40',
+  },
+  {
+    rotulo: 'A caminho', filtro: 'aguardando', campo: 'aguardando', Icone: Truck,
+    corIconeFundo: 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-300',
+    corNumero: 'text-slate-600 dark:text-slate-300',
+    corAtivo: 'border-slate-400 ring-slate-300/70 dark:border-slate-400 dark:ring-slate-500/50',
+  },
+  {
+    rotulo: 'Na loja', filtro: 'na_loja', campo: 'naLoja', Icone: MapPinned,
+    corIconeFundo: 'bg-amber-50 text-amber-500 dark:bg-amber-500/10 dark:text-amber-400',
+    corNumero: 'text-amber-600 dark:text-amber-400',
+    corAtivo: 'border-amber-400 ring-amber-300/60 dark:border-amber-500 dark:ring-amber-500/40',
+  },
+  {
+    rotulo: 'Entregues', filtro: 'concluida', campo: 'concluida', Icone: CheckCircle2,
+    corIconeFundo: 'bg-emerald-50 text-emerald-500 dark:bg-emerald-500/10 dark:text-emerald-400',
+    corNumero: 'text-emerald-600 dark:text-emerald-400',
+    corAtivo: 'border-emerald-400 ring-emerald-300/60 dark:border-emerald-500 dark:ring-emerald-500/40',
+  },
+  {
+    rotulo: 'Atrasadas', filtro: 'atrasadas', campo: 'atrasadas', Icone: AlertTriangle,
+    corIconeFundo: 'bg-red-50 text-red-500 dark:bg-red-500/10 dark:text-red-400',
+    corNumero: 'text-red-600 dark:text-red-400',
+    destacarSeMaiorQueZero: true,
+    corBordaDestaque: 'border-red-200 dark:border-red-900/60',
+    corAtivo: 'border-red-400 ring-red-300/60 dark:border-red-500 dark:ring-red-500/40',
+  },
+];
+
+// A entrega faz parte do filtro escolhido? ("Na loja" inclui as atrasadas e
+// "Entregues" inclui as entregues com permanência acima do limite — mesma
+// regra de contagem do resumo; "Atrasadas" = só quem ainda está parado na
+// loja além do limite.)
+function entregaCasaComFiltro(statusChave, filtro) {
+  switch (filtro) {
+    case 'aguardando_nf': return statusChave === 'aguardando_nf';
+    case 'aguardando': return statusChave === 'aguardando';
+    case 'na_loja': return statusChave === 'na_loja' || statusChave === 'na_loja_atrasada';
+    case 'concluida': return statusChave === 'concluida' || statusChave === 'concluida_atrasada';
+    case 'atrasadas': return statusChave === 'na_loja_atrasada';
+    default: return true;
+  }
+}
+
 /**
  * Card "Andamento das Entregas" — usado tanto no Dashboard quanto na aba
  * Box / Frota (mesmos dados e mesma lógica, só o visual muda). `irPara`
@@ -149,6 +211,9 @@ export default function AndamentoEntregasCard({ irPara, compacto = false }) {
     const intervalo = setInterval(() => setAgoraMs(Date.now()), 30000);
     return () => clearInterval(intervalo);
   }, []);
+
+  // Filtro escolhido nos cards de resumo (null = mostra tudo).
+  const [filtroStatus, setFiltroStatus] = useState(null);
 
   const lojasPorId = useMemo(() => {
     const mapa = {};
@@ -231,6 +296,19 @@ export default function AndamentoEntregasCard({ irPara, compacto = false }) {
     });
     return contagem;
   }, [entregasPorVeiculo, agoraMs, limiteMs]);
+
+  // Lista exibida: com filtro, só as entregas daquele status (e só os veículos
+  // que ainda têm alguma). O resumo acima continua contando tudo.
+  const veiculosExibidos = useMemo(() => {
+    if (filtroStatus === null) return entregasPorVeiculo;
+    return entregasPorVeiculo
+      .map((veiculo) => ({
+        ...veiculo,
+        entregas: veiculo.entregas.filter((e) => entregaCasaComFiltro(getStatusEntrega(e, agoraMs, limiteMs), filtroStatus)),
+      }))
+      .filter((veiculo) => veiculo.entregas.length > 0);
+  }, [entregasPorVeiculo, filtroStatus, agoraMs, limiteMs]);
+  const rotuloFiltro = CARDS_RESUMO.find((c) => c.filtro === filtroStatus)?.rotulo;
 
   // Pedido do usuário: tocar um bip quando uma entrega passa a "Na loja
   // (atrasada)" — o alerta vermelho na tela já existia, mas numa operação
@@ -329,77 +407,40 @@ export default function AndamentoEntregasCard({ irPara, compacto = false }) {
               "na loja" x "entregue" pela cor/ícone à distância, sem precisar
               ler o rótulo pequeno, o que ajuda numa tela cheia de números
               como essa. */}
+          {/* Pedido do usuário: cada card vira um FILTRO — ao clicar, a lista de
+              veículos abaixo mostra só as entregas daquele status; clicar de
+              novo no mesmo card (ou em "Total") volta a mostrar tudo. Os
+              números continuam sendo o resumo geral, não mudam com o filtro. */}
           <div className={`grid grid-cols-2 ${gapStats} sm:grid-cols-3 lg:grid-cols-6`}>
-            <div className={`flex items-center gap-2 rounded-lg border border-slate-100 ${padStat} dark:border-slate-700`}>
-              <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-300">
-                <Package size={14} />
-              </span>
-              <span>
-                {/* Era "Total hoje" — mudou pra "Total" puro porque agora
-                    inclui também pendências de dias anteriores (ver
-                    comentário no useMemo acima). */}
-                <p className="text-[11px] font-medium text-slate-400 dark:text-slate-500">Total</p>
-                <p className={`${textStat} font-bold leading-tight text-slate-800 dark:text-slate-100`}>{resumoEntregas.total}</p>
-              </span>
-            </div>
-            {/* Estágio anterior ao "A caminho": carregamento já feito, mas o
-                veículo ainda está parado no CD esperando o faturista
-                terminar a nota fiscal (ver REGISTRAR_ENTREGA_NF em
-                AppContext.jsx e getStatusEntrega acima). Mostra 0 quando não
-                há nenhum, igual às outras. */}
-            <div className={`flex items-center gap-2 rounded-lg border ${padStat} ${resumoEntregas.aguardandoNF > 0 ? 'border-blue-200 dark:border-blue-900/60' : 'border-slate-100 dark:border-slate-700'}`}>
-              <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-500 dark:bg-blue-500/10 dark:text-blue-400">
-                <Clock size={14} />
-              </span>
-              <span>
-                <p className="text-[11px] font-medium text-slate-400 dark:text-slate-500">Aguardando NF</p>
-                <p className={`${textStat} font-bold leading-tight text-blue-600 dark:text-blue-400`}>{resumoEntregas.aguardandoNF}</p>
-              </span>
-            </div>
-            <div className={`flex items-center gap-2 rounded-lg border border-slate-100 ${padStat} dark:border-slate-700`}>
-              <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-300">
-                <Truck size={14} />
-              </span>
-              <span>
-                {/* Só começa a contar depois que a NF é entregue — ver
-                    getStatusEntrega acima. */}
-                <p className="text-[11px] font-medium text-slate-400 dark:text-slate-500">A caminho</p>
-                <p className={`${textStat} font-bold leading-tight text-slate-600 dark:text-slate-300`}>{resumoEntregas.aguardando}</p>
-              </span>
-            </div>
-            <div className={`flex items-center gap-2 rounded-lg border border-slate-100 ${padStat} dark:border-slate-700`}>
-              <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-amber-50 text-amber-500 dark:bg-amber-500/10 dark:text-amber-400">
-                <MapPinned size={14} />
-              </span>
-              <span>
-                <p className="text-[11px] font-medium text-slate-400 dark:text-slate-500">Na loja</p>
-                <p className={`${textStat} font-bold leading-tight text-amber-600 dark:text-amber-400`}>{resumoEntregas.naLoja}</p>
-              </span>
-            </div>
-            <div className={`flex items-center gap-2 rounded-lg border border-slate-100 ${padStat} dark:border-slate-700`}>
-              <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-500 dark:bg-emerald-500/10 dark:text-emerald-400">
-                <CheckCircle2 size={14} />
-              </span>
-              <span>
-                <p className="text-[11px] font-medium text-slate-400 dark:text-slate-500">Entregues</p>
-                <p className={`${textStat} font-bold leading-tight text-emerald-600 dark:text-emerald-400`}>{resumoEntregas.concluida}</p>
-              </span>
-            </div>
-            {/* Pedido do usuário: "Atrasado" como um status a mais nessa
-                fileira, ao lado dos outros — antes só aparecia escondido
-                dentro do aviso vermelho abaixo (que só existe quando há pelo
-                menos uma entrega atrasada). Agora sempre aparece aqui, com
-                contagem 0 quando não há nenhuma, do mesmo jeito que as
-                outras estatísticas. */}
-            <div className={`flex items-center gap-2 rounded-lg border ${padStat} ${resumoEntregas.atrasadas > 0 ? 'border-red-200 dark:border-red-900/60' : 'border-slate-100 dark:border-slate-700'}`}>
-              <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-red-50 text-red-500 dark:bg-red-500/10 dark:text-red-400">
-                <AlertTriangle size={14} />
-              </span>
-              <span>
-                <p className="text-[11px] font-medium text-slate-400 dark:text-slate-500">Atrasadas</p>
-                <p className={`${textStat} font-bold leading-tight text-red-600 dark:text-red-400`}>{resumoEntregas.atrasadas}</p>
-              </span>
-            </div>
+            {CARDS_RESUMO.map((card) => {
+              const ativo = card.filtro === filtroStatus || (card.filtro === null && filtroStatus === null);
+              const valor = resumoEntregas[card.campo];
+              const destacar = card.destacarSeMaiorQueZero && valor > 0;
+              return (
+                <button
+                  key={card.rotulo}
+                  type="button"
+                  onClick={() => setFiltroStatus(card.filtro === filtroStatus ? null : card.filtro)}
+                  aria-pressed={card.filtro !== null && ativo}
+                  title={card.filtro === null ? 'Mostrar todas as entregas' : ativo ? 'Clique para remover o filtro' : `Mostrar só: ${card.rotulo}`}
+                  className={`flex items-center gap-2 rounded-lg border text-left ${padStat} transition-colors hover:bg-slate-50 dark:hover:bg-slate-700/50 ${
+                    card.filtro !== null && ativo
+                      ? `${card.corAtivo} ring-2`
+                      : destacar
+                        ? card.corBordaDestaque
+                        : 'border-slate-100 dark:border-slate-700'
+                  }`}
+                >
+                  <span className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full ${card.corIconeFundo}`}>
+                    <card.Icone size={14} />
+                  </span>
+                  <span>
+                    <p className="text-[11px] font-medium text-slate-400 dark:text-slate-500">{card.rotulo}</p>
+                    <p className={`${textStat} font-bold leading-tight ${card.corNumero}`}>{valor}</p>
+                  </span>
+                </button>
+              );
+            })}
           </div>
 
           {/* Barra de progresso com o percentual concluído por extenso ao
@@ -451,12 +492,29 @@ export default function AndamentoEntregasCard({ irPara, compacto = false }) {
         </div>
       )}
 
+      {filtroStatus !== null && (
+        <div className="mb-2 flex flex-shrink-0 items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+          <span>
+            Mostrando só: <strong className="text-slate-700 dark:text-slate-200">{rotuloFiltro}</strong>
+          </span>
+          <button
+            type="button"
+            onClick={() => setFiltroStatus(null)}
+            className="font-medium text-totvs-600 hover:text-totvs-700 dark:text-whatsapp-400 dark:hover:text-whatsapp-300"
+          >
+            Limpar filtro
+          </button>
+        </div>
+      )}
+
       {entregasPorVeiculo.length === 0 ? (
         <p className="text-sm text-slate-400 dark:text-slate-500">
           Nenhum carregamento hoje nem pendência de dias anteriores ainda — as entregas aparecem aqui assim que um
           protocolo for registrado na aba Carregamento, e continuam aparecendo enquanto a saída da loja não for
           registrada.
         </p>
+      ) : veiculosExibidos.length === 0 ? (
+        <p className="text-sm text-slate-400 dark:text-slate-500">Nenhuma entrega com o status “{rotuloFiltro}” agora.</p>
       ) : (
         <div
           className={
@@ -472,7 +530,7 @@ export default function AndamentoEntregasCard({ irPara, compacto = false }) {
               : 'grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3'
           }
         >
-          {entregasPorVeiculo.map((veiculo) => (
+          {veiculosExibidos.map((veiculo) => (
             <div
               key={`${veiculo.placa}|${veiculo.motorista}`}
               // Borda esquerda colorida = o "pior" status entre as entregas

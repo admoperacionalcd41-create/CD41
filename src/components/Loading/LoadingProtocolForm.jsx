@@ -203,6 +203,7 @@ export default function LoadingProtocolForm({ lojas, aoFechar, aoRegistrar }) {
         ordemCarregamento,
         lotesRestantesPorLoja,
         diaEntregaReferencia: contarEmOutroDia ? diaEntregaReferencia : null,
+        observacoesPorLoja: Object.fromEntries(lojasComObservacao.map((l) => [l.id, l.observacaoLoja])),
       });
 
       if (aoRegistrar) {
@@ -256,6 +257,7 @@ export default function LoadingProtocolForm({ lojas, aoFechar, aoRegistrar }) {
       paletesEnviados: quantidade,
       lotesRestantes: statusEnvio === 'saldo' ? loteRestante : [],
       diaEntregaReferencia: contarEmOutroDia ? diaEntregaReferencia : null,
+      observacaoLoja: lojasComObservacao.find((l) => l.id === loja.id)?.observacaoLoja || null,
     });
 
     if (aoRegistrar) {
