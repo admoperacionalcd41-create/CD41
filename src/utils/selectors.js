@@ -642,3 +642,40 @@ export function consolidarPermanenciaPorLoja(permanencias) {
     .map((l) => ({ ...l, mediaMs: l.somaMs / l.entregas }))
     .sort((a, b) => b.mediaMs - a.mediaMs || b.maiorMs - a.maiorMs || String(a.codigo).localeCompare(String(b.codigo), 'pt-BR'));
 }
+
+
+/**
+ * Paletes que contam como PRODUÇÃO do agrupamento de uma loja (relatório de
+ * Produtividade e Exportar Excel) — o que os agrupadores de fato montaram,
+ * não o que sobrou no box.
+ *
+ * Bug reportado: a loja foi agrupada com N paletes, o carregamento saiu
+ * parcial (ficou um saldo de 2) e a produtividade passou a mostrar só o
+ * saldo. Causa: o valor guardado (`paletesNoAgrupamento`) é reescrito
+ * quando o agrupamento é refeito/reconcluído depois do carregamento parcial
+ * — e nesse momento só existe o saldo no box. Por isso, quando há envios
+ * parciais (protocolos com `statusEnvio: 'saldo'`), o crédito é recomposto:
+ * o que já saiu nos parciais + o que ainda é da loja (o saldo no box ou, se
+ * a loja já foi finalizada, o que saiu no último envio completo). Nunca fica
+ * abaixo do valor guardado. Loja sem envio parcial: valor guardado, igual a
+ * antes.
+ */
+export function getPaletesCreditoAgrupamento(loja, protocolos) {
+  const guardado = loja.paletesNoAgrupamento || loja.paletesAgrupados || 0;
+  const daLoja = (protocolos || []).filter((p) => p.lojaId === loja.id);
+  const parciais = daLoja.filter((p) => p.statusEnvio === 'saldo');
+  if (parciais.length === 0) return guardado;
+  const jaEnviadoEmParciais = parciais.reduce((soma, p) => soma + (Number(p.paletesEnviados) || 0), 0);
+  const restante =
+    loja.status === 'finalizada'
+      ? daLoja.filter((p) => p.statusEnvio !== 'saldo').reduce((soma, p) => soma + (Number(p.paletesEnviados) || 0), 0)
+      : loja.paletesAgrupados || 0;
+  return Math.max(guardado, jaEnviadoEmParciais + restante);
+}
+
+/** Soma do que já saiu em envios parciais de uma loja (ver CONCLUIR_AGRUPAMENTO). */
+export function getPaletesEnviadosEmParciais(loja, protocolos) {
+  return (protocolos || [])
+    .filter((p) => p.lojaId === loja.id && p.statusEnvio === 'saldo')
+    .reduce((soma, p) => soma + (Number(p.paletesEnviados) || 0), 0);
+}

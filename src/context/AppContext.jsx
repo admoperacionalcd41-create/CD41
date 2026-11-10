@@ -3,6 +3,7 @@ import { useSyncedAppState } from '../hooks/useSyncedAppState';
 import { gerarDadosIniciais } from '../data/mockData';
 import { gerarId } from '../utils/idGenerator';
 import { hojeISO, somarDias } from '../utils/dateHelpers';
+import { getPaletesEnviadosEmParciais } from '../utils/selectors';
 import { normalizarTelefoneWhatsapp } from '../utils/whatsapp';
 import {
   alocarVagasCrescente,
@@ -293,7 +294,11 @@ function aplicarAcaoInterna(state, acao) {
                 status: 'agrupada',
                 vagasOcupadas: resultado.vagasAlocadas,
                 paletesAgrupados: quantidade,
-                paletesNoAgrupamento: quantidade,
+                // Reconclusão depois de um carregamento PARCIAL (só o saldo
+                // está no box): a produção do agrupamento continua sendo o
+                // que já saiu + o saldo, não só o saldo — ver
+                // getPaletesCreditoAgrupamento em selectors.js.
+                paletesNoAgrupamento: quantidade + getPaletesEnviadosEmParciais(loja, state.protocolos),
                 composicaoPaletes: composicaoNormalizada,
                 dataAgrupamento: new Date().toISOString(),
               }
@@ -399,7 +404,7 @@ function aplicarAcaoInterna(state, acao) {
                 ...l,
                 status: 'em_agrupamento',
                 vagasOcupadas: resultado.vagasAlocadas,
-                paletesNoAgrupamento: loja.paletesAgrupados,
+                paletesNoAgrupamento: loja.paletesAgrupados + getPaletesEnviadosEmParciais(loja, state.protocolos),
                 dataAgrupamento: null,
               }
             : l

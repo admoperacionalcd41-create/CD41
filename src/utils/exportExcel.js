@@ -7,6 +7,7 @@ import {
   consolidarPermanenciaPorLoja,
   getEntregasPorMotorista,
   getLojasAgrupadasOuAlem,
+  getPaletesCreditoAgrupamento,
 } from './selectors';
 import { getDiasUteisSemanaAtual, formatarDiaSemanaCurto, formatarData, formatarDataHora, hojeISO } from './dateHelpers';
 import { lojaPassaFiltroTipoCarga } from './tipoCarga';
@@ -137,7 +138,7 @@ function construirPlanilhaProdutividade(state, filtroTipoCarga, passaPeriodo) {
 
   const mapa = new Map();
   lojasConsideradas.forEach((loja) => {
-    const paletes = loja.paletesNoAgrupamento || loja.paletesAgrupados || 0;
+    const paletes = getPaletesCreditoAgrupamento(loja, state.protocolos);
     const colaboradoresDaLoja = (loja.colaboradores || []).filter(Boolean);
     if (colaboradoresDaLoja.length === 0) return;
     const paletesPorColaborador = paletes / colaboradoresDaLoja.length;

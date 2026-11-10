@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { BarChart3, ChevronDown, ChevronRight, Users } from 'lucide-react';
 import { useApp } from '../../context/AppContext.jsx';
-import { getLojasAgrupadasOuAlem } from '../../utils/selectors';
+import { getLojasAgrupadasOuAlem, getPaletesCreditoAgrupamento } from '../../utils/selectors';
 import { lojaPassaFiltroTipoCarga } from '../../utils/tipoCarga';
 import { formatarDataHora, formatarHora, eHoje } from '../../utils/dateHelpers';
 
@@ -42,7 +42,7 @@ export default function ProductivityReport({ periodoRelatorio }) {
   const estatisticasPorColaborador = useMemo(() => {
     const mapa = new Map();
     lojasConsideradas.forEach((loja) => {
-      const paletes = loja.paletesNoAgrupamento || loja.paletesAgrupados || 0;
+      const paletes = getPaletesCreditoAgrupamento(loja, state.protocolos);
       const colaboradoresDaLoja = loja.colaboradores.filter(Boolean);
       if (colaboradoresDaLoja.length === 0) return;
       // Os paletes da loja são divididos igualmente entre todos os
