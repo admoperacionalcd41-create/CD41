@@ -3,7 +3,7 @@ import { useSyncedAppState } from '../hooks/useSyncedAppState';
 import { gerarDadosIniciais } from '../data/mockData';
 import { gerarId } from '../utils/idGenerator';
 import { hojeISO, somarDias } from '../utils/dateHelpers';
-import { getPaletesEnviadosEmParciais } from '../utils/selectors';
+import { getPaletesEnviadosEmParciais, planoDevolucaoPaletes } from '../utils/selectors';
 import { normalizarTelefoneWhatsapp } from '../utils/whatsapp';
 import {
   alocarVagasCrescente,
@@ -716,7 +716,12 @@ function aplicarAcaoInterna(state, acao) {
     // (por segurança, protocolos antigos sem essa informação registrada não
     // podem ser cancelados).
     case 'CANCELAR_PROTOCOLO': {
-      const { protocoloId } = acao.payload;
+      // `boxNumeroDestino` (opcional): box para onde os paletes devem
+      // voltar. Pedido do usuário: quando a loja recusa a carga, o box de
+      // origem muitas vezes já foi reutilizado e não tem vagas — a janela
+      // de cancelamento pergunta o box. Sem ele (ou igual ao original)
+      // vale o comportamento de sempre.
+      const { protocoloId, boxNumeroDestino } = acao.payload;
       const protocolo = state.protocolos.find((p) => p.id === protocoloId);
       if (!protocolo) {
         return { ...state, ultimoErro: 'Protocolo não encontrado.' };
@@ -752,6 +757,61 @@ function aplicarAcaoInterna(state, acao) {
       // vagas vazias de sobra no box pra devolver a mesma quantidade. Só
       // continua bloqueado quando nem o fallback encontra vagas vazias
       // suficientes.
+      if (boxNumeroDestino != null && boxNumeroDestino !== protocolo.boxNumero) {
+        const boxDestino = state.boxes.find((b) => b.numero === boxNumeroDestino);
+        if (!boxDestino) {
+          return { ...state, ultimoErro: 'O box escolhido para devolver os paletes não foi encontrado.' };
+        }
+        const plano = planoDevolucaoPaletes(protocolo, loja, state.boxes, boxNumeroDestino);
+        if (plano.disponiveis < plano.necessario) {
+          return {
+            ...state,
+            ultimoErro: `Não é possível devolver pro ${getNomeBox(boxNumeroDestino)}: ${plano.disponiveis} vaga(s) livre(s) — necessário: ${plano.necessario}.`,
+          };
+        }
+        const parcial = protocolo.statusEnvio === 'saldo';
+        // Em envio parcial a loja inteira muda de box: libera o que ela
+        // ainda ocupa e realoca tudo junto (decrescente, como a fase de
+        // carregamento — mesma regra do MOVER_BOX).
+        const boxesBase = parcial
+          ? state.boxes.map((b) => (b.vagas.some((v) => v.ocupada && v.lojaId === loja.id) ? liberarTodasVagas(b, loja.id) : b))
+          : state.boxes;
+        const resultado = alocarVagasDecrescente(
+          boxesBase.find((b) => b.numero === boxNumeroDestino),
+          plano.necessario,
+          loja.id
+        );
+        if (!resultado.sucesso) {
+          return { ...state, ultimoErro: resultado.erro };
+        }
+        const novaLoja =
+          parcial
+            ? {
+                ...loja,
+                status: 'carregando',
+                boxNumero: boxNumeroDestino,
+                paletesAgrupados: loja.paletesAgrupados + protocolo.paletesEnviados,
+                vagasOcupadas: resultado.vagasAlocadas,
+                protocolos: loja.protocolos.filter((p) => p.id !== protocoloId),
+              }
+            : {
+                ...loja,
+                status: 'carregando',
+                boxNumero: boxNumeroDestino,
+                dataCarregamento: null,
+                vagasOcupadas: resultado.vagasAlocadas,
+                protocolos: loja.protocolos.filter((p) => p.id !== protocoloId),
+              };
+        return {
+          ...state,
+          boxes: boxesBase.map((b) => (b.numero === boxNumeroDestino ? resultado.box : b)),
+          lojas: state.lojas.map((l) => (l.id === loja.id ? novaLoja : l)),
+          protocolos: state.protocolos.filter((p) => p.id !== protocoloId),
+          ultimoErro: null,
+          ultimoAviso: `Protocolo cancelado — loja ${loja.loja} voltou para Em Carregamento no ${getNomeBox(boxNumeroDestino)} (vagas ${resultado.vagasAlocadas.join(', ')}).`,
+        };
+      }
+
       const temVagasOriginais = Array.isArray(protocolo.vagasLiberadas) && protocolo.vagasLiberadas.length > 0;
       const vagasIndisponiveis = temVagasOriginais
         ? vagasIndisponiveisParaReocupar(box, protocolo.vagasLiberadas)
@@ -1576,7 +1636,8 @@ export function AppProvider({ children }) {
       cancelarInicioCarregamento: (lojaId) => dispatch({ tipo: 'CANCELAR_INICIO_CARREGAMENTO', payload: { lojaId } }),
       finalizarCarregamento: (payload) => dispatch({ tipo: 'FINALIZAR_CARREGAMENTO', payload }),
       finalizarCarregamentoMultiplo: (payload) => dispatch({ tipo: 'FINALIZAR_CARREGAMENTO_MULTIPLO', payload }),
-      cancelarProtocolo: (protocoloId) => dispatch({ tipo: 'CANCELAR_PROTOCOLO', payload: { protocoloId } }),
+      cancelarProtocolo: (protocoloId, boxNumeroDestino) =>
+        dispatch({ tipo: 'CANCELAR_PROTOCOLO', payload: { protocoloId, boxNumeroDestino } }),
       registrarChegadaLoja: (protocoloId, dataHora, localizacao) =>
         dispatch({ tipo: 'REGISTRAR_CHEGADA_LOJA', payload: { protocoloId, dataHora, localizacao } }),
       registrarSaidaLoja: (protocoloId, dataHora, localizacao, observacao) =>

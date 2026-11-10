@@ -679,3 +679,32 @@ export function getPaletesEnviadosEmParciais(loja, protocolos) {
     .filter((p) => p.lojaId === loja.id && p.statusEnvio === 'saldo')
     .reduce((soma, p) => soma + (Number(p.paletesEnviados) || 0), 0);
 }
+
+/**
+ * Cancelamento de protocolo de carregamento: calcula quantas vagas são
+ * necessárias para devolver os paletes ao box escolhido e quantas ele
+ * realmente tem livres. Usado pela janela de cancelamento (mostra os boxes
+ * e desabilita os que não comportam) e pelo CANCELAR_PROTOCOLO (valida de
+ * novo antes de alocar).
+ *
+ * - Box original do protocolo: só os paletes enviados voltam (o que sobrou
+ *   da loja, em envio parcial, já está lá).
+ * - Outro box: em envio parcial a loja inteira muda de box (uma loja não
+ *   fica dividida em dois boxes), então precisa de enviados + o que ela já
+ *   ocupa hoje; as vagas dela são liberadas antes, por isso contam como
+ *   livres no box em que estão.
+ */
+export function planoDevolucaoPaletes(protocolo, loja, boxes, boxNumeroDestino) {
+  const enviados = Number(protocolo.paletesEnviados) || 0;
+  const parcial = protocolo.statusEnvio === 'saldo';
+  const box = (boxes || []).find((b) => b.numero === boxNumeroDestino);
+  const ehOriginal = boxNumeroDestino === protocolo.boxNumero;
+  const livres = box ? box.vagas.filter((v) => !v.ocupada).length : 0;
+  if (ehOriginal) return { necessario: enviados, disponiveis: livres, mudaDeBox: false };
+
+  const daLojaNoBox = box && parcial ? box.vagas.filter((v) => v.ocupada && v.lojaId === loja.id).length : 0;
+  const daLojaTotal = parcial
+    ? (boxes || []).reduce((s, b) => s + b.vagas.filter((v) => v.ocupada && v.lojaId === loja.id).length, 0)
+    : 0;
+  return { necessario: enviados + daLojaTotal, disponiveis: livres + daLojaNoBox, mudaDeBox: true };
+}

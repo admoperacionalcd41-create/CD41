@@ -17,6 +17,7 @@ import { imprimirEtiquetaCarregamento } from '../../utils/imprimirEtiquetaCarreg
 import { montarMensagemProtocolo } from '../../utils/notificacoes';
 import NotifyWhatsappModal from '../Shared/NotifyWhatsappModal.jsx';
 import EditarProtocoloModal from './EditarProtocoloModal.jsx';
+import CancelarProtocoloModal from './CancelarProtocoloModal.jsx';
 import TipoCargaBadge from '../Shared/TipoCargaBadge.jsx';
 import { lojaPassaFiltroTipoCarga } from '../../utils/tipoCarga';
 
@@ -25,7 +26,7 @@ export default function LoadingList({ aoAbrirProtocolo, irPara }) {
   // ids das lojas marcadas em "Em Carregamento" para sair juntas no mesmo
   // veículo (ver botão "Registrar Protocolo em Lote" abaixo da lista).
   const [selecionadas, setSelecionadas] = useState([]);
-  // id do protocolo com o "Cancelar?" em confirmação na tabela abaixo.
+  // id do protocolo com a janela "Cancelar protocolo" (escolha do box de retorno) aberta.
   const [confirmandoCancelamento, setConfirmandoCancelamento] = useState(null);
   // id da loja com o "Cancelar carregamento?" em confirmação na lista "Em
   // Carregamento" (desfaz o "Iniciar Carregamento", volta pra Agrupada).
@@ -246,11 +247,6 @@ export default function LoadingList({ aoAbrirProtocolo, irPara }) {
         itens,
       })
     );
-  }
-
-  function aoCancelar(protocoloId) {
-    actions.cancelarProtocolo(protocoloId);
-    setConfirmandoCancelamento(null);
   }
 
   function aoCancelarInicioCarregamento(lojaId) {
@@ -630,25 +626,6 @@ export default function LoadingList({ aoAbrirProtocolo, irPara }) {
                         )}
                       </td>
                       <td className="py-2 pr-3">
-                        {confirmandoCancelamento === p.id ? (
-                          <div className="flex items-center gap-1.5 rounded-md border border-amber-300 bg-amber-50 px-2 py-1 dark:border-amber-700 dark:bg-amber-900/40">
-                            <span className="text-amber-700 dark:text-amber-300">Cancelar protocolo?</span>
-                            <button
-                              type="button"
-                              onClick={() => aoCancelar(p.id)}
-                              className="rounded bg-amber-600 px-2 py-0.5 font-medium text-white hover:bg-amber-700"
-                            >
-                              Sim
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setConfirmandoCancelamento(null)}
-                              className="rounded px-2 py-0.5 font-medium text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700"
-                            >
-                              Não
-                            </button>
-                          </div>
-                        ) : (
                           <div className="flex items-center gap-1.5">
                             <button
                               type="button"
@@ -688,7 +665,6 @@ export default function LoadingList({ aoAbrirProtocolo, irPara }) {
                               <Ban size={12} /> Cancelar
                             </button>
                           </div>
-                        )}
                       </td>
                     </tr>
                   );
@@ -706,6 +682,18 @@ export default function LoadingList({ aoAbrirProtocolo, irPara }) {
           aoFechar={() => setEditandoProtocolo(null)}
         />
       )}
+
+      {confirmandoCancelamento && (() => {
+        const protocoloCancelando = state.protocolos.find((x) => x.id === confirmandoCancelamento);
+        const lojaCancelando = protocoloCancelando && state.lojas.find((l) => l.id === protocoloCancelando.lojaId);
+        return protocoloCancelando && lojaCancelando ? (
+          <CancelarProtocoloModal
+            protocolo={protocoloCancelando}
+            loja={lojaCancelando}
+            aoFechar={() => setConfirmandoCancelamento(null)}
+          />
+        ) : null;
+      })()}
 
       {mensagemNotificarManual && (
         <NotifyWhatsappModal
