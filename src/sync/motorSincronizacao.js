@@ -93,6 +93,10 @@ export function criarMotorSincronizacao({
   aoMudarEstado = () => {},
   aoMudarStatus = () => {},
   aoAvisoPatches = () => {},
+  // Chamado sempre que a `base` (último estado confirmado no servidor) muda:
+  // (versao, dados). O app guarda isso no navegador pra abrir da próxima vez
+  // sem baixar o documento inteiro (ver inicioComCache.js).
+  aoMudarBase = () => {},
   atrasoGravacaoMs = 200,
 }) {
   let local = estadoInicial;
@@ -174,6 +178,7 @@ export function criarMotorSincronizacao({
     const remoto = normalizar(dadosServidor);
     const mesclado = baseDaMescla ? mesclarEstadoSincronizado(baseDaMescla, local, remoto) : remoto;
     base = remoto;
+    if (typeof versao === 'number') aoMudarBase(versao, remoto);
     definirLocal(mesclado);
     // O eco da nossa gravação chegou (ou o servidor já passou dela): a `base`
     // agora contém a nossa mudança — pode gravar de novo.
@@ -411,6 +416,7 @@ export function criarMotorSincronizacao({
     }
     ultimaVersao = typeof linha.versao === 'number' ? linha.versao : 0;
     base = normalizar(linha.dados);
+    aoMudarBase(ultimaVersao, base);
     let estado = base;
     fila.forEach((fn) => {
       estado = fn(estado);

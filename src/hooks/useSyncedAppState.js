@@ -4,6 +4,17 @@ import { useAuth } from '../context/AuthContext';
 import { useLocalStorage } from './useLocalStorage';
 import { criarMotorSincronizacao } from '../sync/motorSincronizacao';
 import { normalizarEstadoRecebido } from '../sync/normalizarEstado';
+import { criarGravadorDeSnapshot, iniciarComSnapshot, lerSnapshot } from '../sync/inicioComCache';
+
+// localStorage pode não existir/ser bloqueado (modo privado em alguns
+// navegadores): sem ele o app só perde o cache e faz a carga completa.
+function armazenamentoLocal() {
+  try {
+    return typeof window !== 'undefined' ? window.localStorage : null;
+  } catch (e) {
+    return null;
+  }
+}
 
 // Id fixo da única linha compartilhada da tabela `app_state` — o estado
 // inteiro do sistema (lojas, boxes, motoristas, carregamentos etc.) vive
@@ -87,6 +98,13 @@ function useEstadoSincronizado(estadoLocal, setEstadoLocal) {
   // usuários simulados contra o Postgres real (test-sincronizacao-
   // multiusuario). Este hook só liga o motor à tela e ao Supabase.
   const motorRef = useRef(null);
+  // Guarda no navegador a última base confirmada pelo servidor (ver
+  // inicioComCache.js) — é o que permite abrir o app sem baixar tudo.
+  const gravadorSnapshotRef = useRef(null);
+  if (gravadorSnapshotRef.current === null) {
+    const storage = armazenamentoLocal();
+    gravadorSnapshotRef.current = storage ? criarGravadorDeSnapshot(storage) : { agendar() {}, forcar() {} };
+  }
   // Sincronização leve (ver motorSincronizacao.js, tópicos 6 e 7): usada
   // quando o banco já tem a tabela app_state_log e as funções "_leve"
   // (supabase/migracao-sincronizacao-leve.sql). Decidido ao iniciar a
@@ -100,6 +118,7 @@ function useEstadoSincronizado(estadoLocal, setEstadoLocal) {
       aoMudarEstado: setEstadoLocal,
       aoMudarStatus: setStatusSincronizacao,
       aoAvisoPatches: setAvisoPatches,
+      aoMudarBase: (versao, dados) => gravadorSnapshotRef.current.agendar(versao, dados),
       transporte: {
         aplicarPatches: (patches) =>
           modoLeveRef.current.then((leve) =>
@@ -159,7 +178,9 @@ function useEstadoSincronizado(estadoLocal, setEstadoLocal) {
         .eq('id', ID_ESTADO_COMPARTILHADO)
         .maybeSingle();
 
-    carregar().then(({ data, error }) => {
+    // Carga completa (documento inteiro) — só quando o cache do navegador
+    // não serve (ver iniciarComCache logo abaixo).
+    const cargaCompleta = () => carregar().then(({ data, error }) => {
       if (!ativo) return;
       if (error) {
         // eslint-disable-next-line no-console
@@ -177,6 +198,37 @@ function useEstadoSincronizado(estadoLocal, setEstadoLocal) {
       // Mudanças ocorridas entre a leitura e a inscrição no Realtime.
       if (inscrito) reler();
     });
+
+    // Abre pelo cache quando possível: só confere a versão do servidor
+    // (alguns bytes) e busca o que mudou no diário, em vez de baixar o
+    // documento inteiro a cada abertura do app. Só no modo leve.
+    modoLeve
+      .then(async (leve) => {
+        if (!ativo) return;
+        const storage = armazenamentoLocal();
+        const snapshot = leve && storage ? lerSnapshot(storage) : null;
+        const iniciou = await iniciarComSnapshot({
+          snapshot,
+          motor,
+          lerVersaoServidor: async () => {
+            const { data, error } = await supabase
+              .from('app_state')
+              .select('versao')
+              .eq('id', ID_ESTADO_COMPARTILHADO)
+              .maybeSingle();
+            return error || !data ? null : Number(data.versao);
+          },
+        });
+        if (!ativo) return;
+        if (iniciou) {
+          if (inscrito) reler();
+          return;
+        }
+        cargaCompleta();
+      })
+      .catch(() => {
+        if (ativo) cargaCompleta();
+      });
 
     // Reler o servidor quando o canal em tempo real (re)conecta, o app
     // volta ao primeiro plano ou a internet volta: eventos perdidos nesse
@@ -200,7 +252,12 @@ function useEstadoSincronizado(estadoLocal, setEstadoLocal) {
     }
     const aoVoltarAoPrimeiroPlano = () => {
       if (document.visibilityState === 'visible') reler();
+      // Indo pra segundo plano / fechando: garante que a última base fique
+      // salva no navegador (o celular pode descartar a página em seguida).
+      else gravadorSnapshotRef.current.forcar();
     };
+    const aoSair = () => gravadorSnapshotRef.current.forcar();
+    window.addEventListener('pagehide', aoSair);
     document.addEventListener('visibilitychange', aoVoltarAoPrimeiroPlano);
     window.addEventListener('online', reler);
 
@@ -256,6 +313,7 @@ function useEstadoSincronizado(estadoLocal, setEstadoLocal) {
       clearInterval(conferencia);
       document.removeEventListener('visibilitychange', aoVoltarAoPrimeiroPlano);
       window.removeEventListener('online', reler);
+      window.removeEventListener('pagehide', aoSair);
       supabase.removeChannel(canal);
       motor.reiniciar();
     };
