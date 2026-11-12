@@ -1,9 +1,10 @@
 import React, { useMemo, useState } from 'react';
-import { BarChart3, ChevronDown, ChevronRight, Users } from 'lucide-react';
+import { BarChart3, ChevronDown, ChevronRight, History, Users } from 'lucide-react';
 import { useApp } from '../../context/AppContext.jsx';
 import { getLojasAgrupadasOuAlem, getPaletesCreditoAgrupamento } from '../../utils/selectors';
 import { lojaPassaFiltroTipoCarga } from '../../utils/tipoCarga';
 import { formatarDataHora, formatarHora, eHoje } from '../../utils/dateHelpers';
+import { getNomeBox } from '../../utils/boxLogic';
 
 // Formata contagem de paletes no padrão pt-BR, com até 1 casa decimal —
 // necessário porque, ao dividir os paletes de uma loja entre os
@@ -73,6 +74,19 @@ export default function ProductivityReport({ periodoRelatorio }) {
     mapa.forEach((c) => c.detalhe.sort((a, b) => String(a.concluidoEm || '').localeCompare(String(b.concluidoEm || ''))));
     return [...mapa.values()].sort((a, b) => b.paletes - a.paletes);
   }, [lojasConsideradas]);
+
+  // Últimos 10 agrupamentos concluídos (mais recente primeiro), pedido do
+  // usuário: hora de término | agrupadores | loja | box. Não depende do
+  // período selecionado (é "o que acabou de acontecer"), só do filtro
+  // Seca/Resfriada do cabeçalho.
+  const ultimosAgrupamentos = useMemo(
+    () =>
+      getLojasAgrupadasOuAlem(state)
+        .filter((l) => l.dataAgrupamento && lojaPassaFiltroTipoCarga(l, filtroTipoCarga))
+        .sort((a, b) => String(b.dataAgrupamento).localeCompare(String(a.dataAgrupamento)))
+        .slice(0, 10),
+    [state, filtroTipoCarga]
+  );
 
   // Colaboradores com a lista de lojas aberta no Detalhamento.
   const [abertos, setAbertos] = useState(() => new Set());
@@ -250,6 +264,44 @@ export default function ProductivityReport({ periodoRelatorio }) {
                     </React.Fragment>
                   );
                 })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800" data-testid="ultimos-agrupamentos">
+        <div className="mb-3 flex items-center gap-2">
+          <History size={16} className="text-slate-500 dark:text-slate-400" />
+          <h3 className="text-sm font-bold text-slate-700 dark:text-slate-200">Últimos 10 Agrupamentos</h3>
+        </div>
+        {ultimosAgrupamentos.length === 0 ? (
+          <p className="text-sm text-slate-400 dark:text-slate-500">Nenhum agrupamento concluído ainda.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="text-slate-500 dark:text-slate-400">
+                <tr className="border-b border-slate-100 dark:border-slate-700">
+                  <th className="py-2 pr-3 font-semibold">Hora de término</th>
+                  <th className="py-2 pr-3 font-semibold">Agrupadores</th>
+                  <th className="py-2 pr-3 font-semibold">Loja</th>
+                  <th className="py-2 pr-3 font-semibold">Box</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ultimosAgrupamentos.map((l) => (
+                  <tr key={l.id} className="border-b border-slate-50 last:border-0 dark:border-slate-700/60">
+                    <td className="py-2 pr-3 font-medium text-slate-600 dark:text-slate-300">{formatarConclusao(l.dataAgrupamento)}</td>
+                    <td className="py-2 pr-3 text-slate-700 dark:text-slate-200">
+                      {l.colaboradores.filter(Boolean).join(', ') || '—'}
+                    </td>
+                    <td className="py-2 pr-3">
+                      <span className="font-semibold text-slate-700 dark:text-slate-200">{l.loja}</span>
+                      {l.nomeLoja && <span className="ml-1.5 text-slate-400 dark:text-slate-500">{l.nomeLoja}</span>}
+                    </td>
+                    <td className="py-2 pr-3 text-slate-700 dark:text-slate-200">{l.boxNumero != null ? getNomeBox(l.boxNumero) : '—'}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>

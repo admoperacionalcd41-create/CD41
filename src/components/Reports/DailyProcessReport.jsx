@@ -1,5 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { ListChecks, CheckCircle2, XCircle, Camera, Loader2 } from 'lucide-react';
+import { ListChecks, CheckCircle2, XCircle, Camera, Loader2, Target } from 'lucide-react';
+import PlanejamentoModal from './PlanejamentoModal.jsx';
 import { useApp } from '../../context/AppContext.jsx';
 import { getLinhasProcessoDoDia, getEntregaCodigoLojaNaData, getVolumeExpedicaoHoje } from '../../utils/selectors';
 import { getDiasUteisSemana, formatarDiaSemanaCurto, hojeISO } from '../../utils/dateHelpers';
@@ -147,6 +148,8 @@ export default function DailyProcessReport() {
   // alcançável se isto voltar a ser `false`).
   const modoSequencia = true;
   const rotuloTipo = ROTULO_TIPO[filtroTipoCarga] || ROTULO_TIPO.todos;
+  // PLANEJAMENTO: análise de onde focar pra entregar todas as lojas.
+  const [planejamentoAberto, setPlanejamentoAberto] = useState(false);
 
   // Pedido do usuário: "opção pra permitir o sequenciamento das lojas" —
   // um modo à parte, opcional (não substitui o agrupamento padrão
@@ -393,7 +396,15 @@ export default function DailyProcessReport() {
           dentro, o próprio botão apareceria na imagem copiada. `print:hidden`
           pelo mesmo motivo do lado da impressão (ver imprimirRelatorio.js):
           o botão em si não deve aparecer no papel. */}
-      <div className="mb-3 flex justify-end print:hidden">
+      <div className="mb-3 flex flex-wrap justify-end gap-2 print:hidden">
+        <button
+          type="button"
+          onClick={() => setPlanejamentoAberto(true)}
+          title="Análise da operação: onde focar para entregar todas as lojas"
+          className="flex items-center gap-1.5 rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-white hover:bg-indigo-700"
+        >
+          <Target size={14} /> Planejamento
+        </button>
         <button
           type="button"
           onClick={aoCopiarComoImagem}
@@ -759,6 +770,7 @@ export default function DailyProcessReport() {
       </div>
         </div>
       </div>
+      {planejamentoAberto && <PlanejamentoModal aoFechar={() => setPlanejamentoAberto(false)} />}
     </>
   );
 }
