@@ -87,14 +87,18 @@ export default function PlanejamentoModal({ aoFechar }) {
                     {l.nomeLoja && <span className="ml-1.5 text-slate-400 dark:text-slate-500">{l.nomeLoja}</span>}
                   </td>
                   <td className="px-2 py-1.5 text-slate-700 dark:text-slate-200">
-                    {l.andamento ? (
-                      <>
-                        <span className="font-medium">{ROTULO_ETAPA[l.andamento.etapa]}</span>
-                        <span className="ml-1 text-slate-400 dark:text-slate-500">
-                          {getNomeBox(l.andamento.boxNumero)}
-                          {l.andamento.paletes ? ` · ${l.andamento.paletes} pal.` : ''}
-                        </span>
-                      </>
+                    {l.lugares.length > 0 ? (
+                      <div className="flex flex-col gap-0.5" data-testid="planejamento-lugares">
+                        {l.lugares.map((lg) => (
+                          <div key={lg.boxNumero}>
+                            <span className="font-medium">{ROTULO_ETAPA[lg.etapa]}</span>
+                            <span className="ml-1 text-slate-400 dark:text-slate-500">
+                              {getNomeBox(lg.boxNumero)}
+                              {lg.paletes ? ` · ${lg.paletes} pal.` : ''}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
                     ) : (
                       <span className="text-slate-400 dark:text-slate-500">Sem carga no box</span>
                     )}
@@ -114,7 +118,7 @@ export default function PlanejamentoModal({ aoFechar }) {
 
         <p className="mt-2 text-[11px] text-slate-400 dark:text-slate-500">
           <CheckCircle2 size={11} className="mr-1 inline" />
-          Crítica: não entregue ontem e sem carga hoje · Alta: não entregue ontem (ou saldo pendente) com carga em andamento · Atenção: entregue ontem, mas sem carga hoje · No prazo: entregue ontem e com carga em andamento.
+          Crítica: não entregue ontem e sem carga hoje · Alta: não entregue ontem, com carga em andamento · Atenção: entregue ontem, mas sem carga hoje · Andamento: entregue ontem e com carga em andamento. Entrega parcial conta como entrega.
         </p>
       </div>
     </div>

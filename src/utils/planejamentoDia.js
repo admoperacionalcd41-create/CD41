@@ -42,7 +42,7 @@ export const ROTULO_ETAPA = {
 
 export const NIVEIS = {
   concluida: { rotulo: 'Concluída', ordem: 5 },
-  no_prazo: { rotulo: 'No prazo', ordem: 4 },
+  no_prazo: { rotulo: 'Andamento', ordem: 4 },
   atencao: { rotulo: 'Atenção', ordem: 3 },
   alta: { rotulo: 'Alta', ordem: 2 },
   critica: { rotulo: 'Crítica', ordem: 1 },
@@ -62,22 +62,29 @@ export function getPlanejamentoDoDia(state, filtroTipoCarga, hoje = hojeISO()) {
   const ordemSalva = (state.sequenciaLojas || []).filter((c) => porCodigo.has(c));
   const emOrdem = [...ordemSalva.map((c) => porCodigo.get(c)), ...linhasProcesso.filter((l) => !ordemSalva.includes(l.codigo))];
 
-  // Cargas fisicamente em andamento (box ocupado) por código: etapa mais avançada + paletes.
-  const emAndamentoPorCodigo = new Map();
+  // Cargas fisicamente em andamento (box ocupado) por código. Uma loja pode
+  // estar em mais de um lugar ao mesmo tempo (ex.: uma carga no Box 3 e outra
+  // no Box 9): guarda TODAS (uma por box, na ordem da etapa mais avançada) em
+  // `lugares`; `andamento` (usado pra prioridade/ação) é a mais avançada.
+  const lugaresPorCodigo = new Map();
   state.lojas.forEach((l) => {
     if (l.boxNumero == null || !ETAPAS_NO_BOX.includes(l.status) || !lojaPassaFiltroTipoCarga(l, filtroTipoCarga)) return;
-    const atual = emAndamentoPorCodigo.get(l.loja);
-    if (!atual || ORDEM_ETAPA.indexOf(l.status) >= ORDEM_ETAPA.indexOf(atual.etapa)) {
-      emAndamentoPorCodigo.set(l.loja, {
-        etapa: l.status,
-        boxNumero: l.boxNumero,
-        paletes: (l.status === 'agrupada' || l.status === 'carregando') && l.paletesAgrupados > 0 ? l.paletesAgrupados : null,
-      });
+    const lista = lugaresPorCodigo.get(l.loja) || [];
+    const paletes = (l.status === 'agrupada' || l.status === 'carregando') && l.paletesAgrupados > 0 ? l.paletesAgrupados : null;
+    const existente = lista.find((x) => x.boxNumero === l.boxNumero);
+    if (!existente) {
+      lista.push({ etapa: l.status, boxNumero: l.boxNumero, paletes });
+      lugaresPorCodigo.set(l.loja, lista);
+    } else {
+      if (ORDEM_ETAPA.indexOf(l.status) >= ORDEM_ETAPA.indexOf(existente.etapa)) existente.etapa = l.status;
+      if (paletes) existente.paletes = (existente.paletes || 0) + paletes;
     }
   });
+  lugaresPorCodigo.forEach((lista) => lista.sort((a, b) => ORDEM_ETAPA.indexOf(b.etapa) - ORDEM_ETAPA.indexOf(a.etapa) || a.boxNumero - b.boxNumero));
 
   const linhas = emOrdem.map((l, i) => {
-    const andamento = emAndamentoPorCodigo.get(l.codigo) || null;
+    const lugares = lugaresPorCodigo.get(l.codigo) || [];
+    const andamento = lugares[0] || null;
 
     const completoHoje = l.cargas.some((c) => c.situacaoChave === 'completo');
     const parcialHoje = !completoHoje && l.cargas.some((c) => c.situacaoChave === 'parcial');
@@ -91,7 +98,8 @@ export function getPlanejamentoDoDia(state, filtroTipoCarga, hoje = hojeISO()) {
     const ontem = !entregueOntem ? 'nao' : parcialOntem ? 'parcial' : 'sim';
 
     const temCargaImportadaHoje = l.cargas.length > 0 && l.cargas.some((c) => c.status === 'pendente');
-    const naoEntregueOntem = ontem !== 'sim';
+    // Entrega parcial também conta como entrega: só 'nao' é falta.
+    const naoEntregueOntem = ontem === 'nao';
 
     let nivel;
     let acao;
@@ -116,11 +124,10 @@ export function getPlanejamentoDoDia(state, filtroTipoCarga, hoje = hojeISO()) {
           ? 'Iniciar o agrupamento'
           : 'Terminar a execução e agrupar';
       if (carregadaHoje === 'parcial') acao = `Saldo pendente — ${acao.charAt(0).toLowerCase()}${acao.slice(1)}`;
-      nivel = naoEntregueOntem || carregadaHoje === 'parcial' ? 'alta' : 'no_prazo';
+      // Entrega parcial (ontem ou hoje) conta como entrega: não vira prioridade alta.
+      nivel = naoEntregueOntem ? 'alta' : 'no_prazo';
       motivo = naoEntregueOntem
-        ? ontem === 'parcial'
-          ? 'Ontem saiu só parte da carga'
-          : 'Não foi entregue ontem'
+        ? 'Não foi entregue ontem'
         : carregadaHoje === 'parcial'
         ? 'Saiu só parte hoje — falta o saldo'
         : '';
@@ -134,9 +141,7 @@ export function getPlanejamentoDoDia(state, filtroTipoCarga, hoje = hojeISO()) {
         : 'Sem carga hoje — cobrar geração/importação da carga';
       nivel = naoEntregueOntem ? 'critica' : 'atencao';
       motivo = naoEntregueOntem
-        ? ontem === 'parcial'
-          ? 'Ontem saiu só parte da carga e hoje não há carga no box'
-          : tinhaCargaOntem
+        ? tinhaCargaOntem
           ? 'Faltou ontem (tinha carga) e hoje ainda não tem carga pronta'
           : 'Não foi entregue ontem e hoje ainda não tem carga pronta'
         : 'Sem carga em andamento — risco de ficar sem entrega hoje';
@@ -148,6 +153,7 @@ export function getPlanejamentoDoDia(state, filtroTipoCarga, hoje = hojeISO()) {
       nomeLoja: l.nomeLoja,
       tiposCarga: l.tiposCarga,
       andamento,
+      lugares,
       carregadaHoje,
       ontem,
       tinhaCargaOntem,

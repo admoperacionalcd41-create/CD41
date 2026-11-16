@@ -323,8 +323,12 @@ export function getLinhasProcessoDoDia(state, filtroTipoCarga) {
   // mesmo critério do chip do box (ver BoxCard.jsx): `paletesAgrupados` só
   // vale a partir de 'agrupada'; antes disso (apontada/em agrupamento) a
   // quantidade ainda não foi confirmada, então não aparece.
-  const boxAtualPorCodigo = new Map();
-  const paletesNoBoxPorCodigo = new Map();
+  // Pedido do usuário: se a MESMA loja está em dois (ou mais) lugares ao mesmo
+  // tempo (ex.: uma carga no Box 3 e outra no Box 9), a coluna mostra todos —
+  // por isso guarda uma lista de ocupações (uma por box) em vez de só a última
+  // encontrada. `boxAtual`/`paletesNoBox` continuam existindo (a primeira
+  // ocupação) por compatibilidade.
+  const ocupacoesPorCodigo = new Map();
   state.lojas.forEach((l) => {
     if (
       l.boxNumero != null &&
@@ -332,11 +336,15 @@ export function getLinhasProcessoDoDia(state, filtroTipoCarga) {
       l.status !== 'finalizada' &&
       lojaPassaFiltroTipoCarga(l, filtroTipoCarga)
     ) {
-      boxAtualPorCodigo.set(l.loja, l.boxNumero);
+      const lista = ocupacoesPorCodigo.get(l.loja) || [];
+      let ocupacao = lista.find((o) => o.boxNumero === l.boxNumero);
+      if (!ocupacao) {
+        ocupacao = { boxNumero: l.boxNumero, paletes: null };
+        lista.push(ocupacao);
+        ocupacoesPorCodigo.set(l.loja, lista);
+      }
       if ((l.status === 'agrupada' || l.status === 'carregando') && l.paletesAgrupados > 0) {
-        paletesNoBoxPorCodigo.set(l.loja, l.paletesAgrupados);
-      } else {
-        paletesNoBoxPorCodigo.delete(l.loja);
+        ocupacao.paletes = (ocupacao.paletes || 0) + l.paletesAgrupados;
       }
     }
   });
@@ -355,9 +363,10 @@ export function getLinhasProcessoDoDia(state, filtroTipoCarga) {
       const tiposCarga = cargas.length > 0 ? [...new Set(cargas.map((c) => c.tipoCarga))] : [info.tipoCarga];
       const apontamentoFeito = cargas.some((c) => c.apontada);
       const apontamentoContagem = cargas.filter((c) => c.apontada).length;
-      const boxAtual = boxAtualPorCodigo.get(codigo) ?? null;
-      const paletesNoBox = paletesNoBoxPorCodigo.get(codigo) ?? null;
-      const cargaNoBox = boxAtual != null;
+      const cargasNoBox = ocupacoesPorCodigo.get(codigo) || [];
+      const boxAtual = cargasNoBox[0]?.boxNumero ?? null;
+      const paletesNoBox = cargasNoBox[0]?.paletes ?? null;
+      const cargaNoBox = cargasNoBox.length > 0;
       const carregamentoFeito = cargas.some((c) => c.situacaoChave === 'completo' || c.situacaoChave === 'parcial');
       const carregamentoContagem = cargas.filter(
         (c) => c.situacaoChave === 'completo' || c.situacaoChave === 'parcial'
@@ -385,6 +394,7 @@ export function getLinhasProcessoDoDia(state, filtroTipoCarga) {
         apontamentoFeito,
         apontamentoContagem,
         cargaNoBox,
+        cargasNoBox,
         boxAtual,
         paletesNoBox,
         carregamentoFeito,

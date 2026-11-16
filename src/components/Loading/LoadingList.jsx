@@ -7,6 +7,8 @@ import {
   formatarHora,
   formatarDuracao,
   formatarData,
+  hojeISO,
+  formatarDiaSemanaCurto,
   paraDataHoraLocalInput,
   deDataHoraLocalInput,
 } from '../../utils/dateHelpers';
@@ -20,6 +22,7 @@ import EditarProtocoloModal from './EditarProtocoloModal.jsx';
 import CancelarProtocoloModal from './CancelarProtocoloModal.jsx';
 import TipoCargaBadge from '../Shared/TipoCargaBadge.jsx';
 import { lojaPassaFiltroTipoCarga } from '../../utils/tipoCarga';
+import { getJanelaDiaAnterior } from '../../utils/planejamentoDia';
 
 export default function LoadingList({ aoAbrirProtocolo, irPara }) {
   const { state, actions, filtroTipoCarga } = useApp();
@@ -88,14 +91,27 @@ export default function LoadingList({ aoAbrirProtocolo, irPara }) {
     () => getLojasEmCarregamento(state).filter((l) => lojaPassaFiltroTipoCarga(l, filtroTipoCarga)),
     [state, filtroTipoCarga]
   );
+  // Pedido do usuário: "Últimos Protocolos Registrados" mostra os de HOJE e do
+  // dia anterior; se "ontem" cai num fim de semana, volta até o último dia
+  // útil (segunda mostra sexta, sábado e domingo) — mesma janela do
+  // Planejamento (getJanelaDiaAnterior). Vale o dia em que o protocolo foi
+  // registrado (dataHora), não o dia de entrega de referência.
+  const hoje = hojeISO();
+  const diasProtocolos = useMemo(() => [...getJanelaDiaAnterior(hoje), hoje], [hoje]);
+  const periodoProtocolos = useMemo(() => {
+    const rotulo = (d) => `${formatarDiaSemanaCurto(d)} ${formatarData(d).slice(0, 5)}`;
+    const anteriores = diasProtocolos.slice(0, -1);
+    const ant = anteriores.length > 1 ? `${rotulo(anteriores[0])} a ${rotulo(anteriores[anteriores.length - 1])}` : rotulo(anteriores[0]);
+    return `Hoje (${rotulo(hoje)}) e ${anteriores.length > 1 ? 'dias anteriores' : 'ontem'} (${ant})`;
+  }, [diasProtocolos, hoje]);
   const ultimosProtocolos = useMemo(
     () =>
       state.protocolos
+        .filter((p) => p.dataHora && diasProtocolos.includes(p.dataHora.slice(0, 10)))
         .filter((p) => lojaPassaFiltroTipoCarga(state.lojas.find((l) => l.id === p.lojaId), filtroTipoCarga))
         .slice()
-        .sort((a, b) => new Date(b.dataHora) - new Date(a.dataHora))
-        .slice(0, 8),
-    [state.protocolos, state.lojas, filtroTipoCarga]
+        .sort((a, b) => new Date(b.dataHora) - new Date(a.dataHora)),
+    [state.protocolos, state.lojas, filtroTipoCarga, diasProtocolos]
   );
 
   // Conta quantos protocolos de cada viagem em lote existem, para indicar
@@ -411,7 +427,8 @@ export default function LoadingList({ aoAbrirProtocolo, irPara }) {
       </div>
 
       <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
-        <h2 className="mb-3 text-sm font-bold text-slate-700 dark:text-slate-200">Últimos Protocolos Registrados</h2>
+        <h2 className="text-sm font-bold text-slate-700 dark:text-slate-200">Últimos Protocolos Registrados</h2>
+        <p className="mb-3 text-xs text-slate-400 dark:text-slate-500" data-testid="periodo-protocolos">{periodoProtocolos}</p>
         {statusImpressao === 'ok' && (
           <div className="mb-3 flex items-start gap-2 rounded-lg bg-blue-50 p-3 text-xs text-blue-700 dark:border dark:border-current dark:bg-blue-500/10 dark:text-blue-300">
             <Info size={14} className="mt-0.5 flex-shrink-0" />
@@ -443,7 +460,7 @@ export default function LoadingList({ aoAbrirProtocolo, irPara }) {
           </div>
         )}
         {ultimosProtocolos.length === 0 ? (
-          <p className="text-sm text-slate-400 dark:text-slate-500">Nenhum protocolo registrado ainda.</p>
+          <p className="text-sm text-slate-400 dark:text-slate-500">Nenhum protocolo registrado neste período.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">

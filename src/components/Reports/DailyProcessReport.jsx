@@ -38,9 +38,11 @@ function formatarNumeroBR(valor) {
 // algum lugar.
 // Rótulo da coluna "Cargas em Andamento": nome do box e, quando a carga já
 // foi agrupada, a quantidade de paletes (ex.: "Box 9 (blocado) · 12 pal.").
-function rotuloCargaNoBox(loja) {
-  const nome = getNomeBox(loja.boxAtual);
-  return loja.paletesNoBox ? `${nome} · ${loja.paletesNoBox} pal.` : nome;
+// Loja em mais de um lugar ao mesmo tempo (ex.: uma carga no Box 3 e outra no
+// Box 9): cada lugar vira um selo, um embaixo do outro.
+function rotulosCargaNoBox(loja) {
+  const lista = loja.cargasNoBox?.length ? loja.cargasNoBox : [{ boxNumero: loja.boxAtual, paletes: loja.paletesNoBox }];
+  return lista.map((o) => (o.paletes ? `${getNomeBox(o.boxNumero)} · ${o.paletes} pal.` : getNomeBox(o.boxNumero)));
 }
 
 function Selo({ feito, rotuloFeito = 'Feito', rotuloPendente = 'Pendente' }) {
@@ -55,6 +57,17 @@ function Selo({ feito, rotuloFeito = 'Feito', rotuloPendente = 'Pendente' }) {
       {feito ? <CheckCircle2 size={12} /> : <XCircle size={12} />}
       {feito ? rotuloFeito : rotuloPendente}
     </span>
+  );
+}
+
+function SelosCargaNoBox({ loja }) {
+  if (!loja.cargaNoBox) return <Selo feito={false} rotuloPendente="Vazio" />;
+  return (
+    <div className="flex flex-col items-center gap-1" data-testid="cargas-no-box">
+      {rotulosCargaNoBox(loja).map((rotulo) => (
+        <Selo key={rotulo} feito rotuloFeito={rotulo} />
+      ))}
+    </div>
   );
 }
 
@@ -602,11 +615,7 @@ export default function DailyProcessReport() {
                         />
                       </td>
                       <td className="px-2 py-1.5 text-center">
-                        <Selo
-                          feito={loja.cargaNoBox}
-                          rotuloFeito={rotuloCargaNoBox(loja)}
-                          rotuloPendente="Vazio"
-                        />
+                        <SelosCargaNoBox loja={loja} />
                       </td>
                       <td className="py-1.5 pr-3">
                         <div className="flex flex-wrap items-center gap-1.5">
@@ -729,11 +738,7 @@ export default function DailyProcessReport() {
                         }`}
                       >
                         <td className="px-2 py-1.5 text-center">
-                          <Selo
-                            feito={loja.cargaNoBox}
-                            rotuloFeito={rotuloCargaNoBox(loja)}
-                            rotuloPendente="Vazio"
-                          />
+                          <SelosCargaNoBox loja={loja} />
                         </td>
                         <td className="py-1.5 pl-3 pr-3">
                           <div className="flex flex-wrap items-center gap-1.5">
